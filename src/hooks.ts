@@ -7,7 +7,7 @@ import { State, Event, ProgressState } from './interfaces'
 export const usePlaybackState = () => {
   const [state, setState] = useState(State.None)
   const isUnmountedRef = useRef(true)
-
+  console.log("test")
   useEffect(() => {
     isUnmountedRef.current = false
     return () => {

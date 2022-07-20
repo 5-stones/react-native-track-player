@@ -2,7 +2,7 @@
 sidebar_position: 8
 ---
 
-# Core Team  ✨
+# Core Team  ✨✨
 
 <table>
   <tr>
