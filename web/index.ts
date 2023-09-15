@@ -1,4 +1,4 @@
 import {TrackPlayerModule} from './TrackPlayerModule';
 
-const module = new TrackPlayerModule();
-export default module;
+const TrackPlayer = new TrackPlayerModule();
+export default TrackPlayer;
