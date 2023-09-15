@@ -37,6 +37,12 @@ export class Player {
     // shaka only runs in a browser
     if (typeof window === 'undefined') return;
 
+    // Prevent the creation of multiple instances by checking if 'window.rntp' is already available.  
+    // @ts-expect-error Not defined global
+    if (typeof window.rntp !== "undefined") {
+      return true;
+    }
+
     // @ts-ignore
     const shaka = await import('shaka-player/dist/shaka-player.ui');
     // Install built-in polyfills to patch browser incompatibilities.
