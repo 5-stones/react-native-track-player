@@ -74,6 +74,7 @@ export class Player {
     this.element.addEventListener('pause', () => this.onTrackPaused());
     this.player!.addEventListener('loading', () => this.onTrackLoading());
     this.player!.addEventListener('loaded', () => this.onTrackLoaded());
+    this.player!.addEventListener('unloading', () => this.onUnloading());
     this.player!.addEventListener('buffering', ({ buffering }: any) => {
       if (buffering === true) {
         this.onTrackBuffering();
@@ -106,6 +107,9 @@ export class Player {
   }
   protected async onTrackEnded() {
     this.state = { state: State.Ended };
+  }
+  protected async onUnloading() {
+    this.state = { state: State.Stopped };
   }
   protected onError(error: any) {
     this.state = {
