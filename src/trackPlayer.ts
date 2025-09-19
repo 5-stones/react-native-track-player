@@ -13,8 +13,8 @@ import type {
   TrackMetadataBase,
   UpdateOptions,
 } from './interfaces';
-import resolveAssetSource from './resolveAssetSource';
 import TrackPlayer from './NativeTrackPlayer';
+import resolveAssetSource from './resolveAssetSource';
 
 const isAndroid = Platform.OS === 'android';
 const emitter = new NativeEventEmitter(TrackPlayer);
@@ -25,14 +25,22 @@ function resolveImportedAssetOrPath(pathOrAsset: string | number | undefined) {
   return pathOrAsset === undefined
     ? undefined
     : typeof pathOrAsset === 'string'
-      ? pathOrAsset
-      : resolveImportedAsset(pathOrAsset);
+    ? pathOrAsset
+    : resolveImportedAsset(pathOrAsset);
 }
 
 function resolveImportedAsset(id?: number) {
   return id
-    ? ((resolveAssetSource(id) as { uri: string } | null) ?? undefined)
+    ? (resolveAssetSource(id) as { uri: string } | null) ?? undefined
     : undefined;
+}
+
+function resolveTrackAssets(track: AddTrack) {
+  return {
+    ...track,
+    url: resolveImportedAssetOrPath(track.url),
+    artwork: resolveImportedAssetOrPath(track.artwork),
+  };
 }
 
 // MARK: - General API
@@ -99,16 +107,10 @@ export async function add(
   tracks: AddTrack | AddTrack[],
   insertBeforeIndex = -1
 ): Promise<number | void> {
-  const resolvedTracks = (Array.isArray(tracks) ? tracks : [tracks]).map(
-    (track) => ({
-      ...track,
-      url: resolveImportedAssetOrPath(track.url),
-      artwork: resolveImportedAssetOrPath(track.artwork),
-    })
-  );
-  return resolvedTracks.length < 1
+  const addTracks = Array.isArray(tracks) ? tracks : [tracks];
+  return addTracks.length < 1
     ? undefined
-    : TrackPlayer.add(resolvedTracks, insertBeforeIndex);
+    : TrackPlayer.add(addTracks.map(resolveTrackAssets), insertBeforeIndex);
 }
 
 /**
@@ -117,7 +119,7 @@ export async function add(
  * @param track The track to load.
  */
 export async function load(track: Track): Promise<number | void> {
-  return TrackPlayer.load(track);
+  return TrackPlayer.load(resolveTrackAssets(track));
 }
 
 /**
