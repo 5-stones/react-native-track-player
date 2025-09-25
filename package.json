@@ -50,16 +50,18 @@
     }
   ],
   "scripts": {
+    "build": "yarn prepare",
+    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
     "example": "yarn workspace react-native-track-player-example",
-    "test": "jest",
-    "typecheck": "tsc",
-    "lint": "eslint src web --max-warnings=0",
     "format": "prettier --check src web",
     "format:fix": "prettier --write src web",
-    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
-    "build": "yarn prepare",
+    "ide:android": "cd example/android && open -a 'Android Studio' .",
+    "ide:ios": "cd example/ios && open TrackPlayerExample.xcworkspace",
+    "lint": "eslint src web --max-warnings=0",
     "prepare": "bob build",
-    "release": "release-it --only-version"
+    "release": "release-it --only-version",
+    "test": "jest",
+    "typecheck": "tsc"
   },
   "keywords": [
     "react",
