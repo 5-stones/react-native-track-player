@@ -4,49 +4,43 @@ import { type UnsafeObject } from 'react-native/Libraries/Types/CodegenTypes';
 export interface Spec extends TurboModule {
   // init and config
   setupPlayer(options: UnsafeObject): Promise<void>;
-  updateOptions(options: UnsafeObject): Promise<void>;
+  updateOptions(options: UnsafeObject): void;
 
   // player api
-  load(track: UnsafeObject): Promise<number | void>;
-  reset(): Promise<void>;
-  play(): Promise<void>;
-  pause(): Promise<void>;
-  stop(): Promise<void>;
-  setPlayWhenReady(playWhenReady: boolean): Promise<boolean>;
-  getPlayWhenReady(): Promise<boolean>;
-  seekTo(position: number): Promise<void>;
-  seekBy(offset: number): Promise<void>;
-  setVolume(level: number): Promise<void>;
-  getVolume(): Promise<number>;
-  setRate(rate: number): Promise<void>;
-  getRate(): Promise<number>;
-  getProgress(): Promise<UnsafeObject>;
-  getPlaybackState(): Promise<UnsafeObject>;
-  retry(): Promise<void>;
+  load(track: UnsafeObject): void;
+  reset(): void;
+  play(): void;
+  pause(): void;
+  stop(): void;
+  setPlayWhenReady(playWhenReady: boolean): void;
+  getPlayWhenReady(): boolean;
+  seekTo(position: number): void;
+  seekBy(offset: number): void;
+  setVolume(level: number): void;
+  getVolume(): number;
+  setRate(rate: number): void;
+  getRate(): number;
+  getProgress(): UnsafeObject;
+  getPlaybackState(): UnsafeObject;
+  retry(): void;
 
   // playlist management
-  add(
-    tracks: UnsafeObject[],
-    insertBeforeIndex?: number
-  ): Promise<number | void>;
-  move(fromIndex: number, toIndex: number): Promise<void>;
-  remove(indexes: number[]): Promise<void>;
-  removeUpcomingTracks(): Promise<void>;
-  skip(index: number, initialPosition?: number): Promise<void>;
-  skipToNext(initialPosition?: number): Promise<void>;
-  skipToPrevious(initialPosition?: number): Promise<void>;
-  updateMetadataForTrack(
-    trackIndex: number,
-    metadata: UnsafeObject
-  ): Promise<void>;
-  updateNowPlayingMetadata(metadata: UnsafeObject): Promise<void>;
-  setQueue(tracks: UnsafeObject[]): Promise<void>;
-  getQueue(): Promise<UnsafeObject[]>;
-  setRepeatMode(mode: number): Promise<number>;
-  getRepeatMode(): Promise<number>;
-  getTrack(index: number): Promise<UnsafeObject | undefined>;
-  getActiveTrackIndex(): Promise<number | undefined>;
-  getActiveTrack(): Promise<UnsafeObject | undefined>;
+  add(tracks: UnsafeObject[], insertBeforeIndex?: number): number;
+  move(fromIndex: number, toIndex: number): void;
+  remove(indexes: number[]): void;
+  removeUpcomingTracks(): void;
+  skip(index: number, initialPosition?: number): void;
+  skipToNext(initialPosition?: number): void;
+  skipToPrevious(initialPosition?: number): void;
+  updateMetadataForTrack(trackIndex: number, metadata: UnsafeObject): void;
+  updateNowPlayingMetadata(metadata: UnsafeObject): void;
+  setQueue(tracks: UnsafeObject[]): void;
+  getQueue(): UnsafeObject[];
+  setRepeatMode(mode: number): void;
+  getRepeatMode(): number;
+  getTrack(index: number): UnsafeObject | undefined;
+  getActiveTrackIndex(): number | undefined;
+  getActiveTrack(): UnsafeObject | undefined;
 
   // event listeners
   addListener(eventName: string): void;
@@ -97,9 +91,9 @@ export interface Spec extends TurboModule {
   };
 
   // android methods
-  acquireWakeLock(): Promise<void>;
-  abandonWakeLock(): Promise<void>;
-  validateOnStartCommandIntent(): Promise<boolean>;
+  acquireWakeLock(): void;
+  abandonWakeLock(): void;
+  validateOnStartCommandIntent(): boolean;
 }
 
 const module = TurboModuleRegistry.getEnforcing<Spec>('TrackPlayer');
