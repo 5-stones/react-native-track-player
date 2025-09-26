@@ -40,7 +40,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   private var isServiceBound = false
   private var playerSetUpPromise: Promise? = null
   private val mainScope = MainScope()
-  private lateinit var musicService: MusicService
+  private lateinit var service: MusicService
   private val context = reactContext
 
   @Nonnull
@@ -66,13 +66,13 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     AppForegroundTracker.start()
   }
 
-  override fun onServiceConnected(name: ComponentName, service: IBinder) {
+  override fun onServiceConnected(name: ComponentName, serviceBinder: IBinder) {
     launchInScope {
       // If a binder already exists, don't get a new one
-      if (!::musicService.isInitialized) {
-        val binder: MusicService.MusicBinder = service as MusicService.MusicBinder
-        musicService = binder.service
-        musicService.setupPlayer(playerOptions)
+      if (!::service.isInitialized) {
+        val binder: MusicService.MusicBinder = serviceBinder as MusicService.MusicBinder
+        service = binder.service
+        service.setupPlayer(playerOptions)
         playerSetUpPromise?.resolve(null)
       }
 
@@ -91,7 +91,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
 
   private fun bundleToTrack(bundle: Bundle): Track {
-    return Track(context, bundle, musicService.ratingType)
+    return Track(context, bundle, service.ratingType)
   }
 
 
@@ -206,7 +206,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     val options = Arguments.toBundle(data)
 
     options?.let {
-      musicService.updateOptions(it)
+      service.updateOptions(it)
     }
   }
 
@@ -218,11 +218,11 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     val insertBeforeIndexInt = insertBeforeIndex?.toInt() ?: 0
     val tracks = readableArrayToTrackList(data)
-    if (insertBeforeIndexInt < -1 || insertBeforeIndexInt > musicService.tracks.size) {
+    if (insertBeforeIndexInt < -1 || insertBeforeIndexInt > service.tracks.size) {
       throw Exception("The track index is out of bounds")
     }
-    val index = if (insertBeforeIndexInt == -1) musicService.tracks.size else insertBeforeIndexInt
-    musicService.add(tracks, index)
+    val index = if (insertBeforeIndexInt == -1) service.tracks.size else insertBeforeIndexInt
+    service.add(tracks, index)
     index.toDouble()
   }
 
@@ -232,7 +232,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     val bundle = Arguments.toBundle(data)
     if (bundle is Bundle) {
-      musicService.load(bundleToTrack(bundle))
+      service.load(bundleToTrack(bundle))
     } else {
       throw Exception("Track was not a dictionary type")
     }
@@ -240,14 +240,14 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
   override fun move(fromIndex: Double, toIndex: Double) = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.move(fromIndex.toInt(), toIndex.toInt())
+    service.move(fromIndex.toInt(), toIndex.toInt())
   }
 
   override fun remove(data: ReadableArray?) = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
     val inputIndexes = Arguments.toList(data)
     if (inputIndexes != null) {
-      val size = musicService.tracks.size
+      val size = service.tracks.size
       val indexes: ArrayList<Int> = ArrayList()
       for (inputIndex in inputIndexes) {
         val index = if (inputIndex is Int) inputIndex else inputIndex.toString().toInt()
@@ -256,178 +256,176 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
         }
         indexes.add(index)
       }
-      musicService.remove(indexes)
+      service.remove(indexes)
     }
   }
 
   override fun updateMetadataForTrack(index: Double, map: ReadableMap?): Unit = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
 
-    if (index < 0 || index >= musicService.tracks.size) {
+    if (index < 0 || index >= service.tracks.size) {
       throw Exception("The index is out of bounds")
     }
 
     Arguments.toBundle(map)?.let {
-      musicService.updateMetadataForTrack(index.toInt(), it)
+      service.updateMetadataForTrack(index.toInt(), it)
     }
   }
 
   override fun updateNowPlayingMetadata(map: ReadableMap?): Unit = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
 
-    if (musicService.tracks.isEmpty()) {
+    if (service.tracks.isEmpty()) {
       throw Exception("There is no current item in the player")
     }
 
     Arguments.toBundle(map)?.let {
-      musicService.updateNowPlayingMetadata(it)
+      service.updateNowPlayingMetadata(it)
     }
   }
 
   override fun removeUpcomingTracks() = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.removeUpcomingTracks()
+    service.removeUpcomingTracks()
   }
 
   override fun skip(index: Double, initialTime: Double?) = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
 
-    musicService.skip(index.toInt())
+    service.skip(index.toInt())
 
     if (initialTime != null && initialTime >= 0) {
-      musicService.seekTo(initialTime.toFloat())
+      service.seekTo(initialTime.toFloat())
     }
   }
 
   override fun skipToNext(initialTime: Double?) = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
 
-    musicService.skipToNext()
+    service.skipToNext()
 
     if (initialTime != null && initialTime >= 0) {
-      musicService.seekTo(initialTime.toFloat())
+      service.seekTo(initialTime.toFloat())
     }
   }
 
   override fun skipToPrevious(initialTime: Double?) = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
 
-    musicService.skipToPrevious()
+    service.skipToPrevious()
 
     if (initialTime != null && initialTime >= 0) {
-      musicService.seekTo(initialTime.toFloat())
+      service.seekTo(initialTime.toFloat())
     }
   }
 
   override fun reset() = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
 
-    musicService.stop()
+    service.stop()
     delay(300) // Allow playback to stop
-    musicService.clear()
+    service.clear()
   }
 
   override fun play() = runBlockingOnMain {
     if (!isServiceBound) return@runBlockingOnMain
-
-    musicService.play()
+    service.play()
   }
 
   override fun pause() = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.pause()
+    service.pause()
   }
 
   override fun stop() = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.stop()
+    service.stop()
   }
 
   override fun seekTo(seconds: Double) = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.seekTo(seconds.toFloat())
+    service.seekTo(seconds.toFloat())
   }
 
   override fun seekBy(offset: Double) = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.seekBy(offset.toFloat())
+    service.seekBy(offset.toFloat())
   }
 
   override fun retry() = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.retry()
+    service.retry()
   }
 
   override fun setVolume(volume: Double) = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.setVolume(volume.toFloat())
+    service.setVolume(volume.toFloat())
   }
 
   override fun getVolume(): Double = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.getVolume().toDouble()
+    service.getVolume().toDouble()
   }
 
   override fun setRate(rate: Double) = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.setRate(rate.toFloat())
+    service.setRate(rate.toFloat())
   }
 
   override fun getRate(): Double = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.getRate().toDouble()
+    service.getRate().toDouble()
   }
 
   override fun setRepeatMode(mode: Double) = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.setRepeatMode(RepeatMode.fromOrdinal(mode.toInt()))
+    service.setRepeatMode(RepeatMode.fromOrdinal(mode.toInt()))
   }
 
   override fun getRepeatMode(): Double = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.getRepeatMode().ordinal.toDouble()
+    service.getRepeatMode().ordinal.toDouble()
   }
 
   override fun setPlayWhenReady(playWhenReady: Boolean) = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.playWhenReady = playWhenReady
+    service.playWhenReady = playWhenReady
   }
 
   override fun getPlayWhenReady(): Boolean = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.playWhenReady
+    service.playWhenReady
   }
 
   override fun getTrack(index: Double): WritableMap? = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-
     val indexInt = index.toInt()
-    if (indexInt >= 0 && indexInt < musicService.tracks.size) {
-      Arguments.fromBundle(musicService.tracks[indexInt].originalItem)
+    if (indexInt >= 0 && indexInt < service.tracks.size) {
+      Arguments.fromBundle(service.tracks[indexInt].originalItem)
     } else {
       null
     }
   }
 
   override fun getQueue(): WritableArray = runBlockingOnMain {
-    Arguments.fromList(musicService.tracks.map { it.originalItem })
+    Arguments.fromList(service.tracks.map { it.originalItem })
   }
 
   override fun setQueue(data: ReadableArray?) = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
 
-    musicService.clear()
-    musicService.add(readableArrayToTrackList(data))
+    service.clear()
+    service.add(readableArrayToTrackList(data))
   }
 
   override fun getActiveTrackIndex(): Double? = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    if (musicService.tracks.isEmpty()) null else musicService.getCurrentTrackIndex().toDouble()
+    if (service.tracks.isEmpty()) null else service.getCurrentTrackIndex().toDouble()
   }
 
   override fun getActiveTrack(): WritableMap? = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.currentTrack?.let {
+    service.currentTrack?.let {
       Arguments.fromBundle(it.originalItem)
     }
   }
@@ -435,30 +433,30 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   override fun getProgress(): WritableMap = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
     val bundle = Bundle()
-    bundle.putDouble("duration", musicService.getDurationInSeconds())
-    bundle.putDouble("position", musicService.getPositionInSeconds())
-    bundle.putDouble("buffered", musicService.getBufferedPositionInSeconds())
+    bundle.putDouble("duration", service.getDurationInSeconds())
+    bundle.putDouble("position", service.getPositionInSeconds())
+    bundle.putDouble("buffered", service.getBufferedPositionInSeconds())
     Arguments.fromBundle(bundle)
   }
 
   override fun getPlaybackState(): WritableMap = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    Arguments.fromBundle(musicService.getPlayerStateBundle(musicService.state))
+    Arguments.fromBundle(service.getPlayerStateBundle(service.state))
   }
 
   override fun acquireWakeLock() = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.acquireWakeLock()
+    service.acquireWakeLock()
   }
 
   override fun abandonWakeLock() = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.abandonWakeLock()
+    service.abandonWakeLock()
   }
 
   override fun validateOnStartCommandIntent(): Boolean = runBlockingOnMain {
     if (!isServiceBound) throw Exception("Player not initialized")
-    musicService.onStartCommandIntentValid
+    service.onStartCommandIntentValid
   }
 
   // Bridgeless interop layer tries to pass the `Job` from `scope.launch` to the JS side
