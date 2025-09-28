@@ -1,5 +1,5 @@
 #import "TrackPlayer.h"
-#import <React/RCTEventEmitter.h>
+#import <ReactCommon/RCTTurboModule.h>
 
 #if __has_include("react_native_track_player-Swift.h")
 #import "react_native_track_player-Swift.h"
@@ -26,181 +26,261 @@ RCT_EXPORT_MODULE()
   return self;
 }
 
+
++ (BOOL)requiresMainQueueSetup {
+  return NO;
+}
+
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
     (const facebook::react::ObjCTurboModule::InitParams &)params
 {
     return std::make_shared<facebook::react::NativeTrackPlayerSpecJSI>(params);
 }
 
-+ (BOOL)requiresMainQueueSetup {
-  return NO;
-}
 
-
-- (void)add:(nonnull NSArray *)tracks insertBeforeIndex:(nonnull NSNumber *)insertBeforeIndex resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer addWithTrackDicts:tracks before:insertBeforeIndex resolve:resolve reject:reject];
+- (NSNumber *)add:(NSArray *)tracks insertBeforeIndex:(NSNumber *)insertBeforeIndex {
+  NSInteger result = [nativeTrackPlayer addWithTrackDicts:tracks before:insertBeforeIndex];
+  return @(result);
 }
 
 - (nonnull facebook::react::ModuleConstants<JS::NativeTrackPlayer::Constants::Builder>)constantsToExport {
   return [NativeTrackPlayerImpl constantsToExport];
 }
 
-- (void)getActiveTrack:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer getActiveTrackWithResolve:resolve reject:reject];
+- (NSDictionary * _Nullable)getActiveTrack {
+  return [nativeTrackPlayer getActiveTrack];
 }
 
-- (void)getActiveTrackIndex:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer getActiveTrackIndexWithResolve:resolve reject:reject];
+- (NSNumber * _Nullable)getActiveTrackIndex {
+  return [nativeTrackPlayer getActiveTrackIndex];
 }
 
 - (nonnull facebook::react::ModuleConstants<JS::NativeTrackPlayer::Constants::Builder>)getConstants {
   return [self constantsToExport];
 }
 
-- (void)getPlayWhenReady:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer getPlayWhenReadyWithResolve:resolve reject:reject];
+- (NSNumber *)getPlayWhenReady {
+  return @([nativeTrackPlayer getPlayWhenReady]);
 }
 
-- (void)getPlaybackState:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer getPlaybackStateWithResolve:resolve reject:reject];
+- (NSDictionary *)getPlaybackState {
+  return [nativeTrackPlayer getPlaybackState];
 }
 
-- (void)getProgress:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer getProgressWithResolve:resolve reject:reject];
+- (NSDictionary *)getProgress {
+  return [nativeTrackPlayer getProgress];
 }
 
-- (void)getQueue:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer getQueueWithResolve:resolve reject:reject];
+- (NSArray<NSDictionary *> *)getQueue {
+  return [nativeTrackPlayer getQueue];
 }
 
-- (void)getRate:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer getRateWithResolve:resolve reject:reject];
+- (NSNumber *)getRate {
+  return @([nativeTrackPlayer getRate]);
 }
 
-- (void)getRepeatMode:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer getRepeatModeWithResolve:resolve reject:reject];
+- (NSNumber *)getRepeatMode {
+  return @([nativeTrackPlayer getRepeatMode]);
 }
 
-- (void)getTrack:(double)index resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer getTrackWithIndex:index resolve:resolve reject:reject];
+- (NSDictionary * _Nullable)getTrack:(double)index {
+  return [nativeTrackPlayer getTrackWithIndex:index];
 }
 
-- (void)getVolume:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer getVolumeWithResolve:resolve reject:reject];
+- (NSNumber *)getVolume {
+  return @([nativeTrackPlayer getVolume]);
 }
 
-- (void)load:(nonnull NSDictionary *)track resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer loadWithTrackDict:track resolve:resolve reject:reject];
+- (void)load:(NSDictionary *)track {
+  [nativeTrackPlayer loadWithTrackDict:track];
 }
 
-- (void)move:(double)fromIndex toIndex:(double)toIndex resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer moveFromIndex:fromIndex toIndex:toIndex resolve:resolve reject:reject];
+- (void)move:(double)fromIndex toIndex:(double)toIndex {
+  [nativeTrackPlayer moveFromIndex:(int)fromIndex toIndex:(int)toIndex];
 }
 
-- (void)pause:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer pauseWithResolve:resolve reject:reject];
+- (void)pause {
+  [nativeTrackPlayer pause];
 }
 
-- (void)play:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer playWithResolve:resolve reject:reject];
+- (void)play {
+  [nativeTrackPlayer play];
 }
 
-- (void)remove:(nonnull NSArray *)indexes resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer removeWithTracks:indexes resolve:resolve reject:reject];
+- (void)remove:(NSArray *)indexes {
+  [nativeTrackPlayer removeWithTracks:indexes];
 }
 
-- (void)removeUpcomingTracks:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer removeUpcomingTracksWithResolve:resolve reject:reject];
+- (void)removeUpcomingTracks {
+  [nativeTrackPlayer removeUpcomingTracks];
 }
 
-- (void)reset:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer resetWithResolve:resolve reject:reject];
+- (void)reset {
+  [nativeTrackPlayer reset];
 }
 
-- (void)retry:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer retryWithResolve:resolve reject:reject];
+- (void)retry {
+  [nativeTrackPlayer retry];
 }
 
-- (void)seekBy:(double)offset resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer seekByOffset:offset resolve:resolve reject:reject];
+- (void)seekBy:(double)offset {
+  [nativeTrackPlayer seekByOffset:offset];
 }
 
-- (void)seekTo:(double)position resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer seekToTime:position resolve:resolve reject:reject];
+- (void)seekTo:(double)position {
+  [nativeTrackPlayer seekToTime:position];
 }
 
-- (void)setPlayWhenReady:(BOOL)playWhenReady resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer setPlayWhenReadyWithPlayWhenReady:playWhenReady resolve:resolve reject:reject];
+- (void)setPlayWhenReady:(BOOL)playWhenReady {
+  [nativeTrackPlayer setPlayWhenReadyWithPlayWhenReady:playWhenReady];
 }
 
-- (void)setQueue:(nonnull NSArray *)tracks resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer setQueueWithTrackDicts:tracks resolve:resolve reject:reject];
+- (void)setQueue:(NSArray *)tracks {
+  [nativeTrackPlayer setQueueWithTrackDicts:tracks];
 }
 
-- (void)setRate:(double)rate resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer setRateWithRate:rate resolve:resolve reject:reject];
+- (void)setRate:(double)rate {
+  [nativeTrackPlayer setRateWithRate:rate];
 }
 
-- (void)setRepeatMode:(double)mode resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer setRepeatModeWithRepeatMode:@(mode) resolve:resolve reject:reject];
+- (void)setRepeatMode:(double)mode {
+  [nativeTrackPlayer setRepeatModeWithRepeatMode:@(mode)];
 }
 
-- (void)setVolume:(double)level resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer setVolumeWithLevel:level resolve:resolve reject:reject];
+- (void)setVolume:(double)level {
+  [nativeTrackPlayer setVolumeWithLevel:level];
 }
 
-- (void)setupPlayer:(nonnull NSDictionary *)options resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
+- (void)setupPlayer:(NSDictionary *)options resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
   [nativeTrackPlayer setupPlayer:options resolver:resolve rejecter:reject];
 }
 
-- (void)skip:(double)index initialPosition:(nonnull NSNumber *)initialPosition resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer skipTo:index initialTime:initialPosition.doubleValue resolve:resolve reject:reject];
+- (void)skip:(double)index initialPosition:(NSNumber *)initialPosition {
+  [nativeTrackPlayer skipTo:(int)index initialTime:initialPosition.doubleValue];
 }
 
-- (void)skipToNext:(nonnull NSNumber *)initialPosition resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer skipToNextWithInitialTime:initialPosition.doubleValue resolve:resolve reject:reject];
+- (void)skipToNext:(NSNumber *)initialPosition {
+  [nativeTrackPlayer skipToNextWithInitialTime:initialPosition.doubleValue];
 }
 
-- (void)skipToPrevious:(nonnull NSNumber *)initialPosition resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer skipToPreviousWithInitialTime:initialPosition.doubleValue resolve:resolve reject:reject];
+- (void)skipToPrevious:(NSNumber *)initialPosition {
+  [nativeTrackPlayer skipToPreviousWithInitialTime:initialPosition.doubleValue];
 }
 
-- (void)stop:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer stopWithResolve:resolve reject:reject];
+- (void)stop {
+  [nativeTrackPlayer stop];
 }
 
-- (void)updateMetadataForTrack:(double)trackIndex metadata:(nonnull NSDictionary *)metadata resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer updateMetadataFor:trackIndex metadata:metadata resolve:resolve reject:reject];
+- (void)updateMetadataForTrack:(double)trackIndex metadata:(NSDictionary *)metadata {
+  [nativeTrackPlayer updateMetadataFor:(int)trackIndex metadata:metadata];
 }
 
-- (void)updateNowPlayingMetadata:(nonnull NSDictionary *)metadata resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer updateNowPlayingMetadataWithMetadata:metadata resolve:resolve reject:reject];
+- (void)updateNowPlayingMetadata:(NSDictionary *)metadata {
+  [nativeTrackPlayer updateNowPlayingMetadataWithMetadata:metadata];
 }
 
-- (void)updateOptions:(nonnull NSDictionary *)options resolve:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  [nativeTrackPlayer updateOptions:options resolver:resolve rejecter:reject];
+- (void)updateOptions:(NSDictionary *)options {
+  [nativeTrackPlayer updateOptionsSyncWithOptions:options];
 }
 
 // event listeners
-- (void)sendEvent:(NSString *)name body:(id)body {
-  [super sendEventWithName:name body:body];
+- (void)addListener:(NSString *)eventName {
+  // Event listeners are managed by RCTEventEmitter automatically
 }
 
-- (NSArray<NSString *> *)supportedEvents {
-  return [NativeTrackPlayerImpl supportedEvents];
+- (void)removeListeners:(double)count {
+  // Event listeners are managed by RCTEventEmitter automatically
 }
+
+- (void)emitPlaybackState:(NSDictionary *)body {
+  [self emitOnPlaybackState:body];
+}
+
+- (void)emitPlaybackActiveTrackChanged:(NSDictionary *)body {
+  [self emitOnPlaybackActiveTrackChanged:body];
+}
+
+- (void)emitPlaybackProgressUpdated:(NSDictionary *)body {
+  [self emitOnPlaybackProgressUpdated:body];
+}
+
+- (void)emitPlaybackPlayWhenReadyChanged:(NSDictionary *)body {
+  [self emitOnPlaybackPlayWhenReadyChanged:body];
+}
+
+- (void)emitPlaybackQueueEnded:(NSDictionary *)body {
+  [self emitOnPlaybackQueueEnded:body];
+}
+
+- (void)emitPlaybackError:(NSDictionary *)body {
+  [self emitOnPlaybackError:body];
+}
+
+- (void)emitRemotePlay:(NSDictionary *)body {
+  [self emitOnRemotePlay:body];
+}
+
+- (void)emitRemotePause:(NSDictionary *)body {
+  [self emitOnRemotePause:body];
+}
+
+- (void)emitRemoteNext:(NSDictionary *)body {
+  [self emitOnRemoteNext:body];
+}
+
+- (void)emitRemotePrevious:(NSDictionary *)body {
+  [self emitOnRemotePrevious:body];
+}
+
+- (void)emitRemoteSeek:(NSDictionary *)body {
+  [self emitOnRemoteSeek:body];
+}
+
+- (void)emitRemoteJumpForward:(NSDictionary *)body {
+  [self emitOnRemoteJumpForward:body];
+}
+
+- (void)emitRemoteJumpBackward:(NSDictionary *)body {
+  [self emitOnRemoteJumpBackward:body];
+}
+
+- (void)emitRemoteDuck:(NSDictionary *)body {
+  [self emitOnRemoteDuck:body];
+}
+
+- (void)emitRemoteStop:(NSDictionary *)body {
+  [self emitOnRemoteStop:body];
+}
+
+- (void)emitRemoteSetRating:(NSDictionary *)body {
+  [self emitOnRemoteSetRating:body];
+}
+
+- (void)emitMetadataTimedReceived:(NSDictionary *)body {
+  [self emitOnMetadataTimedReceived:body];
+}
+
+- (void)emitMetadataCommonReceived:(NSDictionary *)body {
+  [self emitOnMetadataCommonReceived:body];
+}
+
+- (void)emitPlaybackMetadata:(NSDictionary *)body {
+  [self emitOnPlaybackMetadata:body];
+}
+
+
 
 /*****************************************
  * Android Only Methods (Stubs)
  *****************************************/
-- (void)validateOnStartCommandIntent:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  resolve(@(YES));
+- (NSNumber *)validateOnStartCommandIntent {
+  return @(YES);
 }
-- (void)abandonWakeLock:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  resolve(nil);
+- (void)abandonWakeLock {
+  // iOS doesn't need wake lock management
 }
-- (void)acquireWakeLock:(nonnull RCTPromiseResolveBlock)resolve reject:(nonnull RCTPromiseRejectBlock)reject {
-  resolve(nil);
+- (void)acquireWakeLock {
+  // iOS doesn't need wake lock management
 }
 
 @end

@@ -45,12 +45,46 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
     }
 
     deinit {
-        reset(resolve: { _ in }, reject: { _, _, _  in })
+        reset()
     }
 
-    // MARK: - RCTEventEmitter
+    // MARK: - Event Emission
     private func emit(event: EventType, body: Any? = nil) {
-        delegate?.sendEvent(name: event.rawValue, body: body)
+        let bodyDict = body as? [String: Any] ?? [:]
+
+        switch event {
+        case .PlaybackState:
+            delegate?.emitPlaybackState(bodyDict)
+        case .PlaybackActiveTrackChanged:
+            delegate?.emitPlaybackActiveTrackChanged(bodyDict)
+        case .PlaybackProgressUpdated:
+            delegate?.emitPlaybackProgressUpdated(bodyDict)
+        case .PlaybackPlayWhenReadyChanged:
+            delegate?.emitPlaybackPlayWhenReadyChanged(bodyDict)
+        case .PlaybackQueueEnded:
+            delegate?.emitPlaybackQueueEnded(bodyDict)
+        case .PlaybackError:
+            delegate?.emitPlaybackError(bodyDict)
+        case .RemotePlay:
+            delegate?.emitRemotePlay(bodyDict)
+        case .RemotePause:
+            delegate?.emitRemotePause(bodyDict)
+        case .RemoteNext:
+            delegate?.emitRemoteNext(bodyDict)
+        case .RemotePrevious:
+            delegate?.emitRemotePrevious(bodyDict)
+        case .RemoteSeek:
+            delegate?.emitRemoteSeek(bodyDict)
+        case .RemoteJumpForward:
+            delegate?.emitRemoteJumpForward(bodyDict)
+        case .RemoteJumpBackward:
+            delegate?.emitRemoteJumpBackward(bodyDict)
+        case .RemoteDuck:
+            delegate?.emitRemoteDuck(bodyDict)
+        default:
+            // Log unmapped events - these should be added to the switch statement
+            print("[TrackPlayer] Unmapped event: \(event.rawValue)")
+        }
     }
 
     // MARK: - AudioSessionControllerDelegate
@@ -262,6 +296,13 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
     @objc(updateOptions:resolver:rejecter:)
     public func update(options: [String: Any], resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
         if (rejectWhenNotInitialized(reject: reject)) { return }
+        updateOptionsSync(options: options)
+        resolve(NSNull())
+    }
+
+    @objc
+    public func updateOptionsSync(options: [String: Any]) {
+        guard hasInitialized else { return }
 
         var capabilitiesStr = options["capabilities"] as? [String] ?? []
         if (capabilitiesStr.contains("play") && capabilitiesStr.contains("pause")) {
@@ -286,8 +327,6 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
         configureProgressUpdateEvent(
             interval: ((options["progressUpdateEventInterval"] as? NSNumber) ?? 0).doubleValue
         )
-
-        resolve(NSNull())
     }
 
     private func configureProgressUpdateEvent(interval: Double) {
@@ -298,62 +337,36 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
     }
 
     @objc
-    public func add(
-        trackDicts: [[String: Any]],
-        before trackIndex: NSNumber,
-        resolve: RCTPromiseResolveBlock,
-        reject: RCTPromiseRejectBlock
-    ) {
+    public func add(trackDicts: [[String: Any]], before trackIndex: NSNumber) -> Int {
+        guard hasInitialized else { return -1 }
         // -1 means no index was passed and therefore should be inserted at the end.
-        let index = trackIndex.intValue == -1 ? player.items.count : trackIndex.intValue;
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-        if (rejectWhenTrackIndexOutOfBounds(
-            index: index,
-            max: player.items.count,
-            reject: reject
-        )) { return }
+        let index = trackIndex.intValue == -1 ? player.items.count : trackIndex.intValue
+        guard index >= 0 && index <= player.items.count else { return -1 }
 
         var tracks = [Track]()
         for trackDict in trackDicts {
-            guard let track = Track(dictionary: trackDict) else {
-                reject("invalid_track_object", "Track is missing a required key", nil)
-                return
-            }
-
+            guard let track = Track(dictionary: trackDict) else { return -1 }
             tracks.append(track)
         }
 
-        try? player.add(
-            items: tracks,
-            at: index
-        )
-        resolve(index)
+        try? player.add(items: tracks, at: index)
+        return index
     }
 
     @objc
-    public func load(
-        trackDict: [String: Any],
-        resolve: RCTPromiseResolveBlock,
-        reject: RCTPromiseRejectBlock
-    ) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
-        guard let track = Track(dictionary: trackDict) else {
-            reject("invalid_track_object", "Track is missing a required key", nil)
-            return
-        }
-
+    public func load(trackDict: [String: Any]) {
+        guard hasInitialized else { return }
+        guard let track = Track(dictionary: trackDict) else { return }
         player.load(item: track)
-        resolve(player.currentIndex)
     }
 
     @objc
-    public func remove(tracks indexes: [Int], resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
+    public func remove(tracks indexes: [Int]) {
+        guard hasInitialized else { return }
+
+        // Validate all indexes first
         for index in indexes {
-            if (rejectWhenTrackIndexOutOfBounds(index: index, message: "One or more of the indexes were out of bounds.", reject: reject)) {
-                return
-            }
+            guard index >= 0 && index < player.items.count else { return }
         }
 
         // Sort the indexes in descending order so we can safely remove them one by one
@@ -361,318 +374,234 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
         for index in indexes.sorted().reversed() {
             try? player.removeItem(at: index)
         }
-
-        resolve(NSNull())
     }
 
     @objc
-    public func move(
-        fromIndex: Int,
-        toIndex: Int,
-        resolve: RCTPromiseResolveBlock,
-        reject: RCTPromiseRejectBlock
-    ) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-        if (rejectWhenTrackIndexOutOfBounds(
-            index: fromIndex,
-            message: "The fromIndex is out of bounds",
-            reject: reject)
-        ) { return }
-        if (rejectWhenTrackIndexOutOfBounds(
-            index: toIndex,
-            max: Int.max,
-            message: "The toIndex is out of bounds",
-            reject: reject)
-        ) { return }
+    public func move(fromIndex: Int, toIndex: Int) {
+        guard hasInitialized else { return }
+        guard fromIndex >= 0 && fromIndex < player.items.count else { return }
+        guard toIndex >= 0 else { return }
         try? player.moveItem(fromIndex: fromIndex, toIndex: toIndex)
-        resolve(NSNull())
     }
 
 
     @objc
-    public func removeUpcomingTracks(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func removeUpcomingTracks() {
+        guard hasInitialized else { return }
         player.removeUpcomingItems()
-        resolve(NSNull())
     }
 
     @objc
-    public func skip(
-        to trackIndex: Int,
-        initialTime: Double,
-        resolve: RCTPromiseResolveBlock,
-        reject: RCTPromiseRejectBlock
-    ) {
-        if (rejectWhenTrackIndexOutOfBounds(index: trackIndex, reject: reject)) { return }
-
-        if (rejectWhenNotInitialized(reject: reject)) { return }
+    public func skip(to trackIndex: Int, initialTime: Double) {
+        guard hasInitialized else { return }
+        guard trackIndex >= 0 && trackIndex < player.items.count else { return }
 
         print("Skipping to track:", trackIndex)
         try? player.jumpToItem(atIndex: trackIndex, playWhenReady: player.playerState == .playing)
 
-        // if an initialTime is passed the seek to it
+        // if an initialTime is passed then seek to it
         if (initialTime >= 0) {
-            self.seekTo(time: initialTime, resolve: resolve, reject: reject)
-        } else {
-            resolve(NSNull())
+            self.seekTo(time: initialTime)
         }
     }
 
     @objc
-    public func skipToNext(
-        initialTime: Double,
-        resolve: RCTPromiseResolveBlock,
-        reject: RCTPromiseRejectBlock
-    ) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func skipToNext(initialTime: Double) {
+        guard hasInitialized else { return }
         player.next()
 
-        // if an initialTime is passed the seek to it
+        // if an initialTime is passed then seek to it
         if (initialTime >= 0) {
-            self.seekTo(time: initialTime, resolve: resolve, reject: reject)
-        } else {
-            resolve(NSNull())
+            self.seekTo(time: initialTime)
         }
     }
 
     @objc
-    public func skipToPrevious(
-        initialTime: Double,
-        resolve: RCTPromiseResolveBlock,
-        reject: RCTPromiseRejectBlock
-    ) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func skipToPrevious(initialTime: Double) {
+        guard hasInitialized else { return }
         player.previous()
 
-        // if an initialTime is passed the seek to it
+        // if an initialTime is passed then seek to it
         if (initialTime >= 0) {
-            self.seekTo(time: initialTime, resolve: resolve, reject: reject)
-        } else {
-            resolve(NSNull())
+            self.seekTo(time: initialTime)
         }
     }
 
     @objc
-    public func reset(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func reset() {
+        guard hasInitialized else { return }
         player.stop()
         player.clear()
-        resolve(NSNull())
     }
 
     @objc
-    public func play(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
+    public func play() {
+        guard hasInitialized else { return }
         player.play()
-        resolve(NSNull())
     }
 
     @objc
-    public func pause(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func pause() {
+        guard hasInitialized else { return }
         player.pause()
-        resolve(NSNull())
     }
 
     @objc
-    public func setPlayWhenReady(playWhenReady: Bool, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
+    public func setPlayWhenReady(playWhenReady: Bool) {
+        guard hasInitialized else { return }
         player.playWhenReady = playWhenReady
-        resolve(NSNull())
     }
 
     @objc
-    public func getPlayWhenReady(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-        resolve(player.playWhenReady)
+    public func getPlayWhenReady() -> Bool {
+        guard hasInitialized else { return false }
+        return player.playWhenReady
     }
 
     @objc
-    public func stop(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func stop() {
+        guard hasInitialized else { return }
         player.stop()
-        resolve(NSNull())
     }
 
     @objc
-    public func seekTo(time: Double, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func seekTo(time: Double) {
+        guard hasInitialized else { return }
         player.seek(to: time)
-        resolve(NSNull())
     }
 
     @objc
-    public func seekBy(offset: Double, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func seekBy(offset: Double) {
+        guard hasInitialized else { return }
         player.seek(by: offset)
-        resolve(NSNull())
     }
 
     @objc
-    public func retry(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
+    public func retry() {
+        guard hasInitialized else { return }
         player.reload(startFromCurrentTime: true)
-        resolve(NSNull())
     }
 
     @objc
-    public func setRepeatMode(repeatMode: NSNumber, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func setRepeatMode(repeatMode: NSNumber) {
+        guard hasInitialized else { return }
         player.repeatMode = SwiftAudioEx.RepeatMode(rawValue: repeatMode.intValue) ?? .off
-        resolve(NSNull())
     }
 
     @objc
-    public func getRepeatMode(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
-        resolve(player.repeatMode.rawValue)
+    public func getRepeatMode() -> Int {
+        guard hasInitialized else { return 0 }
+        return player.repeatMode.rawValue
     }
 
     @objc
-    public func setVolume(level: Float, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func setVolume(level: Float) {
+        guard hasInitialized else { return }
         player.volume = level
-        resolve(NSNull())
     }
 
     @objc
-    public func getVolume(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
-        resolve(player.volume)
+    public func getVolume() -> Float {
+        guard hasInitialized else { return 1.0 }
+        return player.volume
     }
 
     @objc
-    public func setRate(rate: Float, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func setRate(rate: Float) {
+        guard hasInitialized else { return }
         player.rate = rate
-        resolve(NSNull())
     }
 
     @objc
-    public func getRate(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
-        resolve(player.rate)
+    public func getRate() -> Float {
+        guard hasInitialized else { return 1.0 }
+        return player.rate
     }
 
     @objc
-    public func getTrack(index: Double, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func getTrack(index: Double) -> [String: Any]? {
+        guard hasInitialized else { return nil }
         let indexInt = Int(index)
         if (indexInt >= 0 && indexInt < player.items.count) {
             let track = player.items[indexInt]
-            resolve((track as? Track)?.toObject())
-        } else {
-            resolve(NSNull())
+            return (track as? Track)?.toObject()
         }
+        return nil
     }
 
     @objc
-    public func getQueue(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
-        let serializedQueue = player.items.map { ($0 as! Track).toObject() }
-        resolve(serializedQueue)
+    public func getQueue() -> [[String: Any]] {
+        guard hasInitialized else { return [] }
+        return player.items.map { ($0 as! Track).toObject() }
     }
 
     @objc
-    public func setQueue(
-        trackDicts: [[String: Any]],
-        resolve: RCTPromiseResolveBlock,
-        reject: RCTPromiseRejectBlock
-    ) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
+    public func setQueue(trackDicts: [[String: Any]]) {
+        guard hasInitialized else { return }
 
         var tracks = [Track]()
         for trackDict in trackDicts {
-            guard let track = Track(dictionary: trackDict) else {
-                reject("invalid_track_object", "Track is missing a required key", nil)
-                return
-            }
-
+            guard let track = Track(dictionary: trackDict) else { return }
             tracks.append(track)
         }
         player.clear()
         try? player.add(items: tracks)
-        resolve(index)
     }
 
     @objc
-    public func getActiveTrack(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func getActiveTrack() -> [String: Any]? {
+        guard hasInitialized else { return nil }
         let index = player.currentIndex
         if (index >= 0 && index < player.items.count) {
             let track = player.items[index]
-            resolve((track as? Track)?.toObject())
-        } else {
-            resolve(NSNull())
+            return (track as? Track)?.toObject()
         }
+        return nil
     }
 
     @objc
-    public func getActiveTrackIndex(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func getActiveTrackIndex() -> NSNumber? {
+        guard hasInitialized else { return nil }
         let index = player.currentIndex
         if index < 0 || index >= player.items.count {
-            resolve(NSNull())
-        } else {
-            resolve(index)
+            return nil
         }
+        return NSNumber(value: index)
     }
 
     @objc
-    public func getProgress(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-        resolve([
+    public func getProgress() -> [String: Any] {
+        guard hasInitialized else { return [:] }
+        return [
             "position": player.currentTime,
             "duration": player.duration,
             "buffered": player.bufferedPosition
-        ])
+        ]
     }
 
     @objc
-    public func getPlaybackState(resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-        resolve(getPlaybackStateBodyKeyValues(state: player.playerState))
+    public func getPlaybackState() -> [String: Any] {
+        guard hasInitialized else { return [:] }
+        return getPlaybackStateBodyKeyValues(state: player.playerState)
     }
 
     @objc
-    public func updateMetadata(for trackIndex: Int, metadata: [String: Any], resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-        if (rejectWhenTrackIndexOutOfBounds(index: trackIndex, reject: reject)) { return }
+    public func updateMetadata(for trackIndex: Int, metadata: [String: Any]) {
+        guard hasInitialized else { return }
+        guard trackIndex >= 0 && trackIndex < player.items.count else { return }
 
-        let track : Track = player.items[trackIndex] as! Track;
+        let track : Track = player.items[trackIndex] as! Track
         track.updateMetadata(dictionary: metadata)
 
         if (player.currentIndex == trackIndex) {
             Metadata.update(for: player, with: metadata)
         }
-
-        resolve(NSNull())
     }
 
     @objc
-    public func updateNowPlayingMetadata(metadata: [String: Any], resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-
+    public func updateNowPlayingMetadata(metadata: [String: Any]) {
+        guard hasInitialized else { return }
         Metadata.update(for: player, with: metadata)
-        resolve(NSNull())
     }
 
     private func getPlaybackStateErrorKeyValues() -> Dictionary<String, Any> {
@@ -820,7 +749,25 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
 
 
 @objc public protocol NativeTrackPlayerImplDelegate {
-    func sendEvent(name: String, body: Any)
+    func emitPlaybackState(_ body: [String: Any])
+    func emitPlaybackActiveTrackChanged(_ body: [String: Any])
+    func emitPlaybackProgressUpdated(_ body: [String: Any])
+    func emitPlaybackPlayWhenReadyChanged(_ body: [String: Any])
+    func emitPlaybackQueueEnded(_ body: [String: Any])
+    func emitPlaybackError(_ body: [String: Any])
+    func emitRemotePlay(_ body: [String: Any])
+    func emitRemotePause(_ body: [String: Any])
+    func emitRemoteNext(_ body: [String: Any])
+    func emitRemotePrevious(_ body: [String: Any])
+    func emitRemoteSeek(_ body: [String: Any])
+    func emitRemoteJumpForward(_ body: [String: Any])
+    func emitRemoteJumpBackward(_ body: [String: Any])
+    func emitRemoteDuck(_ body: [String: Any])
+    func emitRemoteStop(_ body: [String: Any])
+    func emitRemoteSetRating(_ body: [String: Any])
+    func emitMetadataTimedReceived(_ body: [String: Any])
+    func emitMetadataCommonReceived(_ body: [String: Any])
+    func emitPlaybackMetadata(_ body: [String: Any])
 }
 
 extension NativeTrackPlayerImpl {

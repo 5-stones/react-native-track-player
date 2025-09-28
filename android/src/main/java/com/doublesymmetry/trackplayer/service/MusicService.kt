@@ -812,42 +812,42 @@ class MusicService : HeadlessJsMediaService() {
         if (keyEvent?.action == KeyEvent.ACTION_DOWN) {
             return when (keyEvent.keyCode) {
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                    emit(MusicEvents.BUTTON_PLAY_PAUSE)
+                    player.togglePlay()
                     true
                 }
 
                 KeyEvent.KEYCODE_MEDIA_STOP -> {
-                    emit(MusicEvents.BUTTON_STOP)
+                    player.forwardingPlayer.stop()
                     true
                 }
 
                 KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                    emit(MusicEvents.BUTTON_PAUSE)
+                    player.forwardingPlayer.pause()
                     true
                 }
 
                 KeyEvent.KEYCODE_MEDIA_PLAY -> {
-                    emit(MusicEvents.BUTTON_PLAY)
+                    player.forwardingPlayer.play()
                     true
                 }
 
                 KeyEvent.KEYCODE_MEDIA_NEXT -> {
-                    emit(MusicEvents.BUTTON_SKIP_NEXT)
+                    player.forwardingPlayer.seekToNext()
                     true
                 }
 
                 KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-                    emit(MusicEvents.BUTTON_SKIP_PREVIOUS)
+                    player.forwardingPlayer.seekToPrevious()
                     true
                 }
 
                 KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MEDIA_SKIP_FORWARD, KeyEvent.KEYCODE_MEDIA_STEP_FORWARD -> {
-                    emit(MusicEvents.BUTTON_JUMP_FORWARD)
+                    player.forwardingPlayer.seekForward()
                     true
                 }
 
                 KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD, KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD -> {
-                    emit(MusicEvents.BUTTON_JUMP_BACKWARD)
+                    player.forwardingPlayer.seekBack()
                     true
                 }
 
