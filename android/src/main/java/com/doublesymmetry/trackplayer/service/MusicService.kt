@@ -13,7 +13,6 @@ import android.provider.Settings
 import android.view.KeyEvent
 import androidx.annotation.MainThread
 import androidx.annotation.OptIn
-import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.CacheBitmapLoader
@@ -28,13 +27,10 @@ import androidx.media3.session.SessionResult
 import com.doublesymmetry.kotlinaudio.models.*
 import com.doublesymmetry.kotlinaudio.players.QueuedAudioPlayer
 import com.doublesymmetry.trackplayer.HeadlessJsMediaService
-import com.doublesymmetry.trackplayer.extensions.NumberExt.Companion.toMilliseconds
 import com.doublesymmetry.trackplayer.extensions.NumberExt.Companion.toSeconds
-import com.doublesymmetry.trackplayer.extensions.asLibState
 import com.doublesymmetry.trackplayer.extensions.find
 import com.doublesymmetry.trackplayer.model.Track
-import com.doublesymmetry.trackplayer.model.TrackAudioItem
-import com.doublesymmetry.trackplayer.utils.BundleUtils
+import com.doublesymmetry.trackplayer.model.PlayerOptionsData
 import com.doublesymmetry.trackplayer.utils.CoilBitmapLoader
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.jstasks.HeadlessJsTaskConfig
@@ -47,7 +43,7 @@ import kotlin.system.exitProcess
 @OptIn(UnstableApi::class)
 @MainThread
 class MusicService : HeadlessJsMediaService() {
-    public lateinit var player: QueuedAudioPlayer
+    lateinit var player: QueuedAudioPlayer
     private val binder = MusicBinder()
     private val scope = MainScope()
     private lateinit var fakePlayer: ExoPlayer
@@ -120,12 +116,10 @@ class MusicService : HeadlessJsMediaService() {
         AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
     private var stopForegroundGracePeriod: Int = DEFAULT_STOP_FOREGROUND_GRACE_PERIOD
     val tracks: List<Track>
-        get() = player.items.map { (it as TrackAudioItem).track }
+        get() = player.items.mapNotNull { it.track }
 
     val currentTrack: Track?
-        get() {
-            return (player.currentItem as TrackAudioItem?)?.track
-        }
+        get() = player.currentItem?.track
 
     val state
         get() = player.playerState
@@ -148,7 +142,7 @@ class MusicService : HeadlessJsMediaService() {
             player.playWhenReady = value
         }
 
-    private var latestOptions: Bundle? = null
+    private var latestOptions: PlayerOptionsData? = null
     private var commandStarted = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -167,72 +161,43 @@ class MusicService : HeadlessJsMediaService() {
     }
 
     @MainThread
-    fun setupPlayer(playerOptions: Bundle?) {
+    fun setupPlayer(playerOptionsData: PlayerOptionsData) {
         if (this::player.isInitialized) {
             print("Player was initialized previously. Preventing reinitialization.")
             return
         }
         Timber.d("Setting up player")
-        val options = PlayerOptions(
-            alwaysShowNext = playerOptions?.getBoolean(PLAYER_OPTIONS_ALWAYS_SHOW_NEXT, true) ?: true,
-            audioContentType = when (playerOptions?.getString(PLAYER_OPTIONS_ANDROID_AUDIO_CONTENT_TYPE)) {
-                "music" -> C.AUDIO_CONTENT_TYPE_MUSIC
-                "speech" -> C.AUDIO_CONTENT_TYPE_SPEECH
-                "sonification" -> C.AUDIO_CONTENT_TYPE_SONIFICATION
-                "movie" -> C.AUDIO_CONTENT_TYPE_MOVIE
-                "unknown" -> C.AUDIO_CONTENT_TYPE_UNKNOWN
-                else -> C.AUDIO_CONTENT_TYPE_MUSIC
-            },
-            bufferOptions = BufferOptions(
-                playerOptions?.getDouble(PLAYER_OPTIONS_MIN_BUFFER)?.toMilliseconds()?.toInt(),
-                playerOptions?.getDouble(PLAYER_OPTIONS_MAX_BUFFER)?.toMilliseconds()?.toInt(),
-                playerOptions?.getDouble(PLAYER_OPTIONS_PLAY_BUFFER)?.toMilliseconds()?.toInt(),
-                playerOptions?.getDouble(PLAYER_OPTIONS_BACK_BUFFER)?.toMilliseconds()?.toInt(),
-            ),
-            cacheSizeKb = playerOptions?.getDouble(PLAYER_OPTIONS_MAX_CACHE_SIZE_KEY)?.toLong() ?: 0,
-            handleAudioBecomingNoisy = playerOptions?.getBoolean(PLAYER_OPTIONS_HANDLE_NOISY, true) ?: true,
-            handleAudioFocus = playerOptions?.getBoolean(PLAYER_OPTIONS_AUTO_HANDLE_INTERRUPTIONS) ?: true,
-            interceptPlayerActionsTriggeredExternally = true,
-            skipSilence = playerOptions?.getBoolean(PLAYER_OPTIONS_SKIP_SILENCE) ?: false,
-            wakeMode = playerOptions?.getInt(PLAYER_OPTIONS_WAKE_MODE, 0) ?: 0
-        )
+
+        val options = playerOptionsData.toAudioPlayerOptions()
         player = QueuedAudioPlayer(this@MusicService, options)
         fakePlayer.release()
         mediaSession.player = player.forwardingPlayer
     }
 
     @MainThread
-    fun updateOptions(options: Bundle) {
+    fun updateOptions(options: PlayerOptionsData) {
         latestOptions = options
-        val androidOptions = options.getBundle(ANDROID_OPTIONS_KEY)
+        val androidOptions = options.androidOptions
 
-        if (androidOptions?.containsKey(PLAYER_OPTIONS_ANDROID_AUDIO_OFFLOAD_KEY) == true) {
-            player.setAudioOffload(androidOptions.getBoolean(PLAYER_OPTIONS_ANDROID_AUDIO_OFFLOAD_KEY))
+        androidOptions?.audioOffload?.let { audioOffload ->
+            player.setAudioOffload(audioOffload)
         }
-        if (androidOptions?.containsKey(PLAYER_OPTIONS_SKIP_SILENCE) == true) {
-            player.skipSilence = androidOptions.getBoolean(PLAYER_OPTIONS_SKIP_SILENCE)
+
+        androidOptions?.skipSilence?.let { skipSilence ->
+            player.skipSilence = skipSilence
         }
 
         appKilledPlaybackBehavior =
-            AppKilledPlaybackBehavior::string.find(
-                androidOptions?.getString(
-                    PLAYER_OPTIONS_ANDROID_APP_KILLED_PLAYBACK_BEHAVIOR_KEY
-                )
-            ) ?: AppKilledPlaybackBehavior.CONTINUE_PLAYBACK
+            AppKilledPlaybackBehavior::string.find(androidOptions?.appKilledPlaybackBehavior) ?: AppKilledPlaybackBehavior.CONTINUE_PLAYBACK
 
-        BundleUtils.getIntOrNull(androidOptions, PLAYER_OPTIONS_ANDROID_STOP_FOREGROUND_GRACE_PERIOD_KEY)
-            ?.let { stopForegroundGracePeriod = it }
+        androidOptions?.stopForegroundGracePeriod?.let { stopForegroundGracePeriod = it }
 
-        player.alwaysPauseOnInterruption =
-            androidOptions?.getBoolean(PLAYER_OPTIONS_ANDROID_PAUSE_ON_INTERRUPTION) ?: false
-        player.shuffleMode = androidOptions?.getBoolean(PLAYER_OPTIONS_ANDROID_SHUFFLE_KEY) ?: false
+        player.alwaysPauseOnInterruption = androidOptions?.pauseOnInterruption ?: false
+        player.shuffleMode = androidOptions?.shuffle ?: false
 
         // Progress update events now handled by MusicModule
-        val capabilities =
-            options.getIntegerArrayList("capabilities")?.map { Capability.entries[it] }
-                ?: emptyList()
-        var notificationCapabilities = options.getIntegerArrayList("notificationCapabilities")
-            ?.map { Capability.entries[it] } ?: emptyList()
+        val capabilities = options.capabilities?.map { Capability.entries[it] } ?: emptyList()
+        var notificationCapabilities = options.notificationCapabilities?.map { Capability.entries[it] } ?: emptyList()
         if (notificationCapabilities.isEmpty()) notificationCapabilities = capabilities
 
         val playerCommandsBuilder = Player.Commands.Builder().addAll(
@@ -318,7 +283,7 @@ class MusicService : HeadlessJsMediaService() {
 
     @MainThread
     fun move(fromIndex: Int, toIndex: Int) {
-        player.move(fromIndex, toIndex);
+        player.move(fromIndex, toIndex)
     }
 
     @MainThread
@@ -428,17 +393,13 @@ class MusicService : HeadlessJsMediaService() {
     fun getBufferedPositionInSeconds(): Double = player.bufferedPosition.toSeconds()
 
     @MainThread
-    fun updateMetadataForTrack(index: Int, bundle: Bundle) {
-        tracks[index].let { currentTrack ->
-            currentTrack.setMetadata(reactContext, bundle, 0)
-
-            player.replaceItem(index, currentTrack.toAudioItem())
-        }
+    fun updateMetadataForTrack(index: Int, newTrack: Track) {
+        player.replaceItem(index, newTrack.toAudioItem())
     }
 
     @MainThread
-    fun updateNowPlayingMetadata(bundle: Bundle) {
-        updateMetadataForTrack(player.currentIndex, bundle)
+    fun updateNowPlayingMetadata(newTrack: Track) {
+        updateMetadataForTrack(player.currentIndex, newTrack)
     }
 
     override fun getTaskConfig(intent: Intent?): HeadlessJsTaskConfig {

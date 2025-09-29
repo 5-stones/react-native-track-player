@@ -4,16 +4,17 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.annotations.ReactModule
 import android.annotation.SuppressLint
 import android.content.*
-import android.os.Bundle
+import com.facebook.react.bridge.WritableMap
 import android.os.IBinder
 import android.support.v4.media.RatingCompat
 import com.doublesymmetry.kotlinaudio.models.Capability
 import com.doublesymmetry.kotlinaudio.models.RepeatMode
 import com.doublesymmetry.trackplayer.model.State
-import com.doublesymmetry.trackplayer.model.Track
+import com.doublesymmetry.trackplayer.model.TrackFactory
 import com.doublesymmetry.trackplayer.service.MusicService
 import com.doublesymmetry.trackplayer.utils.AppForegroundTracker
-import com.doublesymmetry.trackplayer.utils.RejectionException
+import com.doublesymmetry.trackplayer.model.PlayerOptionsData
+import com.doublesymmetry.trackplayer.utils.BundleUtils
 import com.facebook.react.bridge.*
 import androidx.media3.common.Player
 import androidx.media3.session.MediaBrowser
@@ -21,15 +22,11 @@ import androidx.media3.session.SessionToken
 import com.doublesymmetry.kotlinaudio.models.MediaSessionCallback
 import com.doublesymmetry.kotlinaudio.models.AudioPlayerState
 import com.doublesymmetry.kotlinaudio.models.PlaybackError
-import com.doublesymmetry.kotlinaudio.models.PositionChangedReason
-import com.doublesymmetry.kotlinaudio.models.EventControllerConnectionData
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancelChildren
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.flow
 import timber.log.Timber
 import java.util.*
 import javax.annotation.Nonnull
@@ -41,21 +38,18 @@ import com.doublesymmetry.trackplayer.service.MusicService.Companion.ERROR_KEY
 import com.doublesymmetry.trackplayer.service.MusicService.Companion.STATE_KEY
 import kotlinx.coroutines.runBlocking
 
-/**
- * @author Milen Pivchev @mpivchev
- */
+
 @ReactModule(name = MusicModule.NAME)
 class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec(reactContext),
   ServiceConnection {
   private lateinit var browser: MediaBrowser
-  private var playerOptions: Bundle? = null
+  private var playerOptions: PlayerOptionsData = PlayerOptionsData()
   private var playerSetUpPromise: Promise? = null
   private val mainScope = MainScope()
-  private var service: MusicService? = null
+  private var connectedService: MusicService? = null
   private val context = reactContext
-  private var forwardJumpInterval: Double = 15.0
-  private var backwardJumpInterval: Double = 15.0
   private var progressUpdateManager: ProgressUpdateManager? = null
+  private val trackFactory = TrackFactory(context) { connectedService?.ratingType ?: RatingCompat.RATING_NONE }
 
   @Nonnull
   override fun getName(): String {
@@ -83,20 +77,19 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   override fun onServiceConnected(name: ComponentName, serviceBinder: IBinder) {
     launchInScope {
       // If a binder already exists, don't get a new one
-      if (service == null) {
+      if (connectedService == null) {
         val binder: MusicService.MusicBinder = serviceBinder as MusicService.MusicBinder
-        service = binder.service
+        connectedService = binder.service
         progressUpdateManager = ProgressUpdateManager() {
-          service?.let { svc ->
-            emitOnPlaybackProgressUpdated(Arguments.createMap().apply {
-              putDouble("position", svc.getPositionInSeconds())
-              putDouble("duration", svc.getDurationInSeconds())
-              putDouble("buffered", svc.getBufferedPositionInSeconds())
-              putInt("track", svc.getCurrentTrackIndex())
-            })
-          }
+          val service = connectedService ?: return@ProgressUpdateManager
+          emitOnPlaybackProgressUpdated(Arguments.createMap().apply {
+            putDouble("position", service.getPositionInSeconds())
+            putDouble("duration", service.getDurationInSeconds())
+            putDouble("buffered", service.getBufferedPositionInSeconds())
+            putInt("track", service.getCurrentTrackIndex())
+          })
         }
-        service?.setupPlayer(playerOptions)
+        connectedService?.setupPlayer(playerOptions)
         playerSetUpPromise?.resolve(null)
         observePlayerEvents()
       }
@@ -111,31 +104,10 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     // Cancel all event observation coroutines when service disconnects
     progressUpdateManager?.stop()
     mainScope.coroutineContext.cancelChildren()
-    service = null
+    connectedService = null
   }
 
 
-  private fun bundleToTrack(bundle: Bundle): Track {
-    return Track(context, bundle, service?.ratingType ?: RatingCompat.RATING_NONE)
-  }
-
-
-  private fun readableArrayToTrackList(data: ReadableArray?): MutableList<Track> {
-    val bundleList = Arguments.toList(data)
-    if (bundleList !is ArrayList) {
-      throw RejectionException("invalid_parameter", "Was not given an array of tracks")
-    }
-    return bundleList.map {
-      if (it is Bundle) {
-        bundleToTrack(it)
-      } else {
-        throw RejectionException(
-          "invalid_track_object",
-          "Track was not a dictionary type"
-        )
-      }
-    }.toMutableList()
-  }
 
   private fun getPlaybackErrorMap(error: PlaybackError?): WritableMap {
     return Arguments.createMap().let {
@@ -153,7 +125,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     return Arguments.createMap().let {
       it.putString(STATE_KEY, state.asLibState.state)
       if (state == AudioPlayerState.ERROR) {
-        it.putMap(ERROR_KEY, getPlaybackErrorMap(service?.player?.playbackError))
+        it.putMap(ERROR_KEY, getPlaybackErrorMap(connectedService?.player?.playbackError))
       }
       it
     }
@@ -207,7 +179,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
   @SuppressLint("UnspecifiedRegisterReceiverFlag")
   override fun setupPlayer(data: ReadableMap?, promise: Promise) {
-    if (service != null) {
+    if (connectedService != null) {
       promise.reject(
         "player_already_initialized",
         "The player has already been initialized via setupPlayer."
@@ -215,10 +187,8 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
       return
     }
 
-    val bundledData = Arguments.toBundle(data)
-
     playerSetUpPromise = promise
-    playerOptions = bundledData
+    playerOptions = PlayerOptionsData.fromBridge(data)
 
 
     val musicModule = this
@@ -237,37 +207,21 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   override fun updateOptions(data: ReadableMap?): Unit = runBlockingOnMain {
-    if (service == null) return@runBlockingOnMain
+    val service = requireService()
 
-    val options = Arguments.toBundle(data)
+    val options = PlayerOptionsData.fromBridge(data)
 
-    options?.let {
-      // Update local interval storage
-      forwardJumpInterval = it.getDouble(
-        "forwardJumpInterval",
-        15.0
-      )
-      backwardJumpInterval = it.getDouble(
-        "backwardJumpInterval",
-        15.0
-      )
+    // Store progress update interval for use during playback
+    progressUpdateManager?.setUpdateInterval(if (options.progressUpdateEventInterval > 0) options.progressUpdateEventInterval else null)
 
-      // Store progress update interval for use during playback
-      val updateInterval = it.getDouble("progressUpdateEventInterval", -1.0)
-      progressUpdateManager?.setUpdateInterval(if (updateInterval > 0) updateInterval else null)
-
-      service.updateOptions(it)
-    }
+    service.updateOptions(options)
   }
 
-  // override fun add(data: Double, y: Double): Double {
-  //   return 1.0
-  // }
   override fun add(data: ReadableArray, insertBeforeIndex: Double?): Double = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
 
     val insertBeforeIndexInt = insertBeforeIndex?.toInt() ?: 0
-    val tracks = readableArrayToTrackList(data)
+    val tracks = trackFactory.tracksFromBridge(data)
     if (insertBeforeIndexInt < -1 || insertBeforeIndexInt > service.tracks.size) {
       throw Exception("The track index is out of bounds")
     }
@@ -277,24 +231,19 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   override fun load(data: ReadableMap?) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     if (data == null) return@runBlockingOnMain
 
-    val bundle = Arguments.toBundle(data)
-    if (bundle is Bundle) {
-      service.load(bundleToTrack(bundle))
-    } else {
-      throw Exception("Track was not a dictionary type")
-    }
+    service.load(trackFactory.fromBridge(data))
   }
 
   override fun move(fromIndex: Double, toIndex: Double) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.move(fromIndex.toInt(), toIndex.toInt())
   }
 
   override fun remove(data: ReadableArray?) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     val inputIndexes = Arguments.toList(data)
     if (inputIndexes != null) {
       val size = service.tracks.size
@@ -311,36 +260,62 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   override fun updateMetadataForTrack(index: Double, map: ReadableMap?): Unit = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
 
     if (index < 0 || index >= service.tracks.size) {
       throw Exception("The index is out of bounds")
     }
 
-    Arguments.toBundle(map)?.let {
-      service.updateMetadataForTrack(index.toInt(), it)
+    map?.let {
+      val currentTrack = service.tracks[index.toInt()]
+      val updatedTrack = currentTrack.updateMetadata(
+        title = it.getString("title") ?: currentTrack.title,
+        artist = it.getString("artist") ?: currentTrack.artist,
+        album = it.getString("album") ?: currentTrack.album,
+        artwork = it.getString("artwork") ?: currentTrack.artwork,
+        date = it.getString("date") ?: currentTrack.date,
+        genre = it.getString("genre") ?: currentTrack.genre,
+        duration = if (it.hasKey("duration")) it.getDouble("duration") else currentTrack.duration,
+        rating = BundleUtils.getRating(it, "rating", service.ratingType)
+          ?: currentTrack.rating,
+        mediaId = it.getString("mediaId") ?: currentTrack.mediaId
+      )
+      service.updateMetadataForTrack(index.toInt(), updatedTrack)
     }
   }
 
   override fun updateNowPlayingMetadata(map: ReadableMap?): Unit = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
 
     if (service.tracks.isEmpty()) {
       throw Exception("There is no current item in the player")
     }
 
-    Arguments.toBundle(map)?.let {
-      service.updateNowPlayingMetadata(it)
+    map?.let {
+      val currentTrack = service.currentTrack ?: throw Exception("There is no current track")
+      val updatedTrack = currentTrack.updateMetadata(
+        title = it.getString("title") ?: currentTrack.title,
+        artist = it.getString("artist") ?: currentTrack.artist,
+        album = it.getString("album") ?: currentTrack.album,
+        artwork = it.getString("artwork") ?: currentTrack.artwork,
+        date = it.getString("date") ?: currentTrack.date,
+        genre = it.getString("genre") ?: currentTrack.genre,
+        duration = if (it.hasKey("duration")) it.getDouble("duration") else currentTrack.duration,
+        rating = BundleUtils.getRating(it, "rating", service.ratingType)
+          ?: currentTrack.rating,
+        mediaId = it.getString("mediaId") ?: currentTrack.mediaId
+      )
+      service.updateNowPlayingMetadata(updatedTrack)
     }
   }
 
   override fun removeUpcomingTracks() = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.removeUpcomingTracks()
   }
 
   override fun skip(index: Double, initialTime: Double?) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
 
     service.skip(index.toInt())
 
@@ -350,7 +325,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   override fun skipToNext(initialTime: Double?) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
 
     service.skipToNext()
 
@@ -360,7 +335,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   override fun skipToPrevious(initialTime: Double?) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
 
     service.skipToPrevious()
 
@@ -370,7 +345,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   override fun reset() = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
 
     service.stop()
     delay(300) // Allow playback to stop
@@ -378,134 +353,135 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   override fun play() = runBlockingOnMain {
-    if (service == null) return@runBlockingOnMain
+    val service = requireService()
     service.play()
   }
 
   override fun pause() = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.pause()
   }
 
   override fun stop() = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.stop()
   }
 
   override fun seekTo(seconds: Double) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.seekTo(seconds.toFloat())
   }
 
   override fun seekBy(offset: Double) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.seekBy(offset.toFloat())
   }
 
   override fun retry() = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.retry()
   }
 
   override fun setVolume(volume: Double) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.setVolume(volume.toFloat())
   }
 
   override fun getVolume(): Double = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.getVolume().toDouble()
   }
 
   override fun setRate(rate: Double) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.setRate(rate.toFloat())
   }
 
   override fun getRate(): Double = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.getRate().toDouble()
   }
 
   override fun setRepeatMode(mode: Double) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.setRepeatMode(RepeatMode.fromOrdinal(mode.toInt()))
   }
 
   override fun getRepeatMode(): Double = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.getRepeatMode().ordinal.toDouble()
   }
 
   override fun setPlayWhenReady(playWhenReady: Boolean) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.playWhenReady = playWhenReady
   }
 
   override fun getPlayWhenReady(): Boolean = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.playWhenReady
   }
 
   override fun getTrack(index: Double): WritableMap? = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     val indexInt = index.toInt()
     if (indexInt >= 0 && indexInt < service.tracks.size) {
-      Arguments.fromBundle(service.tracks[indexInt].originalItem)
+      service.tracks[indexInt].toBridge()
     } else {
       null
     }
   }
 
   override fun getQueue(): WritableArray = runBlockingOnMain {
-    Arguments.fromList(service.tracks.map { it.originalItem })
+    val service = requireService()
+    Arguments.fromList(service.tracks.map { it.toBridge() })
   }
 
-  override fun setQueue(data: ReadableArray?) = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
-
-    service.clear()
-    service.add(readableArrayToTrackList(data))
+  override fun setQueue(data: ReadableArray?): Unit = runBlockingOnMain {
+    val service = requireService()
+    data?.let {
+      service.clear()
+      service.add(trackFactory.tracksFromBridge(data))
+    }
   }
 
   override fun getActiveTrackIndex(): Double? = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     if (service.tracks.isEmpty()) null else service.getCurrentTrackIndex().toDouble()
   }
 
   override fun getActiveTrack(): WritableMap? = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
-    service.currentTrack?.let {
-      Arguments.fromBundle(it.originalItem)
-    }
+    val service = requireService()
+    service.currentTrack?.toBridge()
   }
 
   override fun getProgress(): WritableMap = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
-    val bundle = Bundle()
-    bundle.putDouble("duration", service.getDurationInSeconds())
-    bundle.putDouble("position", service.getPositionInSeconds())
-    bundle.putDouble("buffered", service.getBufferedPositionInSeconds())
-    Arguments.fromBundle(bundle)
+    val service = requireService()
+    Arguments.createMap().let {
+      it.putDouble("duration", service.getDurationInSeconds())
+      it.putDouble("position", service.getPositionInSeconds())
+      it.putDouble("buffered", service.getBufferedPositionInSeconds())
+      it
+    }
   }
 
   override fun getPlaybackState(): WritableMap = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     getPlayerStateMap(service.state)
   }
 
   override fun acquireWakeLock() = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.acquireWakeLock()
   }
 
   override fun abandonWakeLock() = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.abandonWakeLock()
   }
 
   override fun validateOnStartCommandIntent(): Boolean = runBlockingOnMain {
-    if (service == null) throw Exception("Player not initialized")
+    val service = requireService()
     service.onStartCommandIntentValid
   }
 
@@ -523,246 +499,232 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     }
   }
 
+  private fun requireService(): MusicService {
+    return connectedService ?: throw Exception("Player not initialized")
+  }
+
   private fun observePlayerEvents() {
     mainScope.launch {
-      service?.let { service ->
-        service.event.stateChange.collect { state ->
-          emitOnPlaybackState(getPlayerStateMap(state))
+      val service = connectedService ?: return@launch
+      service.event.stateChange.collect { state ->
+        emitOnPlaybackState(getPlayerStateMap(state))
 
-          // Let progress manager handle playback state changes
-          progressUpdateManager?.onPlaybackStateChanged(state)
+        // Let progress manager handle playback state changes
+        progressUpdateManager?.onPlaybackStateChanged(state)
+      }
+    }
+
+    mainScope.launch {
+      val service = connectedService ?: return@launch
+      service.event.audioItemTransition.collect { transition ->
+        if (transition != null) {
+          emitOnPlaybackActiveTrackChanged(Arguments.createMap().apply {
+            putMap("track", service.player.currentItem?.track?.toBridge())
+            putDouble("position", transition.oldPosition.toSeconds())
+          })
         }
       }
     }
 
     mainScope.launch {
-      service?.let { service ->
-        service.event.audioItemTransition.collect { transition ->
-          if (transition != null) {
-            val bundle = Bundle().apply {
-              putInt("track", service.player.currentIndex)
-              putDouble("position", transition.oldPosition.toSeconds())
-            }
-            val readableMap = Arguments.fromBundle(bundle)
-            emitOnPlaybackActiveTrackChanged(readableMap)
-          }
-        }
+      val service = connectedService ?: return@launch
+      service.event.playWhenReadyChange.collect { playWhenReadyData ->
+        emitOnPlaybackPlayWhenReadyChanged(Arguments.createMap().apply {
+          putBoolean("playWhenReady", playWhenReadyData.playWhenReady)
+        })
       }
     }
 
     mainScope.launch {
-      service?.let { service ->
-        service.event.playWhenReadyChange.collect { playWhenReadyData ->
-          val bundle = Bundle().apply {
-            putBoolean("playWhenReady", playWhenReadyData.playWhenReady)
+      val service = connectedService ?: return@launch
+      service.event.onPlayerActionTriggeredExternally.collect { mediaSessionAction ->
+        when (mediaSessionAction) {
+          MediaSessionCallback.PLAY -> {
+            val readableMap = Arguments.createMap()
+            emitOnRemotePlay(readableMap)
           }
-          val readableMap = Arguments.fromBundle(bundle)
-          emitOnPlaybackPlayWhenReadyChanged(readableMap)
-        }
-      }
-    }
 
-    mainScope.launch {
-      service?.let { service ->
-        service.event.onPlayerActionTriggeredExternally.collect { mediaSessionAction ->
-          when (mediaSessionAction) {
-            MediaSessionCallback.PLAY -> {
-              val readableMap = Arguments.createMap()
-              emitOnRemotePlay(readableMap)
-            }
-
-            MediaSessionCallback.PAUSE -> {
-              val readableMap = Arguments.createMap()
-              emitOnRemotePause(readableMap)
-            }
-
-            MediaSessionCallback.NEXT -> {
-              val readableMap = Arguments.createMap()
-              emitOnRemoteNext(readableMap)
-            }
-
-            MediaSessionCallback.PREVIOUS -> {
-              val readableMap = Arguments.createMap()
-              emitOnRemotePrevious(readableMap)
-            }
-
-            MediaSessionCallback.STOP -> {
-              val readableMap = Arguments.createMap()
-              emitOnRemoteStop(readableMap)
-            }
-
-            MediaSessionCallback.FORWARD -> {
-              val readableMap = Arguments.createMap().apply {
-                putInt("interval", forwardJumpInterval.toInt())
-              }
-              emitOnRemoteJumpForward(readableMap)
-            }
-
-            MediaSessionCallback.REWIND -> {
-              val readableMap = Arguments.createMap().apply {
-                putInt("interval", backwardJumpInterval.toInt())
-              }
-              emitOnRemoteJumpBackward(readableMap)
-            }
-
-            is MediaSessionCallback.RATING -> {
-              val readableMap = Arguments.createMap().apply {
-                putString("rating", mediaSessionAction.rating.toString())
-              }
-              emitOnRemoteSetRating(readableMap)
-            }
-
-            is MediaSessionCallback.SEEK -> {
-              val readableMap = Arguments.createMap().apply {
-                putDouble("position", mediaSessionAction.positionMs.toDouble() / 1000.0)
-              }
-              emitOnRemoteSeek(readableMap)
-            }
-
-            else -> {} // Handle other actions as needed
+          MediaSessionCallback.PAUSE -> {
+            val readableMap = Arguments.createMap()
+            emitOnRemotePause(readableMap)
           }
+
+          MediaSessionCallback.NEXT -> {
+            val readableMap = Arguments.createMap()
+            emitOnRemoteNext(readableMap)
+          }
+
+          MediaSessionCallback.PREVIOUS -> {
+            val readableMap = Arguments.createMap()
+            emitOnRemotePrevious(readableMap)
+          }
+
+          MediaSessionCallback.STOP -> {
+            val readableMap = Arguments.createMap()
+            emitOnRemoteStop(readableMap)
+          }
+
+          MediaSessionCallback.FORWARD -> {
+            val readableMap = Arguments.createMap().apply {
+              putInt("interval", playerOptions.forwardJumpInterval.toInt())
+            }
+            emitOnRemoteJumpForward(readableMap)
+          }
+
+          MediaSessionCallback.REWIND -> {
+            val readableMap = Arguments.createMap().apply {
+              putInt("interval", playerOptions.backwardJumpInterval.toInt())
+            }
+            emitOnRemoteJumpBackward(readableMap)
+          }
+
+          is MediaSessionCallback.RATING -> {
+            val readableMap = Arguments.createMap().apply {
+              putString("rating", mediaSessionAction.rating.toString())
+            }
+            emitOnRemoteSetRating(readableMap)
+          }
+
+          is MediaSessionCallback.SEEK -> {
+            val readableMap = Arguments.createMap().apply {
+              putDouble("position", mediaSessionAction.positionMs.toDouble() / 1000.0)
+            }
+            emitOnRemoteSeek(readableMap)
+          }
+
+          else -> {} // Handle other actions as needed
         }
       }
     }
 
     // Progress updates and remote seek detection
     mainScope.launch {
-      service?.let { service ->
-        service.event.positionChanged.collect { positionChangedReason ->
-          emitOnPlaybackProgressUpdated(Arguments.createMap().apply {
-            putDouble("position", service.getPositionInSeconds())
-            putDouble("buffered", service.getBufferedPositionInSeconds())
-            putDouble("duration", service.getDurationInSeconds())
-          })
-        }
+      val service = connectedService ?: return@launch
+      service.event.positionChanged.collect { positionChangedReason ->
+        emitOnPlaybackProgressUpdated(Arguments.createMap().apply {
+          putDouble("position", service.getPositionInSeconds())
+          putDouble("buffered", service.getBufferedPositionInSeconds())
+          putDouble("duration", service.getDurationInSeconds())
+        })
       }
     }
 
     // Queue ended events
     mainScope.launch {
-      service?.let { service ->
-        service.event.stateChange.collect { state ->
-          if (state == AudioPlayerState.ENDED && service.player.nextItem == null) {
-            emitOnPlaybackQueueEnded(Arguments.createMap().apply {
-              putInt("track", service.player.currentIndex)
-              putDouble("position", service.getPositionInSeconds())
-            })
-          }
+      val service = connectedService ?: return@launch
+      service.event.stateChange.collect { state ->
+        if (state == AudioPlayerState.ENDED && service.player.nextItem == null) {
+          emitOnPlaybackQueueEnded(Arguments.createMap().apply {
+            putInt("track", service.player.currentIndex)
+            putDouble("position", service.getPositionInSeconds())
+          })
         }
       }
     }
 
     // Player errors
     mainScope.launch {
-      service?.let { service ->
-        service.event.playbackError.collect { error ->
-          emitOnPlaybackError(getPlaybackErrorMap(error))
-        }
+      val service = connectedService ?: return@launch
+      service.event.playbackError.collect { error ->
+        emitOnPlaybackError(getPlaybackErrorMap(error))
       }
     }
 
     // Audio focus changes (duck events)
     mainScope.launch {
-      service?.let { service ->
-        service.event.onAudioFocusChanged.collect { focusChangeData ->
-          emitOnRemoteDuck(Arguments.createMap().apply {
-            putBoolean(
-              "permanent",
-              focusChangeData.isFocusLostPermanently
-            )
-            putBoolean("paused", focusChangeData.isPaused)
-          })
-        }
+      val service = connectedService ?: return@launch
+      service.event.onAudioFocusChanged.collect { focusChangeData ->
+        emitOnRemoteDuck(Arguments.createMap().apply {
+          putBoolean(
+            "permanent",
+            focusChangeData.isFocusLostPermanently
+          )
+          putBoolean("paused", focusChangeData.isPaused)
+        })
       }
     }
 
 
     // Metadata events
     mainScope.launch {
-      service?.let { service ->
-        service.event.onCommonMetadata.collect { metadata ->
-          emitOnMetadataCommonReceived(Arguments.createMap().apply {
-            putMap("metadata", MetadataAdapter.mapFromMediaMetadata(metadata))
-          })
-        }
+      val service = connectedService ?: return@launch
+      service.event.onCommonMetadata.collect { metadata ->
+        emitOnMetadataCommonReceived(Arguments.createMap().apply {
+          putMap("metadata", MetadataAdapter.mapFromMediaMetadata(metadata))
+        })
       }
     }
 
     mainScope.launch {
-      service?.let { service ->
-        service.event.onTimedMetadata.collect { metadata ->
-          emitOnMetadataTimedReceived(Arguments.createMap().let {
-            it.putArray("metadata", Arguments.createArray().apply {
-              MetadataAdapter.fromMetadata(metadata)
-                .forEach { item -> pushMap(Arguments.fromBundle(item)) }
-            })
-            it
+      val service = connectedService ?: return@launch
+      service.event.onTimedMetadata.collect { metadata ->
+        emitOnMetadataTimedReceived(Arguments.createMap().let {
+          it.putArray("metadata", Arguments.createArray().apply {
+            MetadataAdapter.fromMetadata(metadata)
+              .forEach { item -> pushMap(item) }
           })
+          it
+        })
 
-          // TODO: Handle the different types of metadata and publish to new events
-          val playbackMetadata = PlaybackMetadata.fromId3Metadata(metadata)
-            ?: PlaybackMetadata.fromIcy(metadata)
-            ?: PlaybackMetadata.fromVorbisComment(metadata)
-            ?: PlaybackMetadata.fromQuickTime(metadata)
+        // TODO: Handle the different types of metadata and publish to new events
+        val playbackMetadata = PlaybackMetadata.fromId3Metadata(metadata)
+          ?: PlaybackMetadata.fromIcy(metadata)
+          ?: PlaybackMetadata.fromVorbisComment(metadata)
+          ?: PlaybackMetadata.fromQuickTime(metadata)
 
-          if (playbackMetadata != null) {
-            emitOnPlaybackMetadata(Arguments.createMap().apply {
-              putString("source", playbackMetadata.source)
-              putString("title", playbackMetadata.title)
-              putString("url", playbackMetadata.url)
-              putString("artist", playbackMetadata.artist)
-              putString("album", playbackMetadata.album)
-              putString("date", playbackMetadata.date)
-              putString("genre", playbackMetadata.genre)
-            })
-          }
+        if (playbackMetadata != null) {
+          emitOnPlaybackMetadata(Arguments.createMap().apply {
+            putString("source", playbackMetadata.source)
+            putString("title", playbackMetadata.title)
+            putString("url", playbackMetadata.url)
+            putString("artist", playbackMetadata.artist)
+            putString("album", playbackMetadata.album)
+            putString("date", playbackMetadata.date)
+            putString("genre", playbackMetadata.genre)
+          })
         }
       }
     }
 
     // Rating events
     mainScope.launch {
-      service?.let { service ->
-        service.event.onRatingChanged.collect { rating ->
-          emitOnRemoteSetRating(Arguments.createMap().apply {
-            putString("rating", rating.toString())
-          })
-        }
+      val service = connectedService ?: return@launch
+      service.event.onRatingChanged.collect { rating ->
+        emitOnRemoteSetRating(Arguments.createMap().apply {
+          putString("rating", rating.toString())
+        })
       }
     }
 
     // Controller connection events
     mainScope.launch {
-      service?.let { service ->
-        service.event.onControllerConnected.collect { controllerData ->
-          emitOnAndroidControllerConnected(Arguments.createMap().apply {
-            putString("package", controllerData.packageName)
-            putBoolean("isMediaNotificationController", controllerData.isMediaNotificationController)
-            putBoolean("isAutomotiveController", controllerData.isAutomotiveController)
-            putBoolean("isAutoCompanionController", controllerData.isAutoCompanionController)
-          })
-        }
+      val service = connectedService ?: return@launch
+      service.event.onControllerConnected.collect { controllerData ->
+        emitOnAndroidControllerConnected(Arguments.createMap().apply {
+          putString("package", controllerData.packageName)
+          putBoolean("isMediaNotificationController", controllerData.isMediaNotificationController)
+          putBoolean("isAutomotiveController", controllerData.isAutomotiveController)
+          putBoolean("isAutoCompanionController", controllerData.isAutoCompanionController)
+        })
       }
     }
 
     mainScope.launch {
-      service?.let { service ->
-        service.event.onControllerDisconnected.collect { controllerName ->
-          emitOnAndroidControllerDisconnected(Arguments.createMap().apply {
-            putString("package", controllerName)
-          })
-        }
+      val service = connectedService ?: return@launch
+      service.event.onControllerDisconnected.collect { controllerName ->
+        emitOnAndroidControllerDisconnected(Arguments.createMap().apply {
+          putString("package", controllerName)
+        })
       }
     }
 
     // Playback resume events
     mainScope.launch {
-      service?.let { service ->
-        service.event.onPlaybackResume.collect { packageName ->
-          emitOnAndroidPlaybackResume(Arguments.createMap().apply {
-            putString("package", packageName)
-          })
-        }
+      val service = connectedService ?: return@launch
+      service.event.onPlaybackResume.collect { packageName ->
+        emitOnAndroidPlaybackResume(Arguments.createMap().apply {
+          putString("package", packageName)
+        })
       }
     }
   }

@@ -3,132 +3,93 @@ package com.doublesymmetry.trackplayer.utils
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
-import android.os.Bundle
+import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.bridge.WritableMap
 import android.support.v4.media.RatingCompat
-import com.doublesymmetry.trackplayer.R
 import com.facebook.react.views.imagehelper.ResourceDrawableIdHelper
 import androidx.media3.common.Rating
 import androidx.media3.common.HeartRating
 import androidx.media3.common.ThumbRating
 import androidx.media3.common.StarRating
 import androidx.media3.common.PercentageRating
+import androidx.core.net.toUri
+import com.facebook.react.bridge.ReadableType
 
 /**
- * @author Milen Pivchev @mpivchev
+ * Utility class for converting between React Native bridge data types and Android native types.
+ *
+ * This class provides a set of helper functions to safely extract and convert data from
+ * React Native's ReadableMap and WritableMap objects to Android-specific types like Uri,
+ * resource IDs, ratings, and drawable resources.
  */
 object BundleUtils {
-    fun getUri(context: Context, data: Bundle?, key: String?): Uri? {
-        if (!data!!.containsKey(key)) return null
-        val obj = data[key]
-        if (obj is String) {
-            // Remote or Local Uri
-            if (obj.trim { it <= ' ' }.isEmpty()) throw RuntimeException("$key: The URL cannot be empty")
-            return Uri.parse(obj as String?)
-        } else if (obj is Bundle) {
-            // require/import
-            val uri = obj.getString("uri")
-            val helper = ResourceDrawableIdHelper.getInstance()
-            val id = helper.getResourceDrawableId(context, uri)
-            return if (id > 0) {
-                // In production, we can obtain the resource uri
-                val res = context.resources
-                Uri.Builder()
-                    .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
-                    .authority(res.getResourcePackageName(id))
-                    .appendPath(res.getResourceTypeName(id))
-                    .appendPath(res.getResourceEntryName(id))
-                    .build()
-            } else {
-                // During development, the resources might come directly from the metro server
-                Uri.parse(uri)
-            }
-        }
-        return null
+  fun getUri(context: Context, data: ReadableMap?, key: String?): Uri? {
+    if (data == null || key == null || !data.hasKey(key)) return null
+    val obj = data.getDynamic(key)
+    if (obj.type == ReadableType.String) {
+      // Remote or Local Uri
+      val uri = obj.asString()
+      if (uri?.trim { it <= ' ' }
+          .isNullOrEmpty()) throw RuntimeException("$key: The URL cannot be empty")
+      return uri.toUri()
+    } else if (obj.type == ReadableType.Map) {
+      // require/import
+      val objMap = obj.asMap()
+      val uri = objMap?.getString("uri")
+      if (uri == null) return null;
+      val id = ResourceDrawableIdHelper.getResourceDrawableId(context, uri)
+      return if (id > 0) {
+        // In production, we can obtain the resource uri
+        val res = context.resources
+        Uri.Builder()
+          .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
+          .authority(res.getResourcePackageName(id))
+          .appendPath(res.getResourceTypeName(id))
+          .appendPath(res.getResourceEntryName(id))
+          .build()
+      } else {
+        // During development, the resources might come directly from the metro server
+        uri.toUri()
+      }
     }
+    return null
+  }
 
-    fun getRawResourceId(context: Context, data: Bundle, key: String?): Int {
-        if (!data.containsKey(key)) return 0
-        val obj = data[key] as? Bundle ?: return 0
-        var name = obj.getString("uri")
-        if (name.isNullOrEmpty()) return 0
-        name = name.lowercase().replace("-", "_")
-        return try {
-            name.toInt()
-        } catch (ex: NumberFormatException) {
-            context.resources.getIdentifier(name, "raw", context.packageName)
-        }
+  fun getRawResourceId(context: Context, data: ReadableMap, key: String?): Int {
+    if (key == null || !data.hasKey(key) || data.getType(key) != ReadableType.Map) return 0
+    val obj = data.getMap(key) ?: return 0
+    var name = obj.getString("uri")
+    if (name.isNullOrEmpty()) return 0
+    name = name.lowercase().replace("-", "_")
+    return try {
+      name.toInt()
+    } catch (ex: NumberFormatException) {
+      context.resources.getIdentifier(name, "raw", context.packageName)
     }
+  }
 
-    private fun getIcon(context: Context, options: Bundle, propertyName: String, defaultIcon: Int): Int {
-        if (!options.containsKey(propertyName)) return defaultIcon
+  fun getRating(data: ReadableMap, key: String?, ratingType: Int): Rating? {
+    if (key == null || !data.hasKey(key)) return null
+    return when (ratingType) {
+      RatingCompat.RATING_HEART -> HeartRating(data.getBoolean(key))
+      RatingCompat.RATING_THUMB_UP_DOWN -> ThumbRating(data.getBoolean(key))
+      RatingCompat.RATING_PERCENTAGE -> PercentageRating(data.getDouble(key).toFloat())
+      RatingCompat.RATING_3_STARS, RatingCompat.RATING_4_STARS, RatingCompat.RATING_5_STARS -> StarRating(
+        ratingType,
+        data.getDouble(key).toFloat()
+      )
 
-        val bundle = options.getBundle(propertyName) ?: return defaultIcon
-
-        val helper = ResourceDrawableIdHelper.getInstance()
-        val icon = helper.getResourceDrawableId(context, bundle.getString("uri"))
-        return if (icon == 0) defaultIcon else icon
+      else -> null
     }
+  }
 
-    fun getCustomIcon(context: Context, options: Bundle, propertyName: String, defaultIcon: Int): Int {
-        when (getIntOrNull(options, propertyName)) {
-            0 -> return R.drawable.hearte_24px
-            1 -> return R.drawable.heart_24px
-            2 -> return R.drawable.baseline_repeat_24
-            3 -> return R.drawable.baseline_repeat_one_24
-            4 -> return R.drawable.shuffle_24px
-            5 -> return R.drawable.ifl_24px
-        }
-        return getIcon(context, options, propertyName, defaultIcon)
+  fun setRating(data: WritableMap, key: String?, rating: Rating) {
+    if (!rating.isRated || key == null) return
+    when (rating) {
+      is HeartRating -> data.putBoolean(key, rating.isHeart)
+      is ThumbRating -> data.putBoolean(key, rating.isThumbsUp)
+      is PercentageRating -> data.putDouble(key, rating.percent.toDouble())
+      is StarRating -> data.putDouble(key, rating.starRating.toDouble())
     }
-
-    fun getIconOrNull(context: Context, options: Bundle, propertyName: String): Int? {
-        if (!options.containsKey(propertyName)) return null
-
-        val bundle = options.getBundle(propertyName) ?: return null
-
-        val helper = ResourceDrawableIdHelper.getInstance()
-        val icon = helper.getResourceDrawableId(context, bundle.getString("uri"))
-        return if (icon == 0) null else icon
-    }
-
-    fun getRating(data: Bundle, key: String?, ratingType: Int): Rating? {
-        return when (ratingType) {
-            RatingCompat.RATING_HEART -> HeartRating(data.getBoolean(key, true))
-            RatingCompat.RATING_THUMB_UP_DOWN -> ThumbRating(data.getBoolean(key, true))
-            RatingCompat.RATING_PERCENTAGE -> PercentageRating(data.getFloat(key, 0f))
-            RatingCompat.RATING_3_STARS, RatingCompat.RATING_4_STARS, RatingCompat.RATING_5_STARS -> StarRating(ratingType, data.getFloat(key, 0f))
-            else -> null
-        }
-    }
-
-    fun setRating(data: Bundle, key: String?, rating: Rating) {
-        if (!rating.isRated) return
-        when (rating) {
-            is HeartRating -> data.putBoolean(key, rating.isHeart)
-            is ThumbRating -> data.putBoolean(key, rating.isThumbsUp)
-            is PercentageRating -> data.putDouble(key, rating.percent.toDouble())
-            is StarRating -> data.putDouble(key, rating.starRating.toDouble())
-        }
-    }
-
-    fun getInt(data: Bundle?, key: String?, defaultValue: Int): Int {
-        val value = data!![key]
-        return if (value is Number) {
-            value.toInt()
-        } else defaultValue
-    }
-
-    fun getIntOrNull(data: Bundle?, key: String?): Int? {
-        val value = data!![key]
-        return if (value is Number) {
-            value.toInt()
-        } else null
-    }
-
-    fun getDoubleOrNull(data: Bundle?, key: String?): Double? {
-        val value = data!![key]
-        return if (value is Number) {
-            value.toDouble()
-        } else null
-    }
+  }
 }

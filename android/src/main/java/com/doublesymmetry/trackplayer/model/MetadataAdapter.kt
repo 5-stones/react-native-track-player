@@ -1,6 +1,6 @@
 package com.doublesymmetry.trackplayer.model
 
-import android.os.Bundle
+import com.facebook.react.bridge.WritableMap
 import androidx.annotation.OptIn
 import androidx.media3.common.Metadata
 import androidx.media3.common.MediaMetadata
@@ -19,19 +19,19 @@ import timber.log.Timber
 sealed class MetadataAdapter {
     companion object {
         @OptIn(UnstableApi::class)
-        fun fromMetadata(metadata: Metadata): List<Bundle> {
-            val group = mutableListOf<Bundle>()
+        fun fromMetadata(metadata: Metadata): List<WritableMap> {
+            val group = mutableListOf<WritableMap>()
 
             (0 until metadata.length()).forEach { i ->
-                group.add(Bundle().apply {
-                    val rawEntries = mutableListOf<Bundle>()
+                group.add(Arguments.createMap().apply {
+                    val rawEntries = mutableListOf<WritableMap>()
 
                     when (val entry = metadata[i]) {
                         is ChapterFrame -> {
                             Timber.d("ChapterFrame: ${entry.id}")
                         }
                         is TextInformationFrame -> {
-                            val rawEntry = Bundle()
+                            val rawEntry = Arguments.createMap()
 
                             when (entry.id.uppercase()) {
                                 "TIT2", "TT2" -> {
@@ -64,7 +64,7 @@ sealed class MetadataAdapter {
                         }
 
                         is UrlLinkFrame -> {
-                            rawEntries.add(Bundle().apply {
+                            rawEntries.add(Arguments.createMap().apply {
                                 putString("value", entry.url)
                                 putString("key", entry.id.uppercase())
                                 putString("keySpace", "org.id3")
@@ -76,7 +76,7 @@ sealed class MetadataAdapter {
                             putString("title", entry.name)
                             putString("genre", entry.genre)
 
-                            rawEntries.add(Bundle().apply {
+                            rawEntries.add(Arguments.createMap().apply {
                                 putString("value", entry.name)
                                 putString("commonKey", "title")
                                 putString("key", "StreamTitle")
@@ -84,14 +84,14 @@ sealed class MetadataAdapter {
                                 putString("time", "-1")
                             })
 
-                            rawEntries.add(Bundle().apply {
+                            rawEntries.add(Arguments.createMap().apply {
                                 putString("value", entry.url)
                                 putString("key", "StreamURL")
                                 putString("keySpace", "icy")
                                 putString("time", "-1")
                             })
 
-                            rawEntries.add(Bundle().apply {
+                            rawEntries.add(Arguments.createMap().apply {
                                 putString("value", entry.genre)
                                 putString("commonKey", "genre")
                                 putString("key", "StreamGenre")
@@ -103,14 +103,14 @@ sealed class MetadataAdapter {
                         is IcyInfo -> {
                             putString("title", entry.title)
 
-                            rawEntries.add(Bundle().apply {
+                            rawEntries.add(Arguments.createMap().apply {
                                 putString("value", entry.url)
                                 putString("key", "StreamURL")
                                 putString("keySpace", "icy")
                                 putString("time", "-1")
                             })
 
-                            rawEntries.add(Bundle().apply {
+                            rawEntries.add(Arguments.createMap().apply {
                                 putString("value", entry.title)
                                 putString("commonKey", "title")
                                 putString("key", "StreamTitle")
@@ -120,7 +120,7 @@ sealed class MetadataAdapter {
                         }
 
                         is VorbisComment -> {
-                            val rawEntry = Bundle()
+                            val rawEntry = Arguments.createMap()
 
                             when (entry.key) {
                                 "TITLE" -> {
@@ -156,7 +156,7 @@ sealed class MetadataAdapter {
                         }
 
                         is MdtaMetadataEntry -> {
-                            val rawEntry = Bundle()
+                            val rawEntry = Arguments.createMap()
                             when (entry.key) {
                                 "com.apple.quicktime.title" -> {
                                     putString("title", entry.value.toString())
@@ -188,7 +188,9 @@ sealed class MetadataAdapter {
                         }
                     }
 
-                    putParcelableArray("raw", rawEntries.toTypedArray())
+                    val rawArray = Arguments.createArray()
+                    rawEntries.forEach { rawArray.pushMap(it) }
+                    putArray("raw", rawArray)
                 })
             }
 
