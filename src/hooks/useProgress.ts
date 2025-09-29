@@ -1,34 +1,24 @@
 import { useEffect, useState } from 'react';
 
-import { getProgress } from '../trackPlayer';
 import { Event } from '../constants';
-import type { Progress } from '../interfaces';
+import { getProgress } from '../trackPlayer';
 import { useTrackPlayerEvents } from './useTrackPlayerEvents';
-
-const INITIAL_STATE = {
-  position: 0,
-  duration: 0,
-  buffered: 0,
-};
 
 /**
  * Poll for track progress for the given interval (in miliseconds)
  * @param updateInterval - ms interval
  */
 export function useProgress(updateInterval = 1000) {
-  const [state, setState] = useState<Progress>(INITIAL_STATE);
-
+  const [state, setState] = useState(() => getProgress());
+  console.log(state);
   useTrackPlayerEvents([Event.PlaybackActiveTrackChanged], () => {
-    setState(INITIAL_STATE);
+    setState(getProgress());
   });
 
   useEffect(() => {
-    let mounted = true;
-
-    const update = async () => {
+    const update = () => {
       try {
-        const { position, duration, buffered } = await getProgress();
-        if (!mounted) return;
+        const { position, duration, buffered } = getProgress();
 
         setState((currentState) =>
           position === currentState.position &&
@@ -42,18 +32,10 @@ export function useProgress(updateInterval = 1000) {
       }
     };
 
-    const poll = async () => {
-      await update();
-      if (!mounted) return;
-      await new Promise<void>((resolve) => setTimeout(resolve, updateInterval));
-      if (!mounted) return;
-      poll();
-    };
-
-    poll();
+    const interval = setInterval(update, updateInterval);
 
     return () => {
-      mounted = false;
+      clearInterval(interval);
     };
   }, [updateInterval]);
 

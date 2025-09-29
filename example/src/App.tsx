@@ -1,49 +1,48 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import BottomSheet from '@gorhom/bottom-sheet';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Linking,
+  Platform,
   StatusBar,
   StyleSheet,
   View,
-  Platform,
-  Dimensions,
 } from 'react-native';
-import TrackPlayer, { useActiveTrack } from 'react-native-track-player';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
-import BottomSheet from '@gorhom/bottom-sheet';
-
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import TrackPlayer, { useActiveTrack } from 'react-native-track-player';
 import {
+  ActionSheet,
   Button,
   OptionSheet,
-  ActionSheet,
   PlayerControls,
   Progress,
   Spacer,
   TrackInfo,
 } from './components';
-import { QueueInitialTracksService, SetupService } from './services';
 import { SponsorCard } from './components/SponsorCard';
+import { QueueInitialTracksService, SetupService } from './services';
 
 export default function App() {
+  const isPlayerReady = useSetupPlayer();
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView style={styles.gestureContainer}>
-        <Inner />
+        {isPlayerReady ? (
+          <Player />
+        ) : (
+          <SafeAreaView style={styles.screenContainer}>
+            <ActivityIndicator />
+          </SafeAreaView>
+        )}
       </GestureHandlerRootView>
     </SafeAreaProvider>
   );
 }
 
-const Inner: React.FC = () => {
+function Player() {
   const track = useActiveTrack();
-  const isPlayerReady = useSetupPlayer();
 
   // options bottom sheet
   const optionsSheetRef = useRef<BottomSheet>(null);
@@ -74,14 +73,6 @@ const Inner: React.FC = () => {
       subscription.remove();
     };
   }, []);
-
-  if (!isPlayerReady) {
-    return (
-      <SafeAreaView style={styles.screenContainer}>
-        <ActivityIndicator />
-      </SafeAreaView>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.screenContainer}>
@@ -120,7 +111,7 @@ const Inner: React.FC = () => {
       </BottomSheet>
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   gestureContainer: { flex: 1 },
@@ -157,10 +148,8 @@ function useSetupPlayer() {
       await SetupService();
       if (unmounted) return;
       setPlayerReady(true);
-      const queue = await TrackPlayer.getQueue();
-      if (unmounted) return;
-      if (queue.length <= 0) {
-        await QueueInitialTracksService();
+      if (TrackPlayer.getQueue().length <= 0) {
+        QueueInitialTracksService();
       }
     })();
     return () => {

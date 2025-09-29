@@ -1,3 +1,4 @@
+import Icon from '@react-native-vector-icons/fontawesome6';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -6,11 +7,9 @@ import {
   View,
 } from 'react-native';
 import TrackPlayer, { useIsPlaying } from 'react-native-track-player';
-import Icon from '@react-native-vector-icons/fontawesome6';
 
 export const PlayPauseButton: React.FC = () => {
   const { playing, bufferingDuringPlay } = useIsPlaying();
-
   return (
     <View style={styles.container}>
       {bufferingDuringPlay ? (

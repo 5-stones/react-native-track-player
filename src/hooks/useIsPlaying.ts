@@ -1,5 +1,5 @@
-import * as TrackPlayer from '../trackPlayer';
 import { State } from '../constants';
+import * as TrackPlayer from '../trackPlayer';
 import { usePlayWhenReady } from './usePlayWhenReady';
 import { usePlaybackState } from './usePlaybackState';
 
@@ -14,7 +14,6 @@ import { usePlaybackState } from './usePlaybackState';
 export function useIsPlaying() {
   const state = usePlaybackState().state;
   const playWhenReady = usePlayWhenReady();
-
   return determineIsPlaying(playWhenReady, state);
 }
 
@@ -48,9 +47,8 @@ function determineIsPlaying(playWhenReady?: boolean, state?: State) {
  *   undefined if this isn't yet known.
  */
 export async function isPlaying() {
-  const [playbackState, playWhenReady] = await Promise.all([
-    TrackPlayer.getPlaybackState(),
+  return determineIsPlaying(
     TrackPlayer.getPlayWhenReady(),
-  ]);
-  return determineIsPlaying(playWhenReady, playbackState.state);
+    TrackPlayer.getPlaybackState().state
+  );
 }
