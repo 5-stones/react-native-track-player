@@ -12,6 +12,8 @@ import androidx.media3.extractor.metadata.id3.ChapterFrame
 import androidx.media3.extractor.metadata.id3.TextInformationFrame
 import androidx.media3.extractor.metadata.id3.UrlLinkFrame
 import androidx.media3.container.MdtaMetadataEntry
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.ReadableMap
 import timber.log.Timber
 
 sealed class MetadataAdapter {
@@ -193,8 +195,8 @@ sealed class MetadataAdapter {
             return group
         }
 
-        fun fromMediaMetadata(metadata: MediaMetadata): Bundle {
-            return Bundle().apply {
+        fun mapFromMediaMetadata(metadata: MediaMetadata): ReadableMap {
+            return Arguments.createMap().apply {
                 metadata.title?.let { putString("title", it.toString()) }
                 metadata.artist?.let { putString("artist", it.toString()) }
                 metadata.albumTitle?.let { putString("albumName", it.toString()) }

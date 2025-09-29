@@ -61,6 +61,18 @@ class PlayerEventHolder {
     */
     var onPlayerActionTriggeredExternally = _onPlayerActionTriggeredExternally.asSharedFlow()
 
+    private var _onRatingChanged = MutableSharedFlow<Any>()
+    var onRatingChanged = _onRatingChanged.asSharedFlow()
+
+    private var _onControllerConnected = MutableSharedFlow<EventControllerConnectionData>()
+    var onControllerConnected = _onControllerConnected.asSharedFlow()
+
+    private var _onControllerDisconnected = MutableSharedFlow<String>()
+    var onControllerDisconnected = _onControllerDisconnected.asSharedFlow()
+
+    private var _onPlaybackResume = MutableSharedFlow<String>()
+    var onPlaybackResume = _onPlaybackResume.asSharedFlow()
+
     internal fun updateAudioPlayerState(state: AudioPlayerState) {
         coroutineScope.launch {
             _stateChange.emit(state)
@@ -119,6 +131,30 @@ class PlayerEventHolder {
     internal fun updateOnPlayerActionTriggeredExternally(callback: MediaSessionCallback) {
         coroutineScope.launch {
             _onPlayerActionTriggeredExternally.emit(callback)
+        }
+    }
+
+    internal fun updateOnRatingChanged(rating: Any) {
+        coroutineScope.launch {
+            _onRatingChanged.emit(rating)
+        }
+    }
+
+    internal fun updateOnControllerConnected(controllerData: EventControllerConnectionData) {
+        coroutineScope.launch {
+            _onControllerConnected.emit(controllerData)
+        }
+    }
+
+    internal fun updateOnControllerDisconnected(controllerName: String) {
+        coroutineScope.launch {
+            _onControllerDisconnected.emit(controllerName)
+        }
+    }
+
+    internal fun updateOnPlaybackResume(packageName: String) {
+        coroutineScope.launch {
+            _onPlaybackResume.emit(packageName)
         }
     }
 }

@@ -204,7 +204,7 @@ abstract class BaseAudioPlayer internal constructor(
         exoPlayer.prepare()
     }
 
-    fun togglePlaying() {
+    fun togglePlay() {
         if (exoPlayer.isPlaying) {
             pause()
         } else {
