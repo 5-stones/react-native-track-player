@@ -10,7 +10,6 @@ import { useTrackPlayerEvents } from './useTrackPlayerEvents';
  */
 export function useProgress(updateInterval = 1000) {
   const [state, setState] = useState(() => getProgress());
-  console.log(state);
   useTrackPlayerEvents([Event.PlaybackActiveTrackChanged], () => {
     setState(getProgress());
   });
