@@ -116,27 +116,6 @@ class MusicService : HeadlessJsMediaService() {
         AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
     private var stopForegroundGracePeriod: Int = DEFAULT_STOP_FOREGROUND_GRACE_PERIOD
 
-    val state
-        get() = player.playerState
-
-    var ratingType: Int
-        get() = player.ratingType
-        set(value) {
-            player.ratingType = value
-        }
-
-    val playbackError
-        get() = player.playbackError
-
-    val event
-        get() = player.events
-
-    var playWhenReady: Boolean
-        get() = player.playWhenReady
-        set(value) {
-            player.playWhenReady = value
-        }
-
     private var latestOptions: PlayerOptionsData? = null
     private var commandStarted = false
 
