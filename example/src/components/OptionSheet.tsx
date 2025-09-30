@@ -1,7 +1,6 @@
-import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import React, { useState } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import TrackPlayer, {
   AppKilledPlaybackBehavior,
   RepeatMode,
@@ -11,7 +10,7 @@ import { Spacer } from './Spacer';
 
 export function OptionSheet() {
   return (
-    <BottomSheetScrollView>
+    <ScrollView contentContainerStyle={styles.contentContainer}>
       <Options
         label="Repeat Mode"
         options={[
@@ -54,15 +53,13 @@ export function OptionSheet() {
           }}
         />
       )}
-    </BottomSheetScrollView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   contentContainer: {
-    flex: 1,
-    marginTop: '4%',
-    marginHorizontal: 16,
+    padding: 16,
   },
   optionRow: {
     width: '100%',

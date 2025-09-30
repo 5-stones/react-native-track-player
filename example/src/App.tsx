@@ -1,17 +1,19 @@
-import BottomSheet from '@gorhom/bottom-sheet';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
   Linking,
+  Modal,
   Platform,
+  Pressable,
   StatusBar,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useActiveTrack } from 'react-native-track-player';
+import Icon from '@react-native-vector-icons/fontawesome6';
 import {
   ActionSheet,
   Button,
@@ -27,34 +29,21 @@ export default function App() {
   const isPlayerReady = useSetupPlayer();
   return (
     <SafeAreaProvider>
-      <GestureHandlerRootView style={styles.gestureContainer}>
-        {isPlayerReady ? (
-          <Player />
-        ) : (
-          <SafeAreaView style={styles.screenContainer}>
-            <ActivityIndicator />
-          </SafeAreaView>
-        )}
-      </GestureHandlerRootView>
+      {isPlayerReady ? (
+        <Player />
+      ) : (
+        <SafeAreaView style={styles.screenContainer}>
+          <ActivityIndicator />
+        </SafeAreaView>
+      )}
     </SafeAreaProvider>
   );
 }
 
 function Player() {
   const track = useActiveTrack();
-  // options bottom sheet
-  const optionsSheetRef = useRef<BottomSheet>(null);
-  const optionsSheetSnapPoints = useMemo(() => ['40%'], []);
-  const handleOptionsPress = useCallback(() => {
-    optionsSheetRef.current?.snapToIndex(0);
-  }, [optionsSheetRef]);
-
-  // actions bottom sheet
-  const actionsSheetRef = useRef<BottomSheet>(null);
-  const actionsSheetSnapPoints = useMemo(() => ['40%'], []);
-  const handleActionsPress = useCallback(() => {
-    actionsSheetRef.current?.snapToIndex(0);
-  }, [actionsSheetRef]);
+  const [optionsVisible, setOptionsVisible] = useState(false);
+  const [actionsVisible, setActionsVisible] = useState(false);
 
   useEffect(() => {
     function deepLinkHandler(data: { url: string }) {
@@ -77,8 +66,16 @@ function Player() {
       <StatusBar barStyle={'light-content'} />
       <View style={styles.contentContainer}>
         <View style={styles.topBarContainer}>
-          <Button title="Options" onPress={handleOptionsPress} type="primary" />
-          <Button title="Actions" onPress={handleActionsPress} type="primary" />
+          <Button
+            title="Options"
+            onPress={() => setOptionsVisible(true)}
+            type="primary"
+          />
+          <Button
+            title="Actions"
+            onPress={() => setActionsVisible(true)}
+            type="primary"
+          />
         </View>
         <TrackInfo track={track} />
         <Progress live={track?.isLiveStream} />
@@ -86,32 +83,67 @@ function Player() {
         <PlayerControls />
         <Spacer mode={'expand'} />
       </View>
-      <BottomSheet
-        index={-1}
-        ref={optionsSheetRef}
-        enablePanDownToClose={true}
-        snapPoints={optionsSheetSnapPoints}
-        handleIndicatorStyle={styles.sheetHandle}
-        backgroundStyle={styles.sheetBackgroundContainer}
+      <Modal
+        visible={optionsVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setOptionsVisible(false)}
       >
-        <OptionSheet />
-      </BottomSheet>
-      <BottomSheet
-        index={-1}
-        ref={actionsSheetRef}
-        enablePanDownToClose={true}
-        snapPoints={actionsSheetSnapPoints}
-        handleIndicatorStyle={styles.sheetHandle}
-        backgroundStyle={styles.sheetBackgroundContainer}
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setOptionsVisible(false)}
+        >
+          <View
+            style={styles.modalContent}
+            onStartShouldSetResponder={() => true}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
+            <View style={styles.modalHeader}>
+              <Pressable
+                onPress={() => setOptionsVisible(false)}
+                style={styles.closeButton}
+              >
+                <Icon name="xmark" size={24} color="white" iconStyle="solid" />
+              </Pressable>
+            </View>
+            <OptionSheet />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+      <Modal
+        visible={actionsVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setActionsVisible(false)}
       >
-        <ActionSheet />
-      </BottomSheet>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setActionsVisible(false)}
+        >
+          <View
+            style={styles.modalContent}
+            onStartShouldSetResponder={() => true}
+            onTouchEnd={(e) => e.stopPropagation()}
+          >
+            <View style={styles.modalHeader}>
+              <Pressable
+                onPress={() => setActionsVisible(false)}
+                style={styles.closeButton}
+              >
+                <Icon name="xmark" size={24} color="white" iconStyle="solid" />
+              </Pressable>
+            </View>
+            <ActionSheet />
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  gestureContainer: { flex: 1 },
   screenContainer: {
     flex: 1,
     backgroundColor: '#212121',
@@ -128,10 +160,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
-  sheetBackgroundContainer: {
-    backgroundColor: '#181818',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
-  sheetHandle: {
-    backgroundColor: 'white',
+  modalContent: {
+    backgroundColor: '#181818',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '50%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  closeButton: {
+    padding: 8,
   },
 });

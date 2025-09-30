@@ -24,14 +24,11 @@
     "types": "tsc --noEmit true"
   },
   "dependencies": {
-    "@gorhom/bottom-sheet": "^5.1.6",
     "@react-native-community/slider": "^4.5.7",
     "@react-native-segmented-control/segmented-control": "^2.5.7",
     "@react-native-vector-icons/fontawesome6": "^12.0.1",
     "react": "19.1.0",
     "react-native": "0.80.2",
-    "react-native-gesture-handler": "^2.26.0",
-    "react-native-reanimated": "^3.18.0",
     "react-native-safe-area-context": "^5.5.0"
   },
   "devDependencies": {
