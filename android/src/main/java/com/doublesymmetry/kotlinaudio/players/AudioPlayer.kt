@@ -25,6 +25,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.legacy.RatingCompat
 import com.doublesymmetry.kotlinaudio.event.PlayerEvents
 import com.doublesymmetry.kotlinaudio.models.AudioItem
+import com.doublesymmetry.kotlinaudio.models.AudioItemTransition
 import com.doublesymmetry.kotlinaudio.models.AudioItemTransitionReason
 import com.doublesymmetry.kotlinaudio.models.AudioPlayerState
 import com.doublesymmetry.kotlinaudio.models.FocusChangeData
@@ -492,16 +493,16 @@ class AudioPlayer(
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             when (reason) {
                 Player.MEDIA_ITEM_TRANSITION_REASON_AUTO -> events.audioItemTransition.emit(
-                    AudioItemTransitionReason.AUTO(oldPosition)
+                    AudioItemTransition(AudioItemTransitionReason.AUTO, oldPosition)
                 )
                 Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED -> events.audioItemTransition.emit(
-                    AudioItemTransitionReason.QUEUE_CHANGED(oldPosition)
+                    AudioItemTransition(AudioItemTransitionReason.QUEUE_CHANGED, oldPosition)
                 )
                 Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT -> events.audioItemTransition.emit(
-                    AudioItemTransitionReason.REPEAT(oldPosition)
+                    AudioItemTransition(AudioItemTransitionReason.REPEAT, oldPosition)
                 )
                 Player.MEDIA_ITEM_TRANSITION_REASON_SEEK -> events.audioItemTransition.emit(
-                    AudioItemTransitionReason.SEEK_TO_ANOTHER_AUDIO_ITEM(oldPosition)
+                    AudioItemTransition(AudioItemTransitionReason.SEEK_TO_ANOTHER_AUDIO_ITEM, oldPosition)
                 )
             }
         }

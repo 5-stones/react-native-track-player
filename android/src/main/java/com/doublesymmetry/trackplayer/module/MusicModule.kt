@@ -503,27 +503,25 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     private fun observeAudioItemTransition() {
       mainScope.launch {
         player.events.audioItemTransition.collect { transition ->
-          if (transition != null) {
-            emitOnPlaybackActiveTrackChanged(Arguments.createMap().apply {
-              putDouble("lastPosition", transition.oldPosition.toSeconds())
+          emitOnPlaybackActiveTrackChanged(Arguments.createMap().apply {
+            putDouble("lastPosition", transition.oldPosition.toSeconds())
 
-              // Add last track info if available
-              lastTrackIndex?.let { putInt("lastIndex", it) }
-              lastTrack?.let { putMap("lastTrack", it) }
+            // Add last track info if available
+            lastTrackIndex?.let { putInt("lastIndex", it) }
+            lastTrack?.let { putMap("lastTrack", it) }
 
-              // Add current track info
-              val currentIndex = player.currentIndex
-              if (currentIndex >= 0) {
-                putInt("index", currentIndex)
-                player.currentItem?.track?.toBridge()?.let { putMap("track", it) }
-              }
-            })
-
-            // Update last track info for next transition
+            // Add current track info
             val currentIndex = player.currentIndex
-            lastTrackIndex = if (currentIndex >= 0) currentIndex else null
-            lastTrack = player.currentItem?.track?.toBridge()
-          }
+            if (currentIndex >= 0) {
+              putInt("index", currentIndex)
+              player.currentItem?.track?.toBridge()?.let { putMap("track", it) }
+            }
+          })
+
+          // Update last track info for next transition
+          val currentIndex = player.currentIndex
+          lastTrackIndex = if (currentIndex >= 0) currentIndex else null
+          lastTrack = player.currentItem?.track?.toBridge()
         }
       }
     }

@@ -31,7 +31,7 @@ class PlayerEvents {
     val playbackEnd = event<PlaybackEndedReason?>(replay = 1)
     val playbackError = event<PlaybackError>(replay = 1)
     val playWhenReadyChange = event<PlayWhenReadyChangeData>(replay = 1)
-    val audioItemTransition = event<AudioItemTransitionReason?>(replay = 1)
+    val audioItemTransition = event<AudioItemTransition>(replay = 1)
     val positionChanged = event<PositionChangedReason?>(replay = 1)
     val onAudioFocusChanged = event<FocusChangeData>(replay = 1)
     val onCommonMetadata = event<MediaMetadata>(replay = 1)

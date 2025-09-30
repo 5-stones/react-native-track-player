@@ -1,33 +1,42 @@
 package com.doublesymmetry.kotlinaudio.models
 
 /**
- * Use these events to track when and why an [AudioItem] transitions to another.
- * Examples of an audio transition include changes to [AudioItem] queue, an [AudioItem] on repeat, skipping an [AudioItem], or simply when the [AudioItem] has finished.
+ * Indicates the reason why an [AudioItem] transitioned to another.
  */
-sealed class AudioItemTransitionReason(val oldPosition: Long) {
+enum class AudioItemTransitionReason {
     /**
      * Playback has automatically transitioned to the next [AudioItem].
      *
      * This reason also indicates a transition caused by another player.
      */
-    class AUTO(oldPosition: Long) : AudioItemTransitionReason(oldPosition)
+    AUTO,
 
     /**
      * A seek to another [AudioItem] has occurred. Usually triggered when calling
      * [AudioPlayer.next][com.doublesymmetry.kotlinaudio.players.AudioPlayer.next]
      * or [AudioPlayer.previous][com.doublesymmetry.kotlinaudio.players.AudioPlayer.previous].
      */
-    class SEEK_TO_ANOTHER_AUDIO_ITEM(oldPosition: Long) : AudioItemTransitionReason(oldPosition)
+    SEEK_TO_ANOTHER_AUDIO_ITEM,
 
     /**
      * The [AudioItem] has been repeated.
      */
-    class REPEAT(oldPosition: Long) : AudioItemTransitionReason(oldPosition)
+    REPEAT,
 
     /**
      * The current [AudioItem] has changed because of a change in the queue. This can either be if
      * the [AudioItem] previously being played has been removed, or when the queue becomes non-empty
      * after being empty.
      */
-    class QUEUE_CHANGED(oldPosition: Long) : AudioItemTransitionReason(oldPosition)
+    QUEUE_CHANGED
 }
+
+/**
+ * Represents a transition from one [AudioItem] to another.
+ * Examples include changes to [AudioItem] queue, an [AudioItem] on repeat, skipping an [AudioItem],
+ * or simply when the [AudioItem] has finished.
+ */
+data class AudioItemTransition(
+    val reason: AudioItemTransitionReason,
+    val oldPosition: Long
+)
