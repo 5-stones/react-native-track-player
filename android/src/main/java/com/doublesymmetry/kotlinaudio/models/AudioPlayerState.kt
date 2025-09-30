@@ -32,6 +32,21 @@ enum class AudioPlayerState {
     ERROR
 }
 
+val AudioPlayerState.bridge: String
+    get() {
+        return when(this) {
+            AudioPlayerState.LOADING -> "loading"
+            AudioPlayerState.READY -> "ready"
+            AudioPlayerState.BUFFERING -> "buffering"
+            AudioPlayerState.PAUSED -> "paused"
+            AudioPlayerState.PLAYING -> "playing"
+            AudioPlayerState.IDLE -> "none"
+            AudioPlayerState.ENDED -> "ended"
+            AudioPlayerState.ERROR -> "error"
+            AudioPlayerState.STOPPED -> "stopped"
+        }
+    }
+
 /**
  * Represents the current state of the audio player.
  * Includes the playback state and any associated error information.
@@ -42,7 +57,7 @@ data class PlaybackState(
 ) {
     fun toBridge(): WritableMap {
         return Arguments.createMap().apply {
-            putString("state", state.asLibState.state)
+            putString("state", state.bridge)
             error?.let { putMap("error", it.toBridge()) }
         }
     }

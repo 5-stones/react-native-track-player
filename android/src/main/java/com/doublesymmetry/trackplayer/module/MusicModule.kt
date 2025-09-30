@@ -9,7 +9,7 @@ import android.os.IBinder
 import android.support.v4.media.RatingCompat
 import com.doublesymmetry.kotlinaudio.models.Capability
 import com.doublesymmetry.kotlinaudio.models.RepeatMode
-import com.doublesymmetry.trackplayer.model.State
+import com.doublesymmetry.kotlinaudio.models.bridge
 import com.doublesymmetry.trackplayer.model.TrackFactory
 import com.doublesymmetry.trackplayer.service.MusicService
 import com.doublesymmetry.trackplayer.utils.AppForegroundTracker
@@ -32,7 +32,6 @@ import java.util.*
 import javax.annotation.Nonnull
 import com.doublesymmetry.trackplayer.NativeTrackPlayerSpec
 import com.doublesymmetry.trackplayer.extensions.NumberExt.Companion.toSeconds
-import com.doublesymmetry.trackplayer.extensions.asLibState
 import com.doublesymmetry.trackplayer.model.MetadataAdapter
 import kotlinx.coroutines.runBlocking
 
@@ -129,13 +128,13 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
       this["CAPABILITY_JUMP_BACKWARD"] = Capability.JUMP_BACKWARD.ordinal
 
       // States
-      this["STATE_NONE"] = State.None.state
-      this["STATE_READY"] = State.Ready.state
-      this["STATE_PLAYING"] = State.Playing.state
-      this["STATE_PAUSED"] = State.Paused.state
-      this["STATE_STOPPED"] = State.Stopped.state
-      this["STATE_BUFFERING"] = State.Buffering.state
-      this["STATE_LOADING"] = State.Loading.state
+      this["STATE_NONE"] = AudioPlayerState.IDLE.bridge
+      this["STATE_READY"] = AudioPlayerState.READY.bridge
+      this["STATE_PLAYING"] = AudioPlayerState.PLAYING.bridge
+      this["STATE_PAUSED"] = AudioPlayerState.PAUSED.bridge
+      this["STATE_STOPPED"] = AudioPlayerState.STOPPED.bridge
+      this["STATE_BUFFERING"] = AudioPlayerState.BUFFERING.bridge
+      this["STATE_LOADING"] = AudioPlayerState.LOADING.bridge
 
       // Rating Types
       this["RATING_HEART"] = RatingCompat.RATING_HEART
