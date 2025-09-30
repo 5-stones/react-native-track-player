@@ -19,6 +19,7 @@ import androidx.media3.common.Player.Listener
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.legacy.RatingCompat
@@ -35,7 +36,6 @@ import com.doublesymmetry.kotlinaudio.models.PositionChangedReason
 import com.doublesymmetry.kotlinaudio.models.setWakeMode
 import com.doublesymmetry.kotlinaudio.players.components.Cache
 import com.doublesymmetry.kotlinaudio.players.components.MediaFactory
-import com.doublesymmetry.kotlinaudio.players.components.setupBuffer
 import kotlinx.coroutines.MainScope
 import timber.log.Timber
 import java.util.Locale
@@ -163,15 +163,27 @@ abstract class BaseAudioPlayer internal constructor(
 
         val renderer = DefaultRenderersFactory(context)
         renderer.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+
+        val loadControl = run {
+            val bufferConfig = options.bufferOptions
+            val multiplier = DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS / DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS
+            val minBuffer = bufferConfig.minBuffer?.takeIf { it != 0 } ?: DefaultLoadControl.DEFAULT_MIN_BUFFER_MS
+            val maxBuffer = bufferConfig.maxBuffer?.takeIf { it != 0 } ?: DefaultLoadControl.DEFAULT_MAX_BUFFER_MS
+            val playBuffer = bufferConfig.playBuffer?.takeIf { it != 0 } ?: DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS
+            val backBuffer = bufferConfig.backBuffer?.takeIf { it != 0 } ?: DefaultLoadControl.DEFAULT_BACK_BUFFER_DURATION_MS
+            DefaultLoadControl.Builder()
+                .setBufferDurationsMs(minBuffer, maxBuffer, playBuffer, playBuffer * multiplier)
+                .setBackBuffer(backBuffer, false)
+                .build()
+        }
+
         exoPlayer = ExoPlayer
             .Builder(context)
             .setRenderersFactory(renderer)
             .setHandleAudioBecomingNoisy(options.handleAudioBecomingNoisy)
             .setMediaSourceFactory(MediaFactory(context, cache))
             .setWakeMode(setWakeMode(options.wakeMode))
-            .apply {
-                setLoadControl(setupBuffer(options.bufferOptions))
-            }
+            .setLoadControl(loadControl)
             .setSkipSilenceEnabled(options.skipSilence)
             .setName("kotlin-audio-player")
             .build()
