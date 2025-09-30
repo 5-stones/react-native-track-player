@@ -376,7 +376,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
   override fun seekBy(offset: Double) = runBlockingOnMain {
     val service = requireService()
-    service.player.seekBy(offset.toLong(), java.util.concurrent.TimeUnit.SECONDS)
+    service.player.seekBy((offset * 1000).toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
   }
 
   override fun retry() = runBlockingOnMain {
