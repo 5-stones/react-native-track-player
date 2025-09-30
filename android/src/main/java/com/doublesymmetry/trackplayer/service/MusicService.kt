@@ -102,7 +102,6 @@ class MusicService : HeadlessJsMediaService() {
 
     private var appKilledPlaybackBehavior =
         AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
-    private var stopForegroundGracePeriod: Int = DEFAULT_STOP_FOREGROUND_GRACE_PERIOD
 
     private var commandStarted = false
 
@@ -149,8 +148,6 @@ class MusicService : HeadlessJsMediaService() {
 
         appKilledPlaybackBehavior =
             AppKilledPlaybackBehavior::string.find(androidOptions?.appKilledPlaybackBehavior) ?: AppKilledPlaybackBehavior.CONTINUE_PLAYBACK
-
-        androidOptions?.stopForegroundGracePeriod?.let { stopForegroundGracePeriod = it }
 
         player.alwaysPauseOnInterruption = androidOptions?.pauseOnInterruption ?: false
         player.shuffleMode = androidOptions?.shuffle ?: false
@@ -516,6 +513,5 @@ class MusicService : HeadlessJsMediaService() {
         const val STATE_KEY = "state"
         const val ERROR_KEY = "error"
         const val TASK_KEY = "TrackPlayer"
-        const val DEFAULT_STOP_FOREGROUND_GRACE_PERIOD = 5
     }
 }
