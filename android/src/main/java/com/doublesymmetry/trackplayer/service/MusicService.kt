@@ -3,7 +3,6 @@ package com.doublesymmetry.trackplayer.service
 import android.annotation.SuppressLint
 import android.app.*
 import android.content.Intent
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Binder
 import android.os.Build
@@ -17,7 +16,6 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.CacheBitmapLoader
 import androidx.media3.common.Rating
-import androidx.media3.common.util.BitmapLoader
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
@@ -27,9 +25,7 @@ import androidx.media3.session.SessionResult
 import com.doublesymmetry.kotlinaudio.models.*
 import com.doublesymmetry.kotlinaudio.players.QueuedAudioPlayer
 import com.doublesymmetry.trackplayer.HeadlessJsMediaService
-import com.doublesymmetry.trackplayer.extensions.NumberExt.Companion.toSeconds
 import com.doublesymmetry.trackplayer.extensions.find
-import com.doublesymmetry.trackplayer.model.Track
 import com.doublesymmetry.trackplayer.model.PlayerOptionsData
 import com.doublesymmetry.trackplayer.utils.CoilBitmapLoader
 import com.facebook.react.bridge.Arguments
@@ -37,7 +33,6 @@ import com.facebook.react.jstasks.HeadlessJsTaskConfig
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.*
 import timber.log.Timber
-import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 @OptIn(UnstableApi::class)
