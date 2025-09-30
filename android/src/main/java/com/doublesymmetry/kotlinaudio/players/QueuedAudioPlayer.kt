@@ -3,19 +3,13 @@ package com.doublesymmetry.kotlinaudio.players
 import android.content.Context
 import androidx.media3.common.C
 import androidx.media3.common.IllegalSeekPositionException
-import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import com.doublesymmetry.kotlinaudio.models.*
-import java.util.*
-import kotlin.math.max
-import kotlin.math.min
 
 class QueuedAudioPlayer(
     private val context: Context,
     options: PlayerOptions = PlayerOptions()
 ) : AudioPlayer(context, options) {
-
-    private val queue = LinkedList<MediaItem>()
 
     var repeatMode: RepeatMode
         get() {
@@ -36,6 +30,8 @@ class QueuedAudioPlayer(
     val currentIndex
         get() = exoPlayer.currentMediaItemIndex
 
+    fun isEmpty(): Boolean = exoPlayer.mediaItemCount == 0
+
     var shuffleMode
         get() = exoPlayer.shuffleModeEnabled
         set(v) {
@@ -43,7 +39,7 @@ class QueuedAudioPlayer(
         }
 
     override val currentItem: AudioItem?
-        get() = queue.getOrNull(currentIndex)?.let { AudioItem.fromMediaItem(it) }
+        get() = exoPlayer.currentMediaItem?.let { AudioItem.fromMediaItem(it) }
 
     val nextIndex: Int?
         get() {
@@ -58,29 +54,35 @@ class QueuedAudioPlayer(
         }
 
     val items: List<AudioItem>
-        get() = queue.map { AudioItem.fromMediaItem(it) }
+        get() = (0 until exoPlayer.mediaItemCount).map { index ->
+            AudioItem.fromMediaItem(exoPlayer.getMediaItemAt(index))
+        }
 
     val previousItems: List<AudioItem>
         get() {
-            return if (queue.isEmpty()) emptyList()
-            else queue
-                .subList(0, exoPlayer.currentMediaItemIndex)
-                .map { AudioItem.fromMediaItem(it) }
+            return if (currentIndex <= 0) emptyList()
+            else (0 until currentIndex).map { index ->
+                AudioItem.fromMediaItem(exoPlayer.getMediaItemAt(index))
+            }
         }
 
     val nextItems: List<AudioItem>
         get() {
-            return if (queue.isEmpty()) emptyList()
-            else queue
-                .subList(exoPlayer.currentMediaItemIndex, queue.lastIndex)
-                .map { AudioItem.fromMediaItem(it) }
+            return if (currentIndex >= exoPlayer.mediaItemCount - 1) emptyList()
+            else ((currentIndex + 1) until exoPlayer.mediaItemCount).map { index ->
+                AudioItem.fromMediaItem(exoPlayer.getMediaItemAt(index))
+            }
         }
 
     val nextItem: AudioItem?
-        get() = items.getOrNull(currentIndex + 1)
+        get() = if (currentIndex + 1 < exoPlayer.mediaItemCount)
+            AudioItem.fromMediaItem(exoPlayer.getMediaItemAt(currentIndex + 1))
+        else null
 
     val previousItem: AudioItem?
-        get() = items.getOrNull(currentIndex - 1)
+        get() = if (currentIndex > 0)
+            AudioItem.fromMediaItem(exoPlayer.getMediaItemAt(currentIndex - 1))
+        else null
 
     override fun load(item: AudioItem, playWhenReady: Boolean) {
         load(item)
@@ -88,7 +90,7 @@ class QueuedAudioPlayer(
     }
 
     override fun load(item: AudioItem) {
-        if (queue.isEmpty()) {
+        if (isEmpty()) {
             add(item)
         } else {
             replaceItem(currentIndex, item)
@@ -112,7 +114,6 @@ class QueuedAudioPlayer(
      */
     fun add(item: AudioItem) {
         val mediaSource = item.toMediaItem()
-        queue.add(mediaSource)
         exoPlayer.addMediaItem(mediaSource)
         exoPlayer.prepare()
     }
@@ -133,7 +134,6 @@ class QueuedAudioPlayer(
      */
     fun add(items: List<AudioItem>) {
         val mediaItems = items.map { it.toMediaItem() }
-        queue.addAll(mediaItems)
         exoPlayer.addMediaItems(mediaItems)
         exoPlayer.prepare()
     }
@@ -146,7 +146,6 @@ class QueuedAudioPlayer(
      */
     fun add(items: List<AudioItem>, atIndex: Int) {
         val mediaItems = items.map { (it).toMediaItem() }
-        queue.addAll(atIndex, mediaItems)
         exoPlayer.addMediaItems(atIndex, mediaItems)
         exoPlayer.prepare()
     }
@@ -156,7 +155,6 @@ class QueuedAudioPlayer(
      * @param index The index of the item to remove.
      */
     fun remove(index: Int) {
-        queue.removeAt(index)
         exoPlayer.removeMediaItem(index)
     }
 
@@ -199,9 +197,6 @@ class QueuedAudioPlayer(
      */
     fun move(fromIndex: Int, toIndex: Int) {
         exoPlayer.moveMediaItem(fromIndex, toIndex)
-        val item = queue[fromIndex]
-        queue.removeAt(fromIndex)
-        queue.add(max(0, min(items.size, if (toIndex > fromIndex) toIndex else toIndex - 1)), item)
     }
 
     /**
@@ -223,7 +218,7 @@ class QueuedAudioPlayer(
             exoPlayer.seekTo(index, C.TIME_UNSET)
             exoPlayer.prepare()
         } catch (e: IllegalSeekPositionException) {
-            throw Error("This item index $index does not exist. The size of the queue is ${queue.size} items.")
+            throw Error("This item index $index does not exist. The size of the queue is ${exoPlayer.mediaItemCount} items.")
         }
     }
 
@@ -232,7 +227,6 @@ class QueuedAudioPlayer(
      */
     fun replaceItem(index: Int, item: AudioItem) {
         val mediaItem = item.toMediaItem()
-        queue[index] = mediaItem
         exoPlayer.replaceMediaItem(index, mediaItem)
     }
 
@@ -240,12 +234,11 @@ class QueuedAudioPlayer(
      * Removes all the upcoming items, if any (the ones returned by [next]).
      */
     fun removeUpcomingItems() {
-        if (queue.lastIndex == -1 || currentIndex == -1) return
-        val lastIndex = queue.lastIndex + 1
+        if (currentIndex == -1) return
+        val lastIndex = exoPlayer.mediaItemCount
         val fromIndex = currentIndex + 1
 
         exoPlayer.removeMediaItems(fromIndex, lastIndex)
-        queue.subList(fromIndex, lastIndex).clear()
     }
 
     /**
@@ -253,16 +246,5 @@ class QueuedAudioPlayer(
      */
     fun removePreviousItems() {
         exoPlayer.removeMediaItems(0, currentIndex)
-        queue.subList(0, currentIndex).clear()
-    }
-
-    override fun destroy() {
-        queue.clear()
-        super.destroy()
-    }
-
-    override fun clear() {
-        queue.clear()
-        super.clear()
     }
 }
