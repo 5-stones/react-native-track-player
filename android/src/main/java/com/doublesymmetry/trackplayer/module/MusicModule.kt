@@ -209,8 +209,6 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   override fun updateOptions(data: ReadableMap?): Unit = runBlockingOnMain {
-    val service = requireService()
-
     val options = PlayerOptionsData.fromBridge(data)
 
     // Store progress update interval for use during playback
@@ -220,35 +218,30 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   override fun add(data: ReadableArray, insertBeforeIndex: Double?): Double = runBlockingOnMain {
-    val service = requireService()
-
     val insertBeforeIndexInt = insertBeforeIndex?.toInt() ?: 0
     val tracks = trackFactory.tracksFromBridge(data)
-    if (insertBeforeIndexInt < -1 || insertBeforeIndexInt > service.tracks.size) {
+    if (insertBeforeIndexInt < -1 || insertBeforeIndexInt > player.items.size) {
       throw Exception("The track index is out of bounds")
     }
-    val index = if (insertBeforeIndexInt == -1) service.tracks.size else insertBeforeIndexInt
-    service.player.add(tracks.map { it.toAudioItem() }, index)
+    val index = if (insertBeforeIndexInt == -1) player.items.size else insertBeforeIndexInt
+    player.add(tracks.map { it.toAudioItem() }, index)
     index.toDouble()
   }
 
   override fun load(data: ReadableMap?) = runBlockingOnMain {
-    val service = requireService()
-    if (data == null) return@runBlockingOnMain
-
-    service.player.load(trackFactory.fromBridge(data).toAudioItem())
+    data?.let {
+      player.load(trackFactory.fromBridge(it).toAudioItem())
+    }
   }
 
-  override fun move(fromIndex: Double, toIndex: Double) = runBlockingOnMain {
-    val service = requireService()
-    service.player.move(fromIndex.toInt(), toIndex.toInt())
+  override fun move(fromIndex: Double, toIndex: Double) = runBlockingOnMain { 
+    player.move(fromIndex.toInt(), toIndex.toInt())
   }
 
   override fun remove(data: ReadableArray?) = runBlockingOnMain {
-    val service = requireService()
     val inputIndexes = Arguments.toList(data)
     if (inputIndexes != null) {
-      val size = service.tracks.size
+      val size = player.items.size
       val indexes: ArrayList<Int> = ArrayList()
       for (inputIndex in inputIndexes) {
         val index = if (inputIndex is Int) inputIndex else inputIndex.toString().toInt()
@@ -257,19 +250,18 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
         }
         indexes.add(index)
       }
-      service.player.remove(indexes)
+      player.remove(indexes)
     }
   }
 
   override fun updateMetadataForTrack(index: Double, map: ReadableMap?): Unit = runBlockingOnMain {
-    val service = requireService()
-
-    if (index < 0 || index >= service.tracks.size) {
+    if (index < 0 || index >= player.items.size) {
       throw Exception("The index is out of bounds")
     }
 
     map?.let {
-      val currentTrack = service.tracks[index.toInt()]
+      val currentTrack = player.items[index.toInt()].track
+        ?: throw Exception("Track not found at index ${index.toInt()}")
       val updatedTrack = currentTrack.updateMetadata(
         title = it.getString("title") ?: currentTrack.title,
         artist = it.getString("artist") ?: currentTrack.artist,
@@ -282,19 +274,17 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
           ?: currentTrack.rating,
         mediaId = it.getString("mediaId") ?: currentTrack.mediaId
       )
-      service.player.replaceItem(index.toInt(), updatedTrack.toAudioItem())
+      player.replaceItem(index.toInt(), updatedTrack.toAudioItem())
     }
   }
 
   override fun updateNowPlayingMetadata(map: ReadableMap?): Unit = runBlockingOnMain {
-    val service = requireService()
-
-    if (service.tracks.isEmpty()) {
+    if (player.items.isEmpty()) {
       throw Exception("There is no current item in the player")
     }
 
     map?.let {
-      val currentTrack = service.currentTrack ?: throw Exception("There is no current track")
+      val currentTrack = player.currentItem?.track ?: throw Exception("There is no current track")
       val updatedTrack = currentTrack.updateMetadata(
         title = it.getString("title") ?: currentTrack.title,
         artist = it.getString("artist") ?: currentTrack.artist,
@@ -307,183 +297,150 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
           ?: currentTrack.rating,
         mediaId = it.getString("mediaId") ?: currentTrack.mediaId
       )
-      service.player.replaceItem(service.player.currentIndex, updatedTrack.toAudioItem())
+      player.replaceItem(player.currentIndex, updatedTrack.toAudioItem())
     }
   }
 
   override fun removeUpcomingTracks() = runBlockingOnMain {
-    val service = requireService()
-    service.player.removeUpcomingItems()
+    player.removeUpcomingItems()
   }
 
   override fun skip(index: Double, initialTime: Double?) = runBlockingOnMain {
-    val service = requireService()
-
-    service.player.jumpToItem(index.toInt())
+    player.jumpToItem(index.toInt())
 
     if (initialTime != null && initialTime >= 0) {
-      service.player.seek((initialTime * 1000).toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+      player.seek((initialTime * 1000).toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
     }
   }
 
   override fun skipToNext(initialTime: Double?) = runBlockingOnMain {
-    val service = requireService()
-
-    service.player.next()
+    player.next()
 
     if (initialTime != null && initialTime >= 0) {
-      service.player.seek((initialTime * 1000).toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+      player.seek((initialTime * 1000).toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
     }
   }
 
   override fun skipToPrevious(initialTime: Double?) = runBlockingOnMain {
-    val service = requireService()
-
-    service.player.previous()
+    player.previous()
 
     if (initialTime != null && initialTime >= 0) {
-      service.player.seek((initialTime * 1000).toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+      player.seek((initialTime * 1000).toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
     }
   }
 
   override fun reset() = runBlockingOnMain {
-    val service = requireService()
-
-    service.player.stop()
+    player.stop()
     delay(300) // Allow playback to stop
-    service.player.clear()
+    player.clear()
   }
 
   override fun play() = runBlockingOnMain {
-    val service = requireService()
-    service.player.play()
+    player.play()
   }
 
   override fun pause() = runBlockingOnMain {
-    val service = requireService()
-    service.player.pause()
+    player.pause()
   }
 
   override fun stop() = runBlockingOnMain {
-    val service = requireService()
-    service.player.stop()
+    player.stop()
   }
 
   override fun seekTo(seconds: Double) = runBlockingOnMain {
-    val service = requireService()
-    service.player.seek((seconds * 1000).toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+    player.seek((seconds * 1000).toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
   }
 
   override fun seekBy(offset: Double) = runBlockingOnMain {
-    val service = requireService()
-    service.player.seekBy((offset * 1000).toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
+    player.seekBy((offset * 1000).toLong(), java.util.concurrent.TimeUnit.MILLISECONDS)
   }
 
   override fun retry() = runBlockingOnMain {
-    val service = requireService()
-    service.player.prepare()
+    player.prepare()
   }
 
   override fun setVolume(volume: Double) = runBlockingOnMain {
-    val service = requireService()
-    service.player.volume = volume.toFloat()
+    player.volume = volume.toFloat()
   }
 
   override fun getVolume(): Double = runBlockingOnMain {
-    val service = requireService()
-    service.player.volume.toDouble()
+    player.volume.toDouble()
   }
 
   override fun setRate(rate: Double) = runBlockingOnMain {
-    val service = requireService()
-    service.player.playbackSpeed = rate.toFloat()
+    player.playbackSpeed = rate.toFloat()
   }
 
   override fun getRate(): Double = runBlockingOnMain {
-    val service = requireService()
-    service.player.playbackSpeed.toDouble()
+    player.playbackSpeed.toDouble()
   }
 
   override fun setRepeatMode(mode: Double) = runBlockingOnMain {
-    val service = requireService()
-    service.player.repeatMode = RepeatMode.fromOrdinal(mode.toInt())
+    player.repeatMode = RepeatMode.fromOrdinal(mode.toInt())
   }
 
   override fun getRepeatMode(): Double = runBlockingOnMain {
-    val service = requireService()
-    service.player.repeatMode.ordinal.toDouble()
+    player.repeatMode.ordinal.toDouble()
   }
 
   override fun setPlayWhenReady(playWhenReady: Boolean) = runBlockingOnMain {
-    val service = requireService()
     service.playWhenReady = playWhenReady
   }
 
   override fun getPlayWhenReady(): Boolean = runBlockingOnMain {
-    val service = requireService()
     service.playWhenReady
   }
 
   override fun getTrack(index: Double): WritableMap? = runBlockingOnMain {
-    val service = requireService()
     val indexInt = index.toInt()
-    if (indexInt >= 0 && indexInt < service.tracks.size) {
-      service.tracks[indexInt].toBridge()
+    if (indexInt >= 0 && indexInt < player.items.size) {
+      player.items[indexInt].track?.toBridge()
     } else {
       null
     }
   }
 
   override fun getQueue(): WritableArray = runBlockingOnMain {
-    val service = requireService()
-    Arguments.fromList(service.tracks.map { it.toBridge() })
+    Arguments.fromList(player.items.mapNotNull { it.track?.toBridge() })
   }
 
   override fun setQueue(data: ReadableArray?): Unit = runBlockingOnMain {
-    val service = requireService()
     data?.let {
-      service.player.clear()
-      service.player.add(trackFactory.tracksFromBridge(data).map { it.toAudioItem() })
+      player.clear()
+      player.add(trackFactory.tracksFromBridge(data).map { it.toAudioItem() })
     }
   }
 
   override fun getActiveTrackIndex(): Double? = runBlockingOnMain {
-    val service = requireService()
-    if (service.tracks.isEmpty()) null else service.player.currentIndex.toDouble()
+    if (player.items.isEmpty()) null else player.currentIndex.toDouble()
   }
 
   override fun getActiveTrack(): WritableMap? = runBlockingOnMain {
-    val service = requireService()
-    service.currentTrack?.toBridge()
+    player.currentItem?.track?.toBridge()
   }
 
   override fun getProgress(): WritableMap = runBlockingOnMain {
-    val service = requireService()
     Arguments.createMap().let {
-      it.putDouble("duration", service.player.duration.toSeconds())
-      it.putDouble("position", service.player.position.toSeconds())
-      it.putDouble("buffered", service.player.bufferedPosition.toSeconds())
+      it.putDouble("duration", player.duration.toSeconds())
+      it.putDouble("position", player.position.toSeconds())
+      it.putDouble("buffered", player.bufferedPosition.toSeconds())
       it
     }
   }
 
   override fun getPlaybackState(): WritableMap = runBlockingOnMain {
-    val service = requireService()
     getPlayerStateMap(service.state)
   }
 
   override fun acquireWakeLock() = runBlockingOnMain {
-    val service = requireService()
     service.acquireWakeLock()
   }
 
   override fun abandonWakeLock() = runBlockingOnMain {
-    val service = requireService()
     service.abandonWakeLock()
   }
 
   override fun validateOnStartCommandIntent(): Boolean = runBlockingOnMain {
-    val service = requireService()
     service.onStartCommandIntentValid
   }
 
@@ -501,9 +458,11 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     }
   }
 
-  private fun requireService(): MusicService {
-    return connectedService ?: throw Exception("Player not initialized")
-  }
+  private val service: MusicService
+    get() = connectedService ?: throw Exception("Player not initialized")
+
+  private val player
+    get() = service.player
 
   private fun setupEventObserver() {
     val service = connectedService ?: return
