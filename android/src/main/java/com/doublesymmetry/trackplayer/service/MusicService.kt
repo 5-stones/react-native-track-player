@@ -3,13 +3,11 @@ package com.doublesymmetry.trackplayer.service
 import android.annotation.SuppressLint
 import android.app.*
 import android.content.Intent
-import android.net.Uri
 import android.os.Binder
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
-import android.view.KeyEvent
 import androidx.annotation.MainThread
 import androidx.annotation.OptIn
 import androidx.media3.common.Player
@@ -22,7 +20,7 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionCommands
 import androidx.media3.session.SessionResult
 import com.doublesymmetry.kotlinaudio.models.*
-import com.doublesymmetry.kotlinaudio.players.QueuedAudioPlayer
+import com.doublesymmetry.kotlinaudio.players.AudioPlayer
 import com.doublesymmetry.trackplayer.HeadlessJsMediaService
 import com.doublesymmetry.trackplayer.extensions.find
 import com.doublesymmetry.trackplayer.model.PlayerOptionsData
@@ -37,7 +35,7 @@ import androidx.core.net.toUri
 @OptIn(UnstableApi::class)
 @MainThread
 class MusicService : HeadlessJsMediaService() {
-    lateinit var player: QueuedAudioPlayer
+    lateinit var player: AudioPlayer
     private val binder = MusicBinder()
     private val scope = MainScope()
     // Temporary reference to the initial player's ExoPlayer, used for MediaSession initialization
@@ -68,7 +66,7 @@ class MusicService : HeadlessJsMediaService() {
         })
         // Create initial player with default options. This will be replaced in setupPlayer()
         // when JavaScript provides the actual configuration
-        player = QueuedAudioPlayer(this)
+        player = AudioPlayer(this)
         temporaryPlayer = player.exoPlayer
         val openAppIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -120,7 +118,7 @@ class MusicService : HeadlessJsMediaService() {
         val options = playerOptionsData.toAudioPlayerOptions()
         val oldPlayer = player
         // Replace temporary player with properly configured one
-        player = QueuedAudioPlayer(this@MusicService, options)
+        player = AudioPlayer(this@MusicService, options)
         oldPlayer.destroy()
         temporaryPlayer = null
         mediaSession.player = player.forwardingPlayer

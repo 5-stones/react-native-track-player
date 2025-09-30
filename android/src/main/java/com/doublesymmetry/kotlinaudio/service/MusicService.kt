@@ -12,13 +12,13 @@ import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.doublesymmetry.kotlinaudio.models.CustomCommandButton
 import com.doublesymmetry.kotlinaudio.models.PlayerOptions
-import com.doublesymmetry.kotlinaudio.players.QueuedAudioPlayer
+import com.doublesymmetry.kotlinaudio.players.AudioPlayer
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 
 class MusicService : MediaLibraryService() {
     private val binder = MusicBinder()
-    lateinit var player: QueuedAudioPlayer
+    lateinit var player: AudioPlayer
     var mediaLibrarySession: MediaLibrarySession? = null
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? =
         mediaLibrarySession
@@ -26,7 +26,7 @@ class MusicService : MediaLibraryService() {
     // Create your player and media session in the onCreate lifecycle event
     override fun onCreate() {
         super.onCreate()
-        player = QueuedAudioPlayer(this, PlayerOptions(nativeExample = true))
+        player = AudioPlayer(this, PlayerOptions(nativeExample = true))
         val customCommandButtons =
             CustomCommandButton.entries.map { command -> command.commandButton }
         val callback = object : MediaLibrarySession.Callback {

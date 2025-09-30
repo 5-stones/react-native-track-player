@@ -14,8 +14,8 @@ sealed class AudioItemTransitionReason(val oldPosition: Long) {
 
     /**
      * A seek to another [AudioItem] has occurred. Usually triggered when calling
-     * [QueuedAudioPlayer.next][com.doublesymmetry.kotlinaudio.players.QueuedAudioPlayer.next]
-     * or [QueuedAudioPlayer.previous][com.doublesymmetry.kotlinaudio.players.QueuedAudioPlayer.previous].
+     * [AudioPlayer.next][com.doublesymmetry.kotlinaudio.players.AudioPlayer.next]
+     * or [AudioPlayer.previous][com.doublesymmetry.kotlinaudio.players.AudioPlayer.previous].
      */
     class SEEK_TO_ANOTHER_AUDIO_ITEM(oldPosition: Long) : AudioItemTransitionReason(oldPosition)
 
