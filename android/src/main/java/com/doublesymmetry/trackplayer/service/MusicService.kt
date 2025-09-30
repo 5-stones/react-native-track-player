@@ -489,8 +489,6 @@ class MusicService : HeadlessJsMediaService() {
     }
 
     companion object {
-        const val STATE_KEY = "state"
-        const val ERROR_KEY = "error"
         const val TASK_KEY = "TrackPlayer"
     }
 }

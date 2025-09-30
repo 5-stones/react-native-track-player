@@ -34,8 +34,6 @@ import com.doublesymmetry.trackplayer.NativeTrackPlayerSpec
 import com.doublesymmetry.trackplayer.extensions.NumberExt.Companion.toSeconds
 import com.doublesymmetry.trackplayer.extensions.asLibState
 import com.doublesymmetry.trackplayer.model.MetadataAdapter
-import com.doublesymmetry.trackplayer.service.MusicService.Companion.ERROR_KEY
-import com.doublesymmetry.trackplayer.service.MusicService.Companion.STATE_KEY
 import kotlinx.coroutines.runBlocking
 
 
@@ -125,9 +123,9 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
   private fun getPlayerStateMap(state: AudioPlayerState): WritableMap {
     return Arguments.createMap().let {
-      it.putString(STATE_KEY, state.asLibState.state)
+      it.putString("state", state.asLibState.state)
       if (state == AudioPlayerState.ERROR) {
-        it.putMap(ERROR_KEY, getPlaybackErrorMap(connectedService?.player?.playbackError))
+        it.putMap("error", getPlaybackErrorMap(connectedService?.player?.playbackError))
       }
       it
     }
