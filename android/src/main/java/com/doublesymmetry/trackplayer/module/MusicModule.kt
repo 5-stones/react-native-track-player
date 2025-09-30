@@ -50,6 +50,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   private val context = reactContext
   private var progressUpdateManager: ProgressUpdateManager? = null
   private val trackFactory = TrackFactory(context) { connectedService?.ratingType ?: RatingCompat.RATING_NONE }
+  private var eventObserver: PlayerEventObserver? = null
 
   @Nonnull
   override fun getName(): String {
@@ -91,7 +92,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
         }
         connectedService?.setupPlayer(playerOptions)
         playerSetUpPromise?.resolve(null)
-        observePlayerEvents()
+        setupEventObserver()
       }
 
     }
@@ -104,6 +105,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     // Cancel all event observation coroutines when service disconnects
     progressUpdateManager?.stop()
     mainScope.coroutineContext.cancelChildren()
+    eventObserver = null
     connectedService = null
   }
 
@@ -503,228 +505,237 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     return connectedService ?: throw Exception("Player not initialized")
   }
 
-  private fun observePlayerEvents() {
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.stateChange.collect { state ->
-        emitOnPlaybackState(getPlayerStateMap(state))
+  private fun setupEventObserver() {
+    val service = connectedService ?: return
 
-        // Let progress manager handle playback state changes
-        progressUpdateManager?.onPlaybackStateChanged(state)
+    eventObserver = PlayerEventObserver(service)
+
+    eventObserver?.observeAll()
+  }
+
+  private inner class PlayerEventObserver(
+    private val service: MusicService
+  ) {
+    fun observeAll() {
+      observeStateChange()
+      observeAudioItemTransition()
+      observePlayWhenReadyChange()
+      observePlayerActionTriggeredExternally()
+      observePositionChanged()
+      observeQueueEnded()
+      observePlaybackError()
+      observeAudioFocusChanged()
+      observeCommonMetadata()
+      observeTimedMetadata()
+      observeRatingChanged()
+      observeControllerConnected()
+      observeControllerDisconnected()
+      observePlaybackResume()
+    }
+
+    private fun observeStateChange() {
+      mainScope.launch {
+        service.event.stateChange.collect { state ->
+          emitOnPlaybackState(getPlayerStateMap(state))
+          progressUpdateManager?.onPlaybackStateChanged(state)
+        }
       }
     }
 
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.audioItemTransition.collect { transition ->
-        if (transition != null) {
-          emitOnPlaybackActiveTrackChanged(Arguments.createMap().apply {
-            putMap("track", service.player.currentItem?.track?.toBridge())
-            putDouble("position", transition.oldPosition.toSeconds())
+    private fun observeAudioItemTransition() {
+      mainScope.launch {
+        service.event.audioItemTransition.collect { transition ->
+          if (transition != null) {
+            emitOnPlaybackActiveTrackChanged(Arguments.createMap().apply {
+              putMap("track", service.player.currentItem?.track?.toBridge())
+              putDouble("position", transition.oldPosition.toSeconds())
+            })
+          }
+        }
+      }
+    }
+
+    private fun observePlayWhenReadyChange() {
+      mainScope.launch {
+        service.event.playWhenReadyChange.collect { playWhenReadyData ->
+          emitOnPlaybackPlayWhenReadyChanged(Arguments.createMap().apply {
+            putBoolean("playWhenReady", playWhenReadyData.playWhenReady)
           })
         }
       }
     }
 
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.playWhenReadyChange.collect { playWhenReadyData ->
-        emitOnPlaybackPlayWhenReadyChanged(Arguments.createMap().apply {
-          putBoolean("playWhenReady", playWhenReadyData.playWhenReady)
-        })
-      }
-    }
-
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.onPlayerActionTriggeredExternally.collect { mediaSessionAction ->
-        when (mediaSessionAction) {
-          MediaSessionCallback.PLAY -> {
-            val readableMap = Arguments.createMap()
-            emitOnRemotePlay(readableMap)
-          }
-
-          MediaSessionCallback.PAUSE -> {
-            val readableMap = Arguments.createMap()
-            emitOnRemotePause(readableMap)
-          }
-
-          MediaSessionCallback.NEXT -> {
-            val readableMap = Arguments.createMap()
-            emitOnRemoteNext(readableMap)
-          }
-
-          MediaSessionCallback.PREVIOUS -> {
-            val readableMap = Arguments.createMap()
-            emitOnRemotePrevious(readableMap)
-          }
-
-          MediaSessionCallback.STOP -> {
-            val readableMap = Arguments.createMap()
-            emitOnRemoteStop(readableMap)
-          }
-
-          MediaSessionCallback.FORWARD -> {
-            val readableMap = Arguments.createMap().apply {
-              putInt("interval", playerOptions.forwardJumpInterval.toInt())
+    private fun observePlayerActionTriggeredExternally() {
+      mainScope.launch {
+        service.event.onPlayerActionTriggeredExternally.collect { mediaSessionAction ->
+          when (mediaSessionAction) {
+            MediaSessionCallback.PLAY -> {
+              emitOnRemotePlay(Arguments.createMap())
             }
-            emitOnRemoteJumpForward(readableMap)
-          }
-
-          MediaSessionCallback.REWIND -> {
-            val readableMap = Arguments.createMap().apply {
-              putInt("interval", playerOptions.backwardJumpInterval.toInt())
+            MediaSessionCallback.PAUSE -> {
+              emitOnRemotePause(Arguments.createMap())
             }
-            emitOnRemoteJumpBackward(readableMap)
-          }
-
-          is MediaSessionCallback.RATING -> {
-            val readableMap = Arguments.createMap().apply {
-              putString("rating", mediaSessionAction.rating.toString())
+            MediaSessionCallback.NEXT -> {
+              emitOnRemoteNext(Arguments.createMap())
             }
-            emitOnRemoteSetRating(readableMap)
-          }
-
-          is MediaSessionCallback.SEEK -> {
-            val readableMap = Arguments.createMap().apply {
-              putDouble("position", mediaSessionAction.positionMs.toDouble() / 1000.0)
+            MediaSessionCallback.PREVIOUS -> {
+              emitOnRemotePrevious(Arguments.createMap())
             }
-            emitOnRemoteSeek(readableMap)
+            MediaSessionCallback.STOP -> {
+              emitOnRemoteStop(Arguments.createMap())
+            }
+            MediaSessionCallback.FORWARD -> {
+              emitOnRemoteJumpForward(Arguments.createMap().apply {
+                putInt("interval", playerOptions.forwardJumpInterval.toInt())
+              })
+            }
+            MediaSessionCallback.REWIND -> {
+              emitOnRemoteJumpBackward(Arguments.createMap().apply {
+                putInt("interval", playerOptions.backwardJumpInterval.toInt())
+              })
+            }
+            is MediaSessionCallback.RATING -> {
+              emitOnRemoteSetRating(Arguments.createMap().apply {
+                putString("rating", mediaSessionAction.rating.toString())
+              })
+            }
+            is MediaSessionCallback.SEEK -> {
+              emitOnRemoteSeek(Arguments.createMap().apply {
+                putDouble("position", mediaSessionAction.positionMs.toDouble() / 1000.0)
+              })
+            }
+            else -> {} // Handle other actions as needed
           }
-
-          else -> {} // Handle other actions as needed
         }
       }
     }
 
-    // Progress updates and remote seek detection
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.positionChanged.collect { positionChangedReason ->
-        emitOnPlaybackProgressUpdated(Arguments.createMap().apply {
-          putDouble("position", service.getPositionInSeconds())
-          putDouble("buffered", service.getBufferedPositionInSeconds())
-          putDouble("duration", service.getDurationInSeconds())
-        })
-      }
-    }
-
-    // Queue ended events
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.stateChange.collect { state ->
-        if (state == AudioPlayerState.ENDED && service.player.nextItem == null) {
-          emitOnPlaybackQueueEnded(Arguments.createMap().apply {
-            putInt("track", service.player.currentIndex)
+    private fun observePositionChanged() {
+      mainScope.launch {
+        service.event.positionChanged.collect {
+          emitOnPlaybackProgressUpdated(Arguments.createMap().apply {
             putDouble("position", service.getPositionInSeconds())
+            putDouble("buffered", service.getBufferedPositionInSeconds())
+            putDouble("duration", service.getDurationInSeconds())
           })
         }
       }
     }
 
-    // Player errors
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.playbackError.collect { error ->
-        emitOnPlaybackError(getPlaybackErrorMap(error))
+    private fun observeQueueEnded() {
+      mainScope.launch {
+        service.event.stateChange.collect { state ->
+          if (state == AudioPlayerState.ENDED && service.player.nextItem == null) {
+            emitOnPlaybackQueueEnded(Arguments.createMap().apply {
+              putInt("track", service.player.currentIndex)
+              putDouble("position", service.getPositionInSeconds())
+            })
+          }
+        }
       }
     }
 
-    // Audio focus changes (duck events)
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.onAudioFocusChanged.collect { focusChangeData ->
-        emitOnRemoteDuck(Arguments.createMap().apply {
-          putBoolean(
-            "permanent",
-            focusChangeData.isFocusLostPermanently
-          )
-          putBoolean("paused", focusChangeData.isPaused)
-        })
+    private fun observePlaybackError() {
+      mainScope.launch {
+        service.event.playbackError.collect { error ->
+          emitOnPlaybackError(getPlaybackErrorMap(error))
+        }
       }
     }
 
-
-    // Metadata events
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.onCommonMetadata.collect { metadata ->
-        emitOnMetadataCommonReceived(Arguments.createMap().apply {
-          putMap("metadata", MetadataAdapter.mapFromMediaMetadata(metadata))
-        })
-      }
-    }
-
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.onTimedMetadata.collect { metadata ->
-        emitOnMetadataTimedReceived(Arguments.createMap().let {
-          it.putArray("metadata", Arguments.createArray().apply {
-            MetadataAdapter.fromMetadata(metadata)
-              .forEach { item -> pushMap(item) }
-          })
-          it
-        })
-
-        // TODO: Handle the different types of metadata and publish to new events
-        val playbackMetadata = PlaybackMetadata.fromId3Metadata(metadata)
-          ?: PlaybackMetadata.fromIcy(metadata)
-          ?: PlaybackMetadata.fromVorbisComment(metadata)
-          ?: PlaybackMetadata.fromQuickTime(metadata)
-
-        if (playbackMetadata != null) {
-          emitOnPlaybackMetadata(Arguments.createMap().apply {
-            putString("source", playbackMetadata.source)
-            putString("title", playbackMetadata.title)
-            putString("url", playbackMetadata.url)
-            putString("artist", playbackMetadata.artist)
-            putString("album", playbackMetadata.album)
-            putString("date", playbackMetadata.date)
-            putString("genre", playbackMetadata.genre)
+    private fun observeAudioFocusChanged() {
+      mainScope.launch {
+        service.event.onAudioFocusChanged.collect { focusChangeData ->
+          emitOnRemoteDuck(Arguments.createMap().apply {
+            putBoolean("permanent", focusChangeData.isFocusLostPermanently)
+            putBoolean("paused", focusChangeData.isPaused)
           })
         }
       }
     }
 
-    // Rating events
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.onRatingChanged.collect { rating ->
-        emitOnRemoteSetRating(Arguments.createMap().apply {
-          putString("rating", rating.toString())
-        })
+    private fun observeCommonMetadata() {
+      mainScope.launch {
+        service.event.onCommonMetadata.collect { metadata ->
+          emitOnMetadataCommonReceived(Arguments.createMap().apply {
+            putMap("metadata", MetadataAdapter.mapFromMediaMetadata(metadata))
+          })
+        }
       }
     }
 
-    // Controller connection events
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.onControllerConnected.collect { controllerData ->
-        emitOnAndroidControllerConnected(Arguments.createMap().apply {
-          putString("package", controllerData.packageName)
-          putBoolean("isMediaNotificationController", controllerData.isMediaNotificationController)
-          putBoolean("isAutomotiveController", controllerData.isAutomotiveController)
-          putBoolean("isAutoCompanionController", controllerData.isAutoCompanionController)
-        })
+    private fun observeTimedMetadata() {
+      mainScope.launch {
+        service.event.onTimedMetadata.collect { metadata ->
+          emitOnMetadataTimedReceived(Arguments.createMap().let {
+            it.putArray("metadata", Arguments.createArray().apply {
+              MetadataAdapter.fromMetadata(metadata)
+                .forEach { item -> pushMap(item) }
+            })
+            it
+          })
+
+          // TODO: Handle the different types of metadata and publish to new events
+          val playbackMetadata = PlaybackMetadata.fromId3Metadata(metadata)
+            ?: PlaybackMetadata.fromIcy(metadata)
+            ?: PlaybackMetadata.fromVorbisComment(metadata)
+            ?: PlaybackMetadata.fromQuickTime(metadata)
+
+          if (playbackMetadata != null) {
+            emitOnPlaybackMetadata(Arguments.createMap().apply {
+              putString("source", playbackMetadata.source)
+              putString("title", playbackMetadata.title)
+              putString("url", playbackMetadata.url)
+              putString("artist", playbackMetadata.artist)
+              putString("album", playbackMetadata.album)
+              putString("date", playbackMetadata.date)
+              putString("genre", playbackMetadata.genre)
+            })
+          }
+        }
       }
     }
 
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.onControllerDisconnected.collect { controllerName ->
-        emitOnAndroidControllerDisconnected(Arguments.createMap().apply {
-          putString("package", controllerName)
-        })
+    private fun observeRatingChanged() {
+      mainScope.launch {
+        service.event.onRatingChanged.collect { rating ->
+          emitOnRemoteSetRating(Arguments.createMap().apply {
+            putString("rating", rating.toString())
+          })
+        }
       }
     }
 
-    // Playback resume events
-    mainScope.launch {
-      val service = connectedService ?: return@launch
-      service.event.onPlaybackResume.collect { packageName ->
-        emitOnAndroidPlaybackResume(Arguments.createMap().apply {
-          putString("package", packageName)
-        })
+    private fun observeControllerConnected() {
+      mainScope.launch {
+        service.event.onControllerConnected.collect { controllerData ->
+          emitOnAndroidControllerConnected(Arguments.createMap().apply {
+            putString("package", controllerData.packageName)
+            putBoolean("isMediaNotificationController", controllerData.isMediaNotificationController)
+            putBoolean("isAutomotiveController", controllerData.isAutomotiveController)
+            putBoolean("isAutoCompanionController", controllerData.isAutoCompanionController)
+          })
+        }
+      }
+    }
+
+    private fun observeControllerDisconnected() {
+      mainScope.launch {
+        service.event.onControllerDisconnected.collect { controllerName ->
+          emitOnAndroidControllerDisconnected(Arguments.createMap().apply {
+            putString("package", controllerName)
+          })
+        }
+      }
+    }
+
+    private fun observePlaybackResume() {
+      mainScope.launch {
+        service.event.onPlaybackResume.collect { packageName ->
+          emitOnAndroidPlaybackResume(Arguments.createMap().apply {
+            putString("package", packageName)
+          })
+        }
       }
     }
   }
