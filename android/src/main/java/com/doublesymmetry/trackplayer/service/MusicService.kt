@@ -134,7 +134,7 @@ class MusicService : HeadlessJsMediaService() {
         get() = player.playbackError
 
     val event
-        get() = player.playerEventHolder
+        get() = player.events
 
     var playWhenReady: Boolean
         get() = player.playWhenReady
@@ -586,7 +586,7 @@ class MusicService : HeadlessJsMediaService() {
             controller: MediaSession.ControllerInfo
         ) {
             if (::player.isInitialized) {
-                player.playerEventHolder.updateOnControllerDisconnected(controller.packageName)
+                player.events.onControllerDisconnected.emit(controller.packageName)
             }
             super.onDisconnected(session, controller)
         }
@@ -602,7 +602,7 @@ class MusicService : HeadlessJsMediaService() {
             val isAutomotiveController = session.isAutomotiveController(controller)
             val isAutoCompanionController = session.isAutoCompanionController(controller)
             if (::player.isInitialized) {
-                player.playerEventHolder.updateOnControllerConnected(
+                player.events.onControllerConnected.emit(
                     EventControllerConnectionData(
                         packageName = controller.packageName,
                         isMediaNotificationController = isMediaNotificationController,
@@ -678,7 +678,7 @@ class MusicService : HeadlessJsMediaService() {
             mediaSession: MediaSession,
             controller: MediaSession.ControllerInfo
         ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
-            player.playerEventHolder.updateOnPlaybackResume(controller.packageName)
+            player.events.onPlaybackResume.emit(controller.packageName)
             return super.onPlaybackResumption(mediaSession, controller)
         }
 
@@ -687,7 +687,7 @@ class MusicService : HeadlessJsMediaService() {
             controller: MediaSession.ControllerInfo,
             rating: Rating
         ): ListenableFuture<SessionResult> {
-            player.playerEventHolder.updateOnRatingChanged(rating)
+            player.events.onRatingChanged.emit(rating)
             return super.onSetRating(session, controller, rating)
         }
     }
