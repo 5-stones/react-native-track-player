@@ -465,16 +465,14 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     get() = service.player
 
   private fun setupEventObserver() {
-    val service = connectedService ?: return
+    connectedService ?: return
 
-    eventObserver = PlayerEventObserver(service)
+    eventObserver = PlayerEventObserver()
 
     eventObserver?.observeAll()
   }
 
-  private inner class PlayerEventObserver(
-    private val service: MusicService
-  ) {
+  private inner class PlayerEventObserver {
     fun observeAll() {
       observeStateChange()
       observeAudioItemTransition()
@@ -494,7 +492,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observeStateChange() {
       mainScope.launch {
-        service.player.events.stateChange.collect { state ->
+        player.events.stateChange.collect { state ->
           emitOnPlaybackState(getPlayerStateMap(state))
           progressUpdateManager?.onPlaybackStateChanged(state)
         }
@@ -503,10 +501,10 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observeAudioItemTransition() {
       mainScope.launch {
-        service.player.events.audioItemTransition.collect { transition ->
+        player.events.audioItemTransition.collect { transition ->
           if (transition != null) {
             emitOnPlaybackActiveTrackChanged(Arguments.createMap().apply {
-              putMap("track", service.player.currentItem?.track?.toBridge())
+              putMap("track", player.currentItem?.track?.toBridge())
               putDouble("position", transition.oldPosition.toSeconds())
             })
           }
@@ -516,7 +514,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observePlayWhenReadyChange() {
       mainScope.launch {
-        service.player.events.playWhenReadyChange.collect { playWhenReadyData ->
+        player.events.playWhenReadyChange.collect { playWhenReadyData ->
           emitOnPlaybackPlayWhenReadyChanged(Arguments.createMap().apply {
             putBoolean("playWhenReady", playWhenReadyData.playWhenReady)
           })
@@ -526,7 +524,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observePlayerActionTriggeredExternally() {
       mainScope.launch {
-        service.player.events.onPlayerActionTriggeredExternally.collect { mediaSessionAction ->
+        player.events.onPlayerActionTriggeredExternally.collect { mediaSessionAction ->
           when (mediaSessionAction) {
             MediaSessionCallback.PLAY -> {
               emitOnRemotePlay(Arguments.createMap())
@@ -571,11 +569,11 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observePositionChanged() {
       mainScope.launch {
-        service.player.events.positionChanged.collect {
+        player.events.positionChanged.collect {
           emitOnPlaybackProgressUpdated(Arguments.createMap().apply {
-            putDouble("position", service.player.position.toSeconds())
-            putDouble("buffered", service.player.bufferedPosition.toSeconds())
-            putDouble("duration", service.player.duration.toSeconds())
+            putDouble("position", player.position.toSeconds())
+            putDouble("buffered", player.bufferedPosition.toSeconds())
+            putDouble("duration", player.duration.toSeconds())
           })
         }
       }
@@ -583,11 +581,11 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observeQueueEnded() {
       mainScope.launch {
-        service.player.events.stateChange.collect { state ->
-          if (state == AudioPlayerState.ENDED && service.player.nextItem == null) {
+        player.events.stateChange.collect { state ->
+          if (state == AudioPlayerState.ENDED && player.nextItem == null) {
             emitOnPlaybackQueueEnded(Arguments.createMap().apply {
-              putInt("track", service.player.currentIndex)
-              putDouble("position", service.player.position.toSeconds())
+              putInt("track", player.currentIndex)
+              putDouble("position", player.position.toSeconds())
             })
           }
         }
@@ -596,7 +594,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observePlaybackError() {
       mainScope.launch {
-        service.player.events.playbackError.collect { error ->
+        player.events.playbackError.collect { error ->
           emitOnPlaybackError(getPlaybackErrorMap(error))
         }
       }
@@ -604,7 +602,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observeAudioFocusChanged() {
       mainScope.launch {
-        service.player.events.onAudioFocusChanged.collect { focusChangeData ->
+        player.events.onAudioFocusChanged.collect { focusChangeData ->
           emitOnRemoteDuck(Arguments.createMap().apply {
             putBoolean("permanent", focusChangeData.isFocusLostPermanently)
             putBoolean("paused", focusChangeData.isPaused)
@@ -615,7 +613,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observeCommonMetadata() {
       mainScope.launch {
-        service.player.events.onCommonMetadata.collect { metadata ->
+        player.events.onCommonMetadata.collect { metadata ->
           emitOnMetadataCommonReceived(Arguments.createMap().apply {
             putMap("metadata", MetadataAdapter.mapFromMediaMetadata(metadata))
           })
@@ -625,7 +623,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observeTimedMetadata() {
       mainScope.launch {
-        service.player.events.onTimedMetadata.collect { metadata ->
+        player.events.onTimedMetadata.collect { metadata ->
           emitOnMetadataTimedReceived(Arguments.createMap().let {
             it.putArray("metadata", Arguments.createArray().apply {
               MetadataAdapter.fromMetadata(metadata)
@@ -657,7 +655,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observeRatingChanged() {
       mainScope.launch {
-        service.player.events.onRatingChanged.collect { rating ->
+        player.events.onRatingChanged.collect { rating ->
           emitOnRemoteSetRating(Arguments.createMap().apply {
             putString("rating", rating.toString())
           })
@@ -667,7 +665,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observeControllerConnected() {
       mainScope.launch {
-        service.player.events.onControllerConnected.collect { controllerData ->
+        player.events.onControllerConnected.collect { controllerData ->
           emitOnAndroidControllerConnected(Arguments.createMap().apply {
             putString("package", controllerData.packageName)
             putBoolean("isMediaNotificationController", controllerData.isMediaNotificationController)
@@ -680,7 +678,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observeControllerDisconnected() {
       mainScope.launch {
-        service.player.events.onControllerDisconnected.collect { controllerName ->
+        player.events.onControllerDisconnected.collect { controllerName ->
           emitOnAndroidControllerDisconnected(Arguments.createMap().apply {
             putString("package", controllerName)
           })
@@ -690,7 +688,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observePlaybackResume() {
       mainScope.launch {
-        service.player.events.onPlaybackResume.collect { packageName ->
+        player.events.onPlaybackResume.collect { packageName ->
           emitOnAndroidPlaybackResume(Arguments.createMap().apply {
             putString("package", packageName)
           })
