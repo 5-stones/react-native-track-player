@@ -14,7 +14,6 @@ import androidx.annotation.MainThread
 import androidx.annotation.OptIn
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.session.CacheBitmapLoader
 import androidx.media3.common.Rating
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
@@ -27,7 +26,6 @@ import com.doublesymmetry.kotlinaudio.players.QueuedAudioPlayer
 import com.doublesymmetry.trackplayer.HeadlessJsMediaService
 import com.doublesymmetry.trackplayer.extensions.find
 import com.doublesymmetry.trackplayer.model.PlayerOptionsData
-import com.doublesymmetry.trackplayer.utils.CoilBitmapLoader
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.jstasks.HeadlessJsTaskConfig
 import com.google.common.util.concurrent.ListenableFuture
@@ -75,7 +73,6 @@ class MusicService : HeadlessJsMediaService() {
         mediaSession = MediaLibrarySession.Builder(this, fakePlayer,
             InnerMediaSessionCallback()
         )
-            .setBitmapLoader(CacheBitmapLoader(CoilBitmapLoader(this)))
             // https://github.com/androidx/media/issues/1218
             .setSessionActivity(
                 PendingIntent.getActivity(
