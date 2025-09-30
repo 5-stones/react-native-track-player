@@ -210,9 +210,6 @@ class MusicService : HeadlessJsMediaService() {
         }
     }
 
-    override fun onUnbind(intent: Intent?): Boolean {
-        return super.onUnbind(intent)
-    }
 
     override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
         // https://github.com/androidx/media/issues/843#issuecomment-1860555950
