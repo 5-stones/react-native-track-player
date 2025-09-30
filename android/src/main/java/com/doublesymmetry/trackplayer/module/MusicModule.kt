@@ -471,6 +471,9 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   private inner class PlayerEventObserver {
+    private var lastTrackIndex: Int? = null
+    private var lastTrack: WritableMap? = null
+
     fun observeAll() {
       observeStateChange()
       observeAudioItemTransition()
@@ -502,9 +505,24 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
         player.events.audioItemTransition.collect { transition ->
           if (transition != null) {
             emitOnPlaybackActiveTrackChanged(Arguments.createMap().apply {
-              putMap("track", player.currentItem?.track?.toBridge())
-              putDouble("position", transition.oldPosition.toSeconds())
+              putDouble("lastPosition", transition.oldPosition.toSeconds())
+
+              // Add last track info if available
+              lastTrackIndex?.let { putInt("lastIndex", it) }
+              lastTrack?.let { putMap("lastTrack", it) }
+
+              // Add current track info
+              val currentIndex = player.currentIndex
+              if (currentIndex >= 0) {
+                putInt("index", currentIndex)
+                player.currentItem?.track?.toBridge()?.let { putMap("track", it) }
+              }
             })
+
+            // Update last track info for next transition
+            val currentIndex = player.currentIndex
+            lastTrackIndex = if (currentIndex >= 0) currentIndex else null
+            lastTrack = player.currentItem?.track?.toBridge()
           }
         }
       }
