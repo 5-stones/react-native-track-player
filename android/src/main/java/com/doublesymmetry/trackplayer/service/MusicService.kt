@@ -213,9 +213,7 @@ class MusicService : HeadlessJsMediaService() {
 
     @MainThread
     override fun onBind(intent: Intent?): IBinder? {
-        val intentAction = intent?.action
-        Timber.d("intentAction = $intentAction")
-        return if (intentAction != null) {
+        return if (intent?.action != null) {
             super.onBind(intent)
         } else {
             binder
@@ -223,8 +221,6 @@ class MusicService : HeadlessJsMediaService() {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        val intentAction = intent?.action
-        Timber.d("intentAction = $intentAction")
         return super.onUnbind(intent)
     }
 
@@ -267,8 +263,9 @@ class MusicService : HeadlessJsMediaService() {
                 stopSelf()
                 exitProcess(0)
             }
-
-            else -> {}
+            AppKilledPlaybackBehavior.CONTINUE_PLAYBACK -> {
+                // No action needed - just continue playing
+            }
         }
     }
 
