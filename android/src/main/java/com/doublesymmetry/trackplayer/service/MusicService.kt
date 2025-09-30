@@ -245,12 +245,7 @@ class MusicService : HeadlessJsMediaService() {
                 // registers the service being restarted?
                 player.destroy()
                 scope.cancel()
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                } else {
-                    @Suppress("DEPRECATION")
-                    stopForeground(true)
-                }
+                stopForeground(STOP_FOREGROUND_REMOVE)
                 onDestroy()
                 // https://github.com/androidx/media/issues/27#issuecomment-1456042326
                 stopSelf()
