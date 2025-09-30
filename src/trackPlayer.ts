@@ -1,5 +1,6 @@
 import { AppRegistry, Platform } from 'react-native';
 
+import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes';
 import { Event, RepeatMode } from './constants';
 import type {
   AddTrack,
@@ -69,38 +70,48 @@ export function registerPlaybackService(factory: () => ServiceHandler) {
   }
 }
 
+const callbackByEvent = {
+  'android-controller-connected': TrackPlayer.onAndroidControllerConnected,
+  'android-controller-disconnected':
+    TrackPlayer.onAndroidControllerDisconnected,
+  'metadata-chapter-received': TrackPlayer.onMetadataChapterReceived,
+  'metadata-common-received': TrackPlayer.onMetadataCommonReceived,
+  'metadata-timed-received': TrackPlayer.onMetadataTimedReceived,
+  'playback-state': TrackPlayer.onPlaybackState,
+  'playback-active-track-changed': TrackPlayer.onPlaybackActiveTrackChanged,
+  'playback-progress-updated': TrackPlayer.onPlaybackProgressUpdated,
+  'playback-play-when-ready-changed':
+    TrackPlayer.onPlaybackPlayWhenReadyChanged,
+  'playback-queue-ended': TrackPlayer.onPlaybackQueueEnded,
+  'playback-error': TrackPlayer.onPlaybackError,
+  'remote-play': TrackPlayer.onRemotePlay,
+  'remote-play-search': TrackPlayer.onRemotePlaySearch,
+  'remote-play-id': TrackPlayer.onRemotePlayId,
+  'remote-pause': TrackPlayer.onRemotePause,
+  'remote-stop': TrackPlayer.onRemoteStop,
+  'remote-next': TrackPlayer.onRemoteNext,
+  'remote-previous': TrackPlayer.onRemotePrevious,
+  'remote-seek': TrackPlayer.onRemoteSeek,
+  'remote-jump-forward': TrackPlayer.onRemoteJumpForward,
+  'remote-jump-backward': TrackPlayer.onRemoteJumpBackward,
+  'remote-duck': TrackPlayer.onRemoteDuck,
+  'remote-set-rating': TrackPlayer.onRemoteSetRating,
+  'android-playback-resume': TrackPlayer.onAndroidPlaybackResume,
+  'remote-like': TrackPlayer.onRemoteLike,
+  'remote-dislike': TrackPlayer.onRemoteDislike,
+  'remote-bookmark': TrackPlayer.onRemoteBookmark,
+  'remote-skip': TrackPlayer.onRemoteSkip,
+} satisfies Record<Event, EventEmitter<object>>;
+
 export function addEventListener<T extends Event>(
   event: T,
   listener: EventPayloadByEvent[T] extends never
     ? () => void
     : (event: EventPayloadByEvent[T]) => void
-) {
-  // Map old event names to new TurboModule event emitters
-  const eventMap: Record<string, string> = {
-    'playback-state': 'onPlaybackState',
-    'playback-active-track-changed': 'onPlaybackActiveTrackChanged',
-    'playback-progress-updated': 'onPlaybackProgressUpdated',
-    'playback-play-when-ready-changed': 'onPlaybackPlayWhenReadyChanged',
-    'playback-queue-ended': 'onPlaybackQueueEnded',
-    'playback-error': 'onPlaybackError',
-    'remote-play': 'onRemotePlay',
-    'remote-pause': 'onRemotePause',
-    'remote-next': 'onRemoteNext',
-    'remote-previous': 'onRemotePrevious',
-    'remote-seek': 'onRemoteSeek',
-    'remote-jump-forward': 'onRemoteJumpForward',
-    'remote-jump-backward': 'onRemoteJumpBackward',
-    'remote-duck': 'onRemoteDuck',
-  };
-
-  const turboModuleEvent = eventMap[event];
-  if (turboModuleEvent && TrackPlayer[turboModuleEvent]) {
-    return TrackPlayer[turboModuleEvent](listener);
-  }
-
-  // Fallback for unmapped events
-  console.warn(`Event '${event}' not mapped to TurboModule emitter`);
-  return { remove: () => {} };
+): {
+  remove: () => void;
+} {
+  return callbackByEvent[event](listener as never);
 }
 
 // MARK: - Queue API
@@ -295,7 +306,7 @@ export function stop(): void {
  * This is the equivalent of calling `TrackPlayer.play()` when `playWhenReady = true`
  * or `TrackPlayer.pause()` when `playWhenReady = false`.
  */
-export function setPlayWhenReady(playWhenReady: boolean): boolean {
+export function setPlayWhenReady(playWhenReady: boolean): void {
   return TrackPlayer.setPlayWhenReady(playWhenReady);
 }
 
