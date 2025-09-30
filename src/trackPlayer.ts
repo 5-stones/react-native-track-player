@@ -370,7 +370,7 @@ export function setQueue(tracks: Track[]): void {
  * @param repeatMode The repeat mode to set.
  * @see https://rntp.dev/docs/api/constants/repeat-mode
  */
-export function setRepeatMode(mode: RepeatMode): RepeatMode {
+export function setRepeatMode(mode: RepeatMode): void {
   return TrackPlayer.setRepeatMode(mode);
 }
 
