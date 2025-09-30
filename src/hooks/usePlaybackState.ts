@@ -12,7 +12,10 @@ import { addEventListener, getPlaybackState } from '../trackPlayer';
  * */
 export const usePlaybackState = (): PlaybackState => {
   const [playbackState, setPlaybackState] = useState(() => getPlaybackState());
-  useEffect(() => addEventListener(Event.PlaybackState, setPlaybackState), []);
+  useEffect(
+    () => addEventListener(Event.PlaybackState, setPlaybackState).remove,
+    []
+  );
 
   return playbackState;
 };
