@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 
-import { addEventListener } from '../trackPlayer';
 import { Event } from '../constants';
-import type { EventPayloadByEventWithType } from '../interfaces';
+import { addEventListener } from '../trackPlayer';
+import type { EventPayloadByEventWithType } from '../types';
 
 /**
  * Attaches a handler to the given TrackPlayer events and performs cleanup on unmount

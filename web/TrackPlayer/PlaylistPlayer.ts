@@ -1,7 +1,7 @@
 import { Player } from './Player';
 
 import { State } from '../../src/constants/State';
-import type { Track } from '../../src/interfaces';
+import type { Track } from '../../src/types';
 import { RepeatMode } from './RepeatMode';
 
 export class PlaylistPlayer extends Player {

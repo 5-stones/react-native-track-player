@@ -1,9 +1,9 @@
 import { DeviceEventEmitter } from 'react-native';
 
-import type { Spec } from '../src/NativeTrackPlayer';
-import type { Track, UpdateOptions, PlaybackState } from '../src/interfaces';
 import { Event } from '../src/constants/Event';
 import { State } from '../src/constants/State';
+import type { Spec } from '../src/NativeTrackPlayer';
+import type { PlaybackState, Track, UpdateOptions } from '../src/types';
 import { PlaylistPlayer, RepeatMode } from './TrackPlayer';
 import { SetupNotCalledError } from './TrackPlayer/SetupNotCalledError';
 

@@ -1,8 +1,8 @@
 import { useState } from 'react';
 
 import { Event } from '../constants';
-import type { Track } from '../interfaces/Track';
 import { getActiveTrack } from '../trackPlayer';
+import type { Track } from '../types/Track';
 import { useTrackPlayerEvents } from './useTrackPlayerEvents';
 
 export function useActiveTrack(): Track | undefined {

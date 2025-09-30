@@ -2,6 +2,8 @@ import { AppRegistry, Platform } from 'react-native';
 
 import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes';
 import { Event, RepeatMode } from './constants';
+import TrackPlayer from './NativeTrackPlayer';
+import resolveAssetSource from './resolveAssetSource';
 import type {
   AddTrack,
   EventPayloadByEvent,
@@ -13,9 +15,7 @@ import type {
   Track,
   TrackMetadataBase,
   UpdateOptions,
-} from './interfaces';
-import TrackPlayer from './NativeTrackPlayer';
-import resolveAssetSource from './resolveAssetSource';
+} from './types';
 
 const isAndroid = Platform.OS === 'android';
 

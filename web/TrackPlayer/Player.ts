@@ -1,5 +1,5 @@
 import { State } from '../../src/constants/State';
-import type { PlaybackState, Progress, Track } from '../../src/interfaces';
+import type { PlaybackState, Progress, Track } from '../../src/types';
 import { SetupNotCalledError } from './SetupNotCalledError';
 
 export class Player {

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
 import { Event } from '../constants';
-import type { PlaybackState } from '../interfaces';
 import { addEventListener, getPlaybackState } from '../trackPlayer';
+import type { PlaybackState } from '../types';
 
 /**
  * Get current playback state and subsequent updates.
