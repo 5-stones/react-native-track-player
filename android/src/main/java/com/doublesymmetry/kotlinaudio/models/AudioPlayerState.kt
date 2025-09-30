@@ -1,5 +1,8 @@
 package com.doublesymmetry.kotlinaudio.models
 
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.WritableMap
+
 enum class AudioPlayerState {
     /** The current [AudioItem] is being loaded for playback. */
     LOADING,
@@ -27,4 +30,20 @@ enum class AudioPlayerState {
 
     /** The player stopped playing due to an error. */
     ERROR
+}
+
+/**
+ * Represents the current state of the audio player.
+ * Includes the playback state and any associated error information.
+ */
+data class PlaybackState(
+    val state: AudioPlayerState,
+    val error: PlaybackError? = null
+) {
+    fun toBridge(): WritableMap {
+        return Arguments.createMap().apply {
+            putString("state", state.asLibState.state)
+            error?.let { putMap("error", it.toBridge()) }
+        }
+    }
 }

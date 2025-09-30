@@ -27,7 +27,7 @@ class PlayerEvents {
 
     private inline fun <reified T> event(replay: Int) = Event<T>(replay)
 
-    val stateChange = event<AudioPlayerState>(replay = 1)
+    val stateChange = event<PlaybackState>(replay = 1)
     val playbackEnd = event<PlaybackEndedReason?>(replay = 1)
     val playbackError = event<PlaybackError>(replay = 1)
     val playWhenReadyChange = event<PlayWhenReadyChangeData>(replay = 1)

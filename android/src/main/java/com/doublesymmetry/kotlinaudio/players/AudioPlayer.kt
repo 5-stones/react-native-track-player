@@ -71,11 +71,13 @@ class AudioPlayer(
         get() = exoPlayer.currentMediaItem?.let { AudioItem.fromMediaItem(it) }
 
     var playbackError: PlaybackError? = null
+        private set
+
     var playerState: AudioPlayerState = AudioPlayerState.IDLE
         private set(value) {
             if (value != field) {
                 field = value
-                events.stateChange.emit(value)
+                events.stateChange.emit(PlaybackState(value, playbackError))
                 if (!options.handleAudioFocus) {
                     when (value) {
                         AudioPlayerState.IDLE,
@@ -549,6 +551,10 @@ class AudioPlayer(
                             else -> null // noop
                         }
                         if (state != null && state != playerState) {
+                            // Clear error when recovering from ERROR state to a successful state
+                            if (playerState == AudioPlayerState.ERROR && state != AudioPlayerState.ERROR) {
+                                playbackError = null
+                            }
                             playerState = state
                         }
                     }

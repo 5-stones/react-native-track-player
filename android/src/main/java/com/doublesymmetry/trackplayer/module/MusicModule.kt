@@ -110,27 +110,6 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
 
 
-  private fun getPlaybackErrorMap(error: PlaybackError?): WritableMap {
-    return Arguments.createMap().let {
-      if (error?.message != null) {
-        it.putString("message", error.message)
-      }
-      if (error?.code != null) {
-        it.putString("code", "android-" + error.code)
-      }
-      it
-    }
-  }
-
-  private fun getPlayerStateMap(state: AudioPlayerState): WritableMap {
-    return Arguments.createMap().let {
-      it.putString("state", state.asLibState.state)
-      if (state == AudioPlayerState.ERROR) {
-        it.putMap("error", getPlaybackErrorMap(connectedService?.player?.playbackError))
-      }
-      it
-    }
-  }
 
   /* ****************************** API ****************************** */
   override fun getTypedExportedConstants(): Map<String, Any> {
@@ -431,7 +410,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   override fun getPlaybackState(): WritableMap = runBlockingOnMain {
-    getPlayerStateMap(player.playerState)
+    PlaybackState(player.playerState, player.playbackError).toBridge()
   }
 
   override fun acquireWakeLock() = runBlockingOnMain {
@@ -497,9 +476,9 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observeStateChange() {
       mainScope.launch {
-        player.events.stateChange.collect { state ->
-          emitOnPlaybackState(getPlayerStateMap(state))
-          progressUpdateManager?.onPlaybackStateChanged(state)
+        player.events.stateChange.collect { playbackState ->
+          emitOnPlaybackState(playbackState.toBridge())
+          progressUpdateManager?.onPlaybackStateChanged(playbackState.state)
         }
       }
     }
@@ -597,8 +576,8 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
 
     private fun observeQueueEnded() {
       mainScope.launch {
-        player.events.stateChange.collect { state ->
-          if (state == AudioPlayerState.ENDED && player.nextItem == null) {
+        player.events.stateChange.collect { playbackState ->
+          if (playbackState.state == AudioPlayerState.ENDED && player.nextItem == null) {
             player.currentIndex?.let { currentIndex ->
               emitOnPlaybackQueueEnded(Arguments.createMap().apply {
                 putInt("track", currentIndex)
@@ -613,7 +592,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     private fun observePlaybackError() {
       mainScope.launch {
         player.events.playbackError.collect { error ->
-          emitOnPlaybackError(getPlaybackErrorMap(error))
+          emitOnPlaybackError(error.toBridge())
         }
       }
     }
