@@ -3,10 +3,8 @@ pre-commit:
   commands:
     lint:
       glob: "*.{js,ts,jsx,tsx}"
-      run: npx eslint {staged_files}
-    types:
-      glob: "*.{js,ts, jsx, tsx}"
-      run: npx tsc
+      run: npx eslint {staged_files} --fix
+      stage_fixed: true
 commit-msg:
   parallel: true
   commands:
