@@ -1,8 +1,16 @@
-package com.doublesymmetry.kotlinaudio.event
+package com.doublesymmetry.kotlinaudio
 
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Metadata
-import com.doublesymmetry.kotlinaudio.models.*
+import com.doublesymmetry.kotlinaudio.models.AudioItemTransition
+import com.doublesymmetry.kotlinaudio.models.EventControllerConnectionData
+import com.doublesymmetry.kotlinaudio.models.FocusChangeData
+import com.doublesymmetry.kotlinaudio.models.MediaSessionCallback
+import com.doublesymmetry.kotlinaudio.models.PlayWhenReadyChangeData
+import com.doublesymmetry.kotlinaudio.models.PlaybackEndedReason
+import com.doublesymmetry.kotlinaudio.models.PlaybackError
+import com.doublesymmetry.kotlinaudio.models.PlaybackState
+import com.doublesymmetry.kotlinaudio.models.PositionChangedReason
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -10,7 +18,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 
-class PlayerEvents {
+class AudioPlayerEvents {
     private val coroutineScope = MainScope()
 
     inner class Event<T>(replay: Int) : SharedFlow<T> {

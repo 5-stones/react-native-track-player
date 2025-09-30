@@ -1,4 +1,4 @@
-package com.doublesymmetry.kotlinaudio.players
+package com.doublesymmetry.kotlinaudio
 
 import android.content.Context
 import android.media.AudioManager
@@ -23,7 +23,6 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.legacy.RatingCompat
-import com.doublesymmetry.kotlinaudio.event.PlayerEvents
 import com.doublesymmetry.kotlinaudio.models.AudioItem
 import com.doublesymmetry.kotlinaudio.models.AudioItemTransition
 import com.doublesymmetry.kotlinaudio.models.AudioItemTransitionReason
@@ -35,8 +34,6 @@ import com.doublesymmetry.kotlinaudio.models.PlaybackError
 import com.doublesymmetry.kotlinaudio.models.PlayerOptions
 import com.doublesymmetry.kotlinaudio.models.PositionChangedReason
 import com.doublesymmetry.kotlinaudio.models.RepeatMode
-import com.doublesymmetry.kotlinaudio.players.components.Cache
-import com.doublesymmetry.kotlinaudio.players.components.MediaFactory
 import timber.log.Timber
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -58,7 +55,7 @@ class AudioPlayer(
         }
     private var playerListener = InnerPlayerListener()
     private var cache: SimpleCache? = null
-    val events = PlayerEvents()
+    val events = AudioPlayerEvents()
 
     private var wasDucking = false
     private val focusManager: FocusManager = FocusManager()
@@ -211,7 +208,7 @@ class AudioPlayer(
 
     init {
         if (options.cacheSizeKb > 0) {
-            cache = Cache.initCache(context, options.cacheSizeKb)
+            cache = AudioPlayerCache.initCache(context, options.cacheSizeKb)
         }
         events.stateChange.emit(AudioPlayerState.IDLE)
 
@@ -235,7 +232,7 @@ class AudioPlayer(
             .Builder(context)
             .setRenderersFactory(renderer)
             .setHandleAudioBecomingNoisy(options.handleAudioBecomingNoisy)
-            .setMediaSourceFactory(MediaFactory(context, cache))
+            .setMediaSourceFactory(AudioPlayerMediaFactory(context, cache))
             .setWakeMode(options.wakeMode.toExoPlayer())
             .setLoadControl(loadControl)
             .setSkipSilenceEnabled(options.skipSilence)

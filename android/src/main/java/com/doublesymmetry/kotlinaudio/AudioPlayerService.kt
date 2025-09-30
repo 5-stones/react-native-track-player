@@ -1,22 +1,19 @@
-@file: OptIn(UnstableApi::class) package com.doublesymmetry.kotlinaudio.service
+package com.doublesymmetry.kotlinaudio
 
 import android.content.Intent
 import android.os.Binder
 import android.os.Bundle
 import android.os.IBinder
-import androidx.annotation.OptIn
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.doublesymmetry.kotlinaudio.models.CustomCommandButton
 import com.doublesymmetry.kotlinaudio.models.PlayerOptions
-import com.doublesymmetry.kotlinaudio.players.AudioPlayer
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 
-class MusicService : MediaLibraryService() {
+class AudioPlayerService : MediaLibraryService() {
     private val binder = MusicBinder()
     lateinit var player: AudioPlayer
     var mediaLibrarySession: MediaLibrarySession? = null
@@ -88,7 +85,7 @@ class MusicService : MediaLibraryService() {
     }
 
     inner class MusicBinder : Binder() {
-        val service = this@MusicService
+        val service = this@AudioPlayerService
     }
 
     override fun onBind(intent: Intent?): IBinder? {

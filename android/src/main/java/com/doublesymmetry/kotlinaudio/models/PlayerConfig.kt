@@ -6,7 +6,7 @@ data class PlayerConfig(
      *
      * The sources can be: media buttons on headphones, Android Wear, Android Auto, Google Assistant, media notification, etc.
      *
-     * Setting this to true enables the use of [onPlayerActionTriggeredExternally][com.doublesymmetry.kotlinaudio.event.PlayerEvents.onPlayerActionTriggeredExternally] events.
+     * Setting this to true enables the use of [onPlayerActionTriggeredExternally][com.doublesymmetry.kotlinaudio.AudioPlayerEvents.onPlayerActionTriggeredExternally] events.
      *
      * **Example**:
      * ```

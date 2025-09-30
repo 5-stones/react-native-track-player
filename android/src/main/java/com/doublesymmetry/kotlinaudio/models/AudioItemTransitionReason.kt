@@ -13,8 +13,8 @@ enum class AudioItemTransitionReason {
 
     /**
      * A seek to another [AudioItem] has occurred. Usually triggered when calling
-     * [AudioPlayer.next][com.doublesymmetry.kotlinaudio.players.AudioPlayer.next]
-     * or [AudioPlayer.previous][com.doublesymmetry.kotlinaudio.players.AudioPlayer.previous].
+     * [AudioPlayer.next][com.doublesymmetry.kotlinaudio.AudioPlayer.next]
+     * or [AudioPlayer.previous][com.doublesymmetry.kotlinaudio.AudioPlayer.previous].
      */
     SEEK_TO_ANOTHER_AUDIO_ITEM,
 

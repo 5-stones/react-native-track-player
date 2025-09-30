@@ -1,4 +1,4 @@
-package com.doublesymmetry.kotlinaudio.players.components
+package com.doublesymmetry.kotlinaudio
 
 import android.content.Context
 import androidx.media3.common.util.UnstableApi
@@ -9,7 +9,7 @@ import androidx.media3.datasource.cache.SimpleCache
 import java.io.File
 
 @UnstableApi
-object Cache {
+object AudioPlayerCache {
     @Volatile
     private var instance: SimpleCache? = null
 

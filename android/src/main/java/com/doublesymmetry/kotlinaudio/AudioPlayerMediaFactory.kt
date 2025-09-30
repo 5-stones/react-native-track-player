@@ -1,10 +1,9 @@
-package com.doublesymmetry.kotlinaudio.players.components
+package com.doublesymmetry.kotlinaudio
 
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.os.Build
-import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
@@ -26,10 +25,11 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import androidx.media3.extractor.DefaultExtractorsFactory
+import androidx.core.net.toUri
 
 
 @OptIn(UnstableApi::class)
-class MediaFactory (
+class AudioPlayerMediaFactory (
     private val context: Context,
     private val cache: SimpleCache?
 ) : MediaSource.Factory {
@@ -76,7 +76,7 @@ class MediaFactory (
         val resourceId = mediaItem.mediaMetadata.extras?.getInt("resource-id")
         // HACK: why are these capitalized?
         val resourceType = mediaItem.mediaMetadata.extras?.getString("type")?.lowercase()
-        val uri = Uri.parse(mediaItem.mediaMetadata.extras?.getString("uri")!!)
+        val uri = mediaItem.mediaMetadata.extras?.getString("uri")!!.toUri()
         val factory: DataSource.Factory = when {
             resourceId != 0 && resourceId != null -> {
                 val raw = RawResourceDataSource(context)
