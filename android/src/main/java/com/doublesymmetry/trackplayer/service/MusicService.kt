@@ -63,18 +63,6 @@ class MusicService : HeadlessJsMediaService() {
         sWakeLock?.release()
     }
 
-    fun getBitmapLoader(): BitmapLoader {
-        return mediaSession.bitmapLoader
-    }
-
-    fun getCurrentBitmap(): ListenableFuture<Bitmap>? {
-        return player.exoPlayer.currentMediaItem?.mediaMetadata?.let {
-            mediaSession.bitmapLoader.loadBitmapFromMetadata(
-                it
-            )
-        }
-    }
-
     @ExperimentalCoroutinesApi
     override fun onCreate() {
         Timber.plant(object : Timber.DebugTree() {
@@ -116,7 +104,6 @@ class MusicService : HeadlessJsMediaService() {
         AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
     private var stopForegroundGracePeriod: Int = DEFAULT_STOP_FOREGROUND_GRACE_PERIOD
 
-    private var latestOptions: PlayerOptionsData? = null
     private var commandStarted = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -150,7 +137,6 @@ class MusicService : HeadlessJsMediaService() {
 
     @MainThread
     fun updateOptions(options: PlayerOptionsData) {
-        latestOptions = options
         val androidOptions = options.androidOptions
 
         androidOptions?.audioOffload?.let { audioOffload ->
