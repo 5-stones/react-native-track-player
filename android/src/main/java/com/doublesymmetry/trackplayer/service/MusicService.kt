@@ -519,28 +519,7 @@ class MusicService : HeadlessJsMediaService() {
     companion object {
         const val STATE_KEY = "state"
         const val ERROR_KEY = "error"
-
         const val TASK_KEY = "TrackPlayer"
-
-        const val PLAYER_OPTIONS_MIN_BUFFER = "minBuffer"
-        const val PLAYER_OPTIONS_MAX_BUFFER = "maxBuffer"
-        const val PLAYER_OPTIONS_PLAY_BUFFER = "playBuffer"
-        const val PLAYER_OPTIONS_BACK_BUFFER = "backBuffer"
-        const val PLAYER_OPTIONS_MAX_CACHE_SIZE_KEY = "maxCacheSize"
-
-        const val ANDROID_OPTIONS_KEY = "android"
-
-        const val PLAYER_OPTIONS_ANDROID_APP_KILLED_PLAYBACK_BEHAVIOR_KEY = "appKilledPlaybackBehavior"
-        const val PLAYER_OPTIONS_ANDROID_AUDIO_OFFLOAD_KEY = "audioOffload"
-        const val PLAYER_OPTIONS_ANDROID_SHUFFLE_KEY = "shuffle"
-        const val PLAYER_OPTIONS_ANDROID_STOP_FOREGROUND_GRACE_PERIOD_KEY = "stopForegroundGracePeriod"
-        const val PLAYER_OPTIONS_ANDROID_PAUSE_ON_INTERRUPTION = "alwaysPauseOnInterruption"
-        const val PLAYER_OPTIONS_AUTO_HANDLE_INTERRUPTIONS = "autoHandleInterruptions"
-        const val PLAYER_OPTIONS_ANDROID_AUDIO_CONTENT_TYPE = "androidAudioContentType"
-        const val PLAYER_OPTIONS_HANDLE_NOISY = "androidHandleAudioBecomingNoisy"
-        const val PLAYER_OPTIONS_ALWAYS_SHOW_NEXT = "androidAlwaysShowNext"
-        const val PLAYER_OPTIONS_SKIP_SILENCE = "androidSkipSilence"
-        const val PLAYER_OPTIONS_WAKE_MODE = "androidWakeMode"
-       const val DEFAULT_STOP_FOREGROUND_GRACE_PERIOD = 5
+        const val DEFAULT_STOP_FOREGROUND_GRACE_PERIOD = 5
     }
 }
