@@ -307,65 +307,6 @@ class MusicService : HeadlessJsMediaService() {
         super.onDestroy()
     }
 
-    fun onMediaKeyEvent(intent: Intent?): Boolean? {
-        val keyEvent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent?.getParcelableExtra(Intent.EXTRA_KEY_EVENT, KeyEvent::class.java)
-        } else {
-            intent?.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
-        }
-
-        if (keyEvent?.action == KeyEvent.ACTION_DOWN) {
-            return when (keyEvent.keyCode) {
-                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                    if (player.isPlaying) {
-                        player.forwardingPlayer.pause()
-                    } else {
-                        player.forwardingPlayer.play()
-                    }
-                    true
-                }
-
-                KeyEvent.KEYCODE_MEDIA_STOP -> {
-                    player.forwardingPlayer.stop()
-                    true
-                }
-
-                KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                    player.forwardingPlayer.pause()
-                    true
-                }
-
-                KeyEvent.KEYCODE_MEDIA_PLAY -> {
-                    player.forwardingPlayer.play()
-                    true
-                }
-
-                KeyEvent.KEYCODE_MEDIA_NEXT -> {
-                    player.forwardingPlayer.seekToNext()
-                    true
-                }
-
-                KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
-                    player.forwardingPlayer.seekToPrevious()
-                    true
-                }
-
-                KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MEDIA_SKIP_FORWARD, KeyEvent.KEYCODE_MEDIA_STEP_FORWARD -> {
-                    player.forwardingPlayer.seekForward()
-                    true
-                }
-
-                KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_MEDIA_SKIP_BACKWARD, KeyEvent.KEYCODE_MEDIA_STEP_BACKWARD -> {
-                    player.forwardingPlayer.seekBack()
-                    true
-                }
-
-                else -> null
-            }
-        }
-        return null
-    }
-
     @MainThread
     inner class MusicBinder : Binder() {
         val service = this@MusicService
@@ -450,17 +391,6 @@ class MusicService : HeadlessJsMediaService() {
         }
 
 
-        override fun onMediaButtonEvent(
-            session: MediaSession,
-            controllerInfo: MediaSession.ControllerInfo,
-            intent: Intent
-        ): Boolean {
-            return onMediaKeyEvent(intent) ?: super.onMediaButtonEvent(
-                session,
-                controllerInfo,
-                intent
-            )
-        }
 
         override fun onPlaybackResumption(
             mediaSession: MediaSession,
