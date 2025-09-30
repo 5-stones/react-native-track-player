@@ -153,8 +153,9 @@ class AudioPlayer(
             }
         }
 
-    val currentIndex
-        get() = exoPlayer.currentMediaItemIndex
+    val currentIndex: Int?
+        get() = if (exoPlayer.currentMediaItemIndex == C.INDEX_UNSET) null
+            else exoPlayer.currentMediaItemIndex
 
     val isEmpty: Boolean
         get() = exoPlayer.mediaItemCount == 0
@@ -177,9 +178,12 @@ class AudioPlayer(
         }
 
     val nextItem: AudioItem?
-        get() = if (currentIndex + 1 < exoPlayer.mediaItemCount)
-            AudioItem.fromMediaItem(exoPlayer.getMediaItemAt(currentIndex + 1))
-        else null
+        get() {
+            val nextIndex = exoPlayer.currentMediaItemIndex + 1
+            return if (nextIndex < exoPlayer.mediaItemCount)
+                AudioItem.fromMediaItem(exoPlayer.getMediaItemAt(nextIndex))
+            else null
+        }
 
     var skipSilence: Boolean
         get() = exoPlayer.skipSilenceEnabled
@@ -254,8 +258,9 @@ class AudioPlayer(
         if (isEmpty) {
             add(item)
         } else {
-            replaceItem(currentIndex, item)
-            exoPlayer.seekTo(currentIndex, C.TIME_UNSET)
+            val index = exoPlayer.currentMediaItemIndex
+            replaceItem(index, item)
+            exoPlayer.seekTo(index, C.TIME_UNSET)
             exoPlayer.prepare()
         }
     }
@@ -365,9 +370,10 @@ class AudioPlayer(
      * Removes all the upcoming items, if any (the ones returned by [next]).
      */
     fun removeUpcomingItems() {
-        if (currentIndex == -1) return
+        val index = exoPlayer.currentMediaItemIndex
+        if (index == C.INDEX_UNSET) return
         val lastIndex = exoPlayer.mediaItemCount
-        val fromIndex = currentIndex + 1
+        val fromIndex = index + 1
 
         exoPlayer.removeMediaItems(fromIndex, lastIndex)
     }

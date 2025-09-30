@@ -81,11 +81,12 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
         connectedService = binder.service
         progressUpdateManager = ProgressUpdateManager() {
           val service = connectedService ?: return@ProgressUpdateManager
+          val currentIndex = service.player.currentIndex ?: return@ProgressUpdateManager
           emitOnPlaybackProgressUpdated(Arguments.createMap().apply {
             putDouble("position", service.player.position.toSeconds())
             putDouble("duration", service.player.duration.toSeconds())
             putDouble("buffered", service.player.bufferedPosition.toSeconds())
-            putInt("track", service.player.currentIndex)
+            putInt("track", currentIndex)
           })
         }
         connectedService?.setupPlayer(playerOptions)
@@ -282,6 +283,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     }
 
     map?.let {
+      val currentIndex = player.currentIndex ?: throw Exception("There is no current track")
       val currentTrack = player.currentItem?.track ?: throw Exception("There is no current track")
       val updatedTrack = currentTrack.updateMetadata(
         title = it.getString("title") ?: currentTrack.title,
@@ -295,7 +297,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
           ?: currentTrack.rating,
         mediaId = it.getString("mediaId") ?: currentTrack.mediaId
       )
-      player.replaceItem(player.currentIndex, updatedTrack.toAudioItem())
+      player.replaceItem(currentIndex, updatedTrack.toAudioItem())
     }
   }
 
@@ -410,7 +412,7 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   override fun getActiveTrackIndex(): Double? = runBlockingOnMain {
-    if (player.items.isEmpty()) null else player.currentIndex.toDouble()
+    player.currentIndex?.toDouble()
   }
 
   override fun getActiveTrack(): WritableMap? = runBlockingOnMain {
@@ -511,16 +513,14 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
             lastTrack?.let { putMap("lastTrack", it) }
 
             // Add current track info
-            val currentIndex = player.currentIndex
-            if (currentIndex >= 0) {
+            player.currentIndex?.let { currentIndex ->
               putInt("index", currentIndex)
               player.currentItem?.track?.toBridge()?.let { putMap("track", it) }
             }
           })
 
           // Update last track info for next transition
-          val currentIndex = player.currentIndex
-          lastTrackIndex = if (currentIndex >= 0) currentIndex else null
+          lastTrackIndex = player.currentIndex
           lastTrack = player.currentItem?.track?.toBridge()
         }
       }
@@ -597,10 +597,12 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
       mainScope.launch {
         player.events.stateChange.collect { state ->
           if (state == AudioPlayerState.ENDED && player.nextItem == null) {
-            emitOnPlaybackQueueEnded(Arguments.createMap().apply {
-              putInt("track", player.currentIndex)
-              putDouble("position", player.position.toSeconds())
-            })
+            player.currentIndex?.let { currentIndex ->
+              emitOnPlaybackQueueEnded(Arguments.createMap().apply {
+                putInt("track", currentIndex)
+                putDouble("position", player.position.toSeconds())
+              })
+            }
           }
         }
       }
