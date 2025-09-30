@@ -32,6 +32,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.*
 import timber.log.Timber
 import kotlin.system.exitProcess
+import androidx.core.net.toUri
 
 @OptIn(UnstableApi::class)
 @MainThread
@@ -39,7 +40,9 @@ class MusicService : HeadlessJsMediaService() {
     lateinit var player: QueuedAudioPlayer
     private val binder = MusicBinder()
     private val scope = MainScope()
-    private lateinit var fakePlayer: ExoPlayer
+    // Temporary reference to the initial player's ExoPlayer, used for MediaSession initialization
+    // before the player is configured with options from JavaScript
+    private var temporaryPlayer: ExoPlayer? = null
     private lateinit var mediaSession: MediaLibrarySession
     private var sessionCommands: SessionCommands? = null
     private var playerCommands: Player.Commands? = null
@@ -63,14 +66,17 @@ class MusicService : HeadlessJsMediaService() {
                 return "RNTP-${element.className}:${element.methodName}"
             }
         })
-        fakePlayer = ExoPlayer.Builder(this).build()
+        // Create initial player with default options. This will be replaced in setupPlayer()
+        // when JavaScript provides the actual configuration
+        player = QueuedAudioPlayer(this)
+        temporaryPlayer = player.exoPlayer
         val openAppIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             // Add the Uri data so apps can identify that it was a notification click
-            data = Uri.parse("trackplayer://notification.click")
+            data = "trackplayer://notification.click".toUri()
             action = Intent.ACTION_VIEW
         }
-        mediaSession = MediaLibrarySession.Builder(this, fakePlayer,
+        mediaSession = MediaLibrarySession.Builder(this, player.exoPlayer,
             InnerMediaSessionCallback()
         )
             // https://github.com/androidx/media/issues/1218
@@ -104,15 +110,19 @@ class MusicService : HeadlessJsMediaService() {
 
     @MainThread
     fun setupPlayer(playerOptionsData: PlayerOptionsData) {
-        if (this::player.isInitialized) {
-            print("Player was initialized previously. Preventing reinitialization.")
+        // Check if player has already been configured (not the temporary initial player)
+        if (temporaryPlayer == null) {
+            print("Player setup already completed. Preventing reinitialization.")
             return
         }
         Timber.d("Setting up player")
 
         val options = playerOptionsData.toAudioPlayerOptions()
+        val oldPlayer = player
+        // Replace temporary player with properly configured one
         player = QueuedAudioPlayer(this@MusicService, options)
-        fakePlayer.release()
+        oldPlayer.destroy()
+        temporaryPlayer = null
         mediaSession.player = player.forwardingPlayer
     }
 
@@ -219,11 +229,7 @@ class MusicService : HeadlessJsMediaService() {
     @MainThread
     override fun onTaskRemoved(rootIntent: Intent?) {
         onUnbind(rootIntent)
-        Timber.d("isInitialized = ${::player.isInitialized}, appKilledPlaybackBehavior = $appKilledPlaybackBehavior")
-        if (!::player.isInitialized) {
-            mediaSession.release()
-            return
-        }
+        Timber.d("player = $player, appKilledPlaybackBehavior = $appKilledPlaybackBehavior")
 
         when (appKilledPlaybackBehavior) {
             AppKilledPlaybackBehavior.PAUSE_PLAYBACK -> {
@@ -270,7 +276,7 @@ class MusicService : HeadlessJsMediaService() {
             }
             lastWake = currentTime
             val activityIntent = packageManager.getLaunchIntentForPackage(packageName)
-            activityIntent!!.data = Uri.parse("trackplayer://service-bound")
+            activityIntent!!.data = "trackplayer://service-bound".toUri()
             activityIntent.action = Intent.ACTION_VIEW
             activityIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
             var activityOptions = ActivityOptions.makeBasic()
@@ -286,7 +292,7 @@ class MusicService : HeadlessJsMediaService() {
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession {
-        Timber.d("${controllerInfo.packageName}")
+        Timber.d(controllerInfo.packageName)
         return mediaSession
     }
 
@@ -316,11 +322,11 @@ class MusicService : HeadlessJsMediaService() {
         if (keyEvent?.action == KeyEvent.ACTION_DOWN) {
             return when (keyEvent.keyCode) {
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                  if (player.isPlaying) {
-                    player.forwardingPlayer.pause()
-                  } else {
-                    player.forwardingPlayer.play()
-                  }
+                    if (player.isPlaying) {
+                        player.forwardingPlayer.pause()
+                    } else {
+                        player.forwardingPlayer.play()
+                    }
                     true
                 }
 
@@ -378,9 +384,7 @@ class MusicService : HeadlessJsMediaService() {
             session: MediaSession,
             controller: MediaSession.ControllerInfo
         ) {
-            if (::player.isInitialized) {
-                player.events.onControllerDisconnected.emit(controller.packageName)
-            }
+            player.events.onControllerDisconnected.emit(controller.packageName)
             super.onDisconnected(session, controller)
         }
 
@@ -390,20 +394,18 @@ class MusicService : HeadlessJsMediaService() {
             session: MediaSession,
             controller: MediaSession.ControllerInfo
         ): MediaSession.ConnectionResult {
-            Timber.d("${controller.packageName}")
+            Timber.d(controller.packageName)
             val isMediaNotificationController = session.isMediaNotificationController(controller)
             val isAutomotiveController = session.isAutomotiveController(controller)
             val isAutoCompanionController = session.isAutoCompanionController(controller)
-            if (::player.isInitialized) {
-                player.events.onControllerConnected.emit(
-                    EventControllerConnectionData(
-                        packageName = controller.packageName,
-                        isMediaNotificationController = isMediaNotificationController,
-                        isAutomotiveController = isAutomotiveController,
-                        isAutoCompanionController = isAutoCompanionController
-                    )
+            player.events.onControllerConnected.emit(
+                EventControllerConnectionData(
+                    packageName = controller.packageName,
+                    isMediaNotificationController = isMediaNotificationController,
+                    isAutomotiveController = isAutomotiveController,
+                    isAutoCompanionController = isAutoCompanionController
                 )
-            }
+            )
             if (controller.packageName in arrayOf(
                     "com.android.systemui",
                     // https://github.com/googlesamples/android-media-controller
@@ -443,13 +445,11 @@ class MusicService : HeadlessJsMediaService() {
             command: SessionCommand,
             args: Bundle
         ): ListenableFuture<SessionResult> {
-            player.forwardingPlayer.let {
-                when (command.customAction) {
-                    CustomCommandButton.JUMP_BACKWARD.customAction -> { it.seekBack() }
-                    CustomCommandButton.JUMP_FORWARD.customAction -> { it.seekForward() }
-                    CustomCommandButton.NEXT.customAction -> { it.seekToNext() }
-                    CustomCommandButton.PREVIOUS.customAction -> { it.seekToPrevious() }
-                }
+            when (command.customAction) {
+                CustomCommandButton.JUMP_BACKWARD.customAction -> { player.forwardingPlayer.seekBack() }
+                CustomCommandButton.JUMP_FORWARD.customAction -> { player.forwardingPlayer.seekForward() }
+                CustomCommandButton.NEXT.customAction -> { player.forwardingPlayer.seekToNext() }
+                CustomCommandButton.PREVIOUS.customAction -> { player.forwardingPlayer.seekToPrevious() }
             }
             return super.onCustomCommand(session, controller, command, args)
         }
