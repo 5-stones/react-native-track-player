@@ -87,7 +87,7 @@ class MusicService : HeadlessJsMediaService() {
                     this,
                     0,
                     openAppIntent,
-                    getPendingIntentFlags()
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_CANCEL_CURRENT
                 )
             )
             .build()
@@ -510,10 +510,6 @@ class MusicService : HeadlessJsMediaService() {
             player.events.onRatingChanged.emit(rating)
             return super.onSetRating(session, controller, rating)
         }
-    }
-
-    private fun getPendingIntentFlags(): Int {
-        return PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_CANCEL_CURRENT
     }
 
     companion object {
