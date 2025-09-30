@@ -228,13 +228,13 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
     index.toDouble()
   }
 
-  override fun load(data: ReadableMap?) = runBlockingOnMain {
+  override fun load(data: ReadableMap?): Unit = runBlockingOnMain {
     data?.let {
       player.load(trackFactory.fromBridge(it).toAudioItem())
     }
   }
 
-  override fun move(fromIndex: Double, toIndex: Double) = runBlockingOnMain { 
+  override fun move(fromIndex: Double, toIndex: Double): Unit = runBlockingOnMain {
     player.move(fromIndex.toInt(), toIndex.toInt())
   }
 
