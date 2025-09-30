@@ -817,11 +817,6 @@ extension NativeTrackPlayerImpl {
 
     @objc(supportedEvents)
     public static var supportedEvents: [String] {
-        var events = EventType.allRawValues()
-
-        // Stub out events that are only supported on Android
-        events.append("remote-play-pause")
-
-        return events
+        return EventType.allRawValues()
     }
 }
