@@ -95,20 +95,10 @@ class MusicService : HeadlessJsMediaService() {
     private var appKilledPlaybackBehavior =
         AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
 
-    private var commandStarted = false
-
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         onStartCommandIntentValid = intent != null
         Timber.d("onStartCommand: ${intent?.action}, ${intent?.`package`}")
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            // HACK: this is not supposed to be here. I definitely screwed up. but Why?
-            onMediaKeyEvent(intent)
-        }
-        // HACK: Why is onPlay triggering onStartCommand??
-        if (!commandStarted) {
-            commandStarted = true
-            super.onStartCommand(intent, flags, startId)
-        }
+        super.onStartCommand(intent, flags, startId)
         return START_STICKY
     }
 
