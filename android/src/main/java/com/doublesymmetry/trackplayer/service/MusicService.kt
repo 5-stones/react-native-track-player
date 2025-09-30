@@ -527,7 +527,11 @@ class MusicService : HeadlessJsMediaService() {
         if (keyEvent?.action == KeyEvent.ACTION_DOWN) {
             return when (keyEvent.keyCode) {
                 KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                    player.togglePlay()
+                  if (player.isPlaying) {
+                    player.forwardingPlayer.pause()
+                  } else {
+                    player.forwardingPlayer.play()
+                  }
                     true
                 }
 
