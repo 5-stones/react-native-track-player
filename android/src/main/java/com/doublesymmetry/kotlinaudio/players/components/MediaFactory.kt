@@ -1,5 +1,6 @@
 package com.doublesymmetry.kotlinaudio.players.components
 
+import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.os.Build
@@ -25,7 +26,6 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import androidx.media3.extractor.DefaultExtractorsFactory
-import com.doublesymmetry.kotlinaudio.utils.isUriLocalFile
 
 
 @OptIn(UnstableApi::class)
@@ -52,6 +52,19 @@ class MediaFactory (
         return mediaFactory.supportedTypes
     }
 
+    private fun isLocalFile(uri: Uri): Boolean {
+        val scheme = uri.scheme
+        val host = uri.host
+        val isLocalhost = (scheme == "http" || scheme == "https") &&
+                (host == "localhost" || host == "127.0.0.1" || host == "[::1]")
+        return !isLocalhost && (scheme == null ||
+                scheme == ContentResolver.SCHEME_FILE ||
+                scheme == ContentResolver.SCHEME_ANDROID_RESOURCE ||
+                scheme == ContentResolver.SCHEME_CONTENT ||
+                scheme == "res" ||
+                host == null)
+    }
+
     override fun createMediaSource(mediaItem: MediaItem): MediaSource {
 
         val userAgent = mediaItem.mediaMetadata.extras?.getString("user-agent") ?: DEFAULT_USER_AGENT
@@ -70,7 +83,7 @@ class MediaFactory (
                 raw.open(DataSpec(uri))
                 DataSource.Factory { raw }
             }
-            isUriLocalFile(uri) -> {
+            isLocalFile(uri) -> {
                 DefaultDataSource.Factory(context)
             }
             else -> {
