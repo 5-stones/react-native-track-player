@@ -2,17 +2,19 @@ package com.doublesymmetry.trackplayer.model
 
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.ReadableArray
-import androidx.media3.common.C
 import com.doublesymmetry.kotlinaudio.models.PlayerOptions
 import com.doublesymmetry.kotlinaudio.models.BufferOptions
+import com.doublesymmetry.kotlinaudio.models.WakeMode
+import com.doublesymmetry.kotlinaudio.models.AudioContentType
+import com.doublesymmetry.kotlinaudio.models.Capability
 import com.doublesymmetry.trackplayer.extensions.NumberExt.Companion.toMilliseconds
 
 data class PlayerOptionsData(
     val forwardJumpInterval: Double = 15.0,
     val backwardJumpInterval: Double = 15.0,
     val progressUpdateEventInterval: Double = -1.0,
-    val capabilities: List<Int>? = null,
-    val notificationCapabilities: List<Int>? = null,
+    val capabilities: List<Capability>? = null,
+    val notificationCapabilities: List<Capability>? = null,
     val androidOptions: AndroidOptions? = null,
 
     // Audio engine options
@@ -21,22 +23,30 @@ data class PlayerOptionsData(
     val playBuffer: Double? = null,
     val backBuffer: Double? = null,
     val maxCacheSize: Double = 0.0,
-    val audioContentType: String = "music",
+    val audioContentType: AudioContentType = AudioContentType.MUSIC,
     val handleAudioBecomingNoisy: Boolean = true,
     val autoHandleInterruptions: Boolean = true,
     val alwaysShowNext: Boolean = true,
-    val wakeMode: Int = 0
+    val wakeMode: WakeMode = WakeMode.NONE
 ) {
     companion object {
         fun fromBridge(map: ReadableMap?): PlayerOptionsData {
             if (map == null) return PlayerOptionsData()
 
             val capabilities = map.getArray("capabilities")?.let { arr ->
-                (0 until arr.size()).map { arr.getInt(it) }
+                (0 until arr.size()).map { index ->
+                    val value = arr.getInt(index)
+                    Capability.entries.getOrNull(value)
+                        ?: throw IllegalArgumentException("Invalid capability value: $value (valid range: 0-${Capability.entries.size - 1})")
+                }
             }
 
             val notificationCapabilities = map.getArray("notificationCapabilities")?.let { arr ->
-                (0 until arr.size()).map { arr.getInt(it) }
+                (0 until arr.size()).map { index ->
+                    val value = arr.getInt(index)
+                    Capability.entries.getOrNull(value)
+                        ?: throw IllegalArgumentException("Invalid notificationCapability value: $value (valid range: 0-${Capability.entries.size - 1})")
+                }
             }
 
             return PlayerOptionsData(
@@ -53,11 +63,15 @@ data class PlayerOptionsData(
                 playBuffer = if (map.hasKey("playBuffer")) map.getDouble("playBuffer") else null,
                 backBuffer = if (map.hasKey("backBuffer")) map.getDouble("backBuffer") else null,
                 maxCacheSize = if (map.hasKey("maxCacheSize")) map.getDouble("maxCacheSize") else 0.0,
-                audioContentType = map.getString("audioContentType") ?: "music",
+                audioContentType = AudioContentType.fromString(map.getString("audioContentType") ?: "music"),
                 handleAudioBecomingNoisy = if (map.hasKey("handleAudioBecomingNoisy")) map.getBoolean("handleAudioBecomingNoisy") else true,
                 autoHandleInterruptions = if (map.hasKey("autoHandleInterruptions")) map.getBoolean("autoHandleInterruptions") else true,
                 alwaysShowNext = if (map.hasKey("alwaysShowNext")) map.getBoolean("alwaysShowNext") else true,
-                wakeMode = if (map.hasKey("wakeMode")) map.getInt("wakeMode") else 0
+                wakeMode = if (map.hasKey("wakeMode")) {
+                    val value = map.getInt("wakeMode")
+                    WakeMode.entries.getOrNull(value)
+                        ?: throw IllegalArgumentException("Invalid wakeMode value: $value (valid range: 0-${WakeMode.entries.size - 1})")
+                } else WakeMode.NONE
             )
         }
     }
@@ -65,14 +79,7 @@ data class PlayerOptionsData(
     fun toAudioPlayerOptions(): PlayerOptions {
         return PlayerOptions(
             alwaysShowNext = alwaysShowNext,
-            audioContentType = when (audioContentType) {
-                "music" -> C.AUDIO_CONTENT_TYPE_MUSIC
-                "speech" -> C.AUDIO_CONTENT_TYPE_SPEECH
-                "sonification" -> C.AUDIO_CONTENT_TYPE_SONIFICATION
-                "movie" -> C.AUDIO_CONTENT_TYPE_MOVIE
-                "unknown" -> C.AUDIO_CONTENT_TYPE_UNKNOWN
-                else -> C.AUDIO_CONTENT_TYPE_MUSIC
-            },
+            audioContentType = audioContentType,
             bufferOptions = BufferOptions(
                 minBuffer?.toMilliseconds()?.toInt(),
                 maxBuffer?.toMilliseconds()?.toInt(),

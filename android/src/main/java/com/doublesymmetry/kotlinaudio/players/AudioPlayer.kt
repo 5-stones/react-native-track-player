@@ -35,7 +35,6 @@ import com.doublesymmetry.kotlinaudio.models.PlaybackError
 import com.doublesymmetry.kotlinaudio.models.PlayerOptions
 import com.doublesymmetry.kotlinaudio.models.PositionChangedReason
 import com.doublesymmetry.kotlinaudio.models.RepeatMode
-import com.doublesymmetry.kotlinaudio.models.setWakeMode
 import com.doublesymmetry.kotlinaudio.players.components.Cache
 import com.doublesymmetry.kotlinaudio.players.components.MediaFactory
 import timber.log.Timber
@@ -235,7 +234,7 @@ class AudioPlayer(
             .setRenderersFactory(renderer)
             .setHandleAudioBecomingNoisy(options.handleAudioBecomingNoisy)
             .setMediaSourceFactory(MediaFactory(context, cache))
-            .setWakeMode(setWakeMode(options.wakeMode))
+            .setWakeMode(options.wakeMode.toExoPlayer())
             .setLoadControl(loadControl)
             .setSkipSilenceEnabled(options.skipSilence)
             .setName("kotlin-audio-player")
@@ -243,7 +242,7 @@ class AudioPlayer(
 
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(C.USAGE_MEDIA)
-            .setContentType(options.audioContentType)
+            .setContentType(options.audioContentType.toExoPlayer())
             .build()
         exoPlayer.setAudioAttributes(audioAttributes, options.handleAudioFocus)
         forwardingPlayer = InnerForwardingPlayer(exoPlayer)

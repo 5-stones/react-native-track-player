@@ -376,7 +376,9 @@ class MusicModule(reactContext: ReactApplicationContext) : NativeTrackPlayerSpec
   }
 
   override fun setRepeatMode(mode: Double) = runBlockingOnMain {
-    player.repeatMode = RepeatMode.fromOrdinal(mode.toInt())
+    val value = mode.toInt()
+    player.repeatMode = RepeatMode.entries.getOrNull(value)
+      ?: throw IllegalArgumentException("Invalid repeat mode value: $value (valid range: 0-${RepeatMode.entries.size - 1})")
   }
 
   override fun getRepeatMode(): Double = runBlockingOnMain {
