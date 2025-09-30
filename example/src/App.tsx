@@ -1,5 +1,5 @@
 import BottomSheet from '@gorhom/bottom-sheet';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import TrackPlayer, { useActiveTrack } from 'react-native-track-player';
+import { useActiveTrack } from 'react-native-track-player';
 import {
   ActionSheet,
   Button,
@@ -21,8 +21,7 @@ import {
   Spacer,
   TrackInfo,
 } from './components';
-import { SponsorCard } from './components/SponsorCard';
-import { QueueInitialTracksService, SetupService } from './services';
+import { useSetupPlayer } from './hooks/usePlayer';
 
 export default function App() {
   const isPlayerReady = useSetupPlayer();
@@ -43,7 +42,6 @@ export default function App() {
 
 function Player() {
   const track = useActiveTrack();
-
   // options bottom sheet
   const optionsSheetRef = useRef<BottomSheet>(null);
   const optionsSheetSnapPoints = useMemo(() => ['40%'], []);
@@ -87,7 +85,6 @@ function Player() {
         <Spacer />
         <PlayerControls />
         <Spacer mode={'expand'} />
-        <SponsorCard />
       </View>
       <BottomSheet
         index={-1}
@@ -138,23 +135,3 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
 });
-
-function useSetupPlayer() {
-  const [playerReady, setPlayerReady] = useState<boolean>(false);
-
-  useEffect(() => {
-    let unmounted = false;
-    (async () => {
-      await SetupService();
-      if (unmounted) return;
-      setPlayerReady(true);
-      if (TrackPlayer.getQueue().length <= 0) {
-        QueueInitialTracksService();
-      }
-    })();
-    return () => {
-      unmounted = true;
-    };
-  }, []);
-  return playerReady;
-}

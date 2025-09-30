@@ -1,95 +1,62 @@
+import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import React, { useState } from 'react';
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import TrackPlayer, {
   AppKilledPlaybackBehavior,
-  Capability,
   RepeatMode,
 } from 'react-native-track-player';
-import { DefaultAudioServiceBehaviour, DefaultRepeatMode } from '../services';
+import { playerOptions } from '../services';
 import { Spacer } from './Spacer';
-import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
-export const OptionStack: React.FC<{
-  children: React.ReactNode;
-  vertical?: boolean;
-}> = ({ children, vertical }) => {
-  const childrenArray = React.Children.toArray(children);
-
-  return (
-    <View style={vertical ? styles.optionColumn : styles.optionRow}>
-      {childrenArray.map((child, index) => (
-        <View key={index}>{child}</View>
-      ))}
-    </View>
-  );
-};
-
-export const OptionSheet: React.FC = () => {
-  const [selectedRepeatMode, setSelectedRepeatMode] = useState(
-    repeatModeToIndex(DefaultRepeatMode)
-  );
-
-  const [selectedAudioServiceBehaviour, setSelectedAudioServiceBehaviour] =
-    useState(audioServiceBehaviourToIndex(DefaultAudioServiceBehaviour));
-
+export function OptionSheet() {
   return (
     <BottomSheetScrollView>
-      <OptionStack vertical={true}>
-        <Text style={styles.optionRowLabel}>Repeat Mode</Text>
-        <Spacer />
-        <SegmentedControl
-          appearance={'dark'}
-          values={['Off', 'Track', 'Queue']}
-          selectedIndex={selectedRepeatMode}
-          onChange={async (event) => {
-            setSelectedRepeatMode(event.nativeEvent.selectedSegmentIndex);
-            const repeatMode = repeatModeFromIndex(
-              event.nativeEvent.selectedSegmentIndex
-            );
-            await TrackPlayer.setRepeatMode(repeatMode);
-          }}
-        />
-      </OptionStack>
+      <Options
+        label="Repeat Mode"
+        options={[
+          { label: 'Off', value: RepeatMode.Off },
+          { label: 'Track', value: RepeatMode.Track },
+          { label: 'Queue', value: RepeatMode.Queue },
+        ]}
+        initialValue={playerOptions.repeatMode}
+        onSelect={(repeatMode) => {
+          TrackPlayer.setRepeatMode(repeatMode);
+        }}
+      />
       <Spacer />
       {Platform.OS === 'android' && (
-        <OptionStack vertical={true}>
-          <Text style={styles.optionRowLabel}>Audio Service on App Kill</Text>
-          <Spacer />
-          <SegmentedControl
-            appearance={'dark'}
-            values={['Continue', 'Pause', 'Stop & Remove']}
-            selectedIndex={selectedAudioServiceBehaviour}
-            onChange={async (event) => {
-              setSelectedAudioServiceBehaviour(
-                event.nativeEvent.selectedSegmentIndex
-              );
-              const appKilledPlaybackBehavior = audioServiceBehaviourFromIndex(
-                event.nativeEvent.selectedSegmentIndex
-              );
-
-              // TODO: Copied from example/src/services/SetupService.tsx until updateOptions
-              // allows for partial updates (i.e. only android.appKilledPlaybackBehavior).
-              await TrackPlayer.updateOptions({
-                android: {
-                  appKilledPlaybackBehavior,
-                },
-                capabilities: [
-                  Capability.Play,
-                  Capability.Pause,
-                  Capability.SkipToNext,
-                  Capability.SkipToPrevious,
-                  Capability.SeekTo,
-                ],
-                progressUpdateEventInterval: 2,
-              });
-            }}
-          />
-        </OptionStack>
+        <Options
+          label="Audio Service on App Kill"
+          options={[
+            {
+              label: 'Continue',
+              value: AppKilledPlaybackBehavior.ContinuePlayback,
+            },
+            { label: 'Pause', value: AppKilledPlaybackBehavior.PausePlayback },
+            {
+              label: 'Stop & Remove',
+              value:
+                AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
+            },
+          ]}
+          initialValue={playerOptions.android.appKilledPlaybackBehavior}
+          onSelect={async (appKilledPlaybackBehavior) => {
+            // TODO: Copied from example/src/services/SetupService.tsx until updateOptions
+            // allows for partial updates (i.e. only android.appKilledPlaybackBehavior).
+            await TrackPlayer.updateOptions({
+              ...playerOptions,
+              android: {
+                ...playerOptions.android,
+                appKilledPlaybackBehavior,
+              },
+            });
+          }}
+        />
       )}
     </BottomSheetScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   contentContainer: {
@@ -113,58 +80,56 @@ const styles = StyleSheet.create({
   },
 });
 
-const repeatModeFromIndex = (index: number): RepeatMode => {
-  switch (index) {
-    case 0:
-      return RepeatMode.Off;
-    case 1:
-      return RepeatMode.Track;
-    case 2:
-      return RepeatMode.Queue;
-    default:
-      return RepeatMode.Off;
-  }
-};
+function OptionStack({
+  children,
+  vertical,
+}: {
+  children: React.ReactNode;
+  vertical?: boolean;
+}) {
+  const childrenArray = React.Children.toArray(children);
 
-const repeatModeToIndex = (repeatMode: RepeatMode): number => {
-  switch (repeatMode) {
-    case RepeatMode.Off:
-      return 0;
-    case RepeatMode.Track:
-      return 1;
-    case RepeatMode.Queue:
-      return 2;
-    default:
-      return 0;
-  }
-};
+  return (
+    <View style={vertical ? styles.optionColumn : styles.optionRow}>
+      {childrenArray.map((child, index) => (
+        <View key={index}>{child}</View>
+      ))}
+    </View>
+  );
+}
 
-const audioServiceBehaviourFromIndex = (
-  index: number
-): AppKilledPlaybackBehavior => {
-  switch (index) {
-    case 0:
-      return AppKilledPlaybackBehavior.ContinuePlayback;
-    case 1:
-      return AppKilledPlaybackBehavior.PausePlayback;
-    case 2:
-      return AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification;
-    default:
-      return AppKilledPlaybackBehavior.ContinuePlayback;
-  }
-};
+function Options<T>({
+  label,
+  options,
+  initialValue,
+  onSelect,
+}: {
+  label: string;
+  options: Array<{ label: string; value: T }>;
+  initialValue: T;
+  onSelect: (value: T) => void;
+}) {
+  const [selectedIndex, setSelectedIndex] = useState(() =>
+    options.findIndex((opt) => opt.value === initialValue)
+  );
 
-const audioServiceBehaviourToIndex = (
-  audioServiceBehaviour: AppKilledPlaybackBehavior
-): number => {
-  switch (audioServiceBehaviour) {
-    case AppKilledPlaybackBehavior.ContinuePlayback:
-      return 0;
-    case AppKilledPlaybackBehavior.PausePlayback:
-      return 1;
-    case AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification:
-      return 2;
-    default:
-      return 0;
-  }
-};
+  return (
+    <OptionStack vertical={true}>
+      <Text style={styles.optionRowLabel}>{label}</Text>
+      <Spacer />
+      <SegmentedControl
+        appearance={'dark'}
+        values={options.map((opt) => opt.label)}
+        selectedIndex={selectedIndex}
+        onChange={(event) => {
+          const index = event.nativeEvent.selectedSegmentIndex;
+          setSelectedIndex(index);
+          const value = options[index]?.value;
+          if (value !== undefined) {
+            onSelect(value);
+          }
+        }}
+      />
+    </OptionStack>
+  );
+}
