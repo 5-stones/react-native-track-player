@@ -1,7 +1,7 @@
 import { type TurboModule, TurboModuleRegistry } from 'react-native';
 import {
-  type UnsafeObject,
   type EventEmitter,
+  type UnsafeObject,
 } from 'react-native/Libraries/Types/CodegenTypes';
 
 export interface Spec extends TurboModule {
@@ -10,28 +10,35 @@ export interface Spec extends TurboModule {
   updateOptions(options: UnsafeObject): void;
 
   // events
-  readonly onPlaybackState: EventEmitter<UnsafeObject>;
-  readonly onPlaybackActiveTrackChanged: EventEmitter<UnsafeObject>;
-  readonly onPlaybackProgressUpdated: EventEmitter<UnsafeObject>;
-  readonly onPlaybackPlayWhenReadyChanged: EventEmitter<UnsafeObject>;
-  readonly onPlaybackQueueEnded: EventEmitter<UnsafeObject>;
-  readonly onPlaybackError: EventEmitter<UnsafeObject>;
-  readonly onRemotePlay: EventEmitter<UnsafeObject>;
-  readonly onRemotePause: EventEmitter<UnsafeObject>;
-  readonly onRemoteNext: EventEmitter<UnsafeObject>;
-  readonly onRemotePrevious: EventEmitter<UnsafeObject>;
-  readonly onRemoteSeek: EventEmitter<UnsafeObject>;
-  readonly onRemoteJumpForward: EventEmitter<UnsafeObject>;
-  readonly onRemoteJumpBackward: EventEmitter<UnsafeObject>;
-  readonly onRemoteDuck: EventEmitter<UnsafeObject>;
-  readonly onRemoteStop: EventEmitter<UnsafeObject>;
-  readonly onRemoteSetRating: EventEmitter<UnsafeObject>;
-  readonly onMetadataTimedReceived: EventEmitter<UnsafeObject>;
-  readonly onMetadataCommonReceived: EventEmitter<UnsafeObject>;
-  readonly onPlaybackMetadata: EventEmitter<UnsafeObject>;
   readonly onAndroidControllerConnected: EventEmitter<UnsafeObject>;
   readonly onAndroidControllerDisconnected: EventEmitter<UnsafeObject>;
   readonly onAndroidPlaybackResume: EventEmitter<UnsafeObject>;
+  readonly onMetadataChapterReceived: EventEmitter<UnsafeObject>;
+  readonly onMetadataCommonReceived: EventEmitter<UnsafeObject>;
+  readonly onMetadataTimedReceived: EventEmitter<UnsafeObject>;
+  readonly onPlaybackActiveTrackChanged: EventEmitter<UnsafeObject>;
+  readonly onPlaybackError: EventEmitter<UnsafeObject>;
+  readonly onPlaybackMetadata: EventEmitter<UnsafeObject>;
+  readonly onPlaybackPlayWhenReadyChanged: EventEmitter<UnsafeObject>;
+  readonly onPlaybackProgressUpdated: EventEmitter<UnsafeObject>;
+  readonly onPlaybackQueueEnded: EventEmitter<UnsafeObject>;
+  readonly onPlaybackState: EventEmitter<UnsafeObject>;
+  readonly onRemoteBookmark: EventEmitter<UnsafeObject>;
+  readonly onRemoteDislike: EventEmitter<UnsafeObject>;
+  readonly onRemoteDuck: EventEmitter<UnsafeObject>;
+  readonly onRemoteJumpBackward: EventEmitter<UnsafeObject>;
+  readonly onRemoteJumpForward: EventEmitter<UnsafeObject>;
+  readonly onRemoteLike: EventEmitter<UnsafeObject>;
+  readonly onRemoteNext: EventEmitter<UnsafeObject>;
+  readonly onRemotePause: EventEmitter<UnsafeObject>;
+  readonly onRemotePlay: EventEmitter<UnsafeObject>;
+  readonly onRemotePlayId: EventEmitter<UnsafeObject>;
+  readonly onRemotePlaySearch: EventEmitter<UnsafeObject>;
+  readonly onRemotePrevious: EventEmitter<UnsafeObject>;
+  readonly onRemoteSeek: EventEmitter<UnsafeObject>;
+  readonly onRemoteSetRating: EventEmitter<UnsafeObject>;
+  readonly onRemoteSkip: EventEmitter<UnsafeObject>;
+  readonly onRemoteStop: EventEmitter<UnsafeObject>;
 
   // player api
   load(track: UnsafeObject): void;
