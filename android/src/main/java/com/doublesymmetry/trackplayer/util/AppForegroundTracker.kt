@@ -6,30 +6,30 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import com.facebook.react.bridge.UiThreadUtil
 
 object AppForegroundTracker {
-    private var activityCount = 0
+  private var activityCount = 0
 
-    val foregrounded: Boolean
-        get() = activityCount > 0
+  val foregrounded: Boolean
+    get() = activityCount > 0
 
-    val backgrounded: Boolean
-        get() = activityCount <= 0
+  val backgrounded: Boolean
+    get() = activityCount <= 0
 
-    fun start() {
-        UiThreadUtil.runOnUiThread {
-            ProcessLifecycleOwner.Companion.get().lifecycle.addObserver(Observer)
-        }
+  fun start() {
+    UiThreadUtil.runOnUiThread {
+      ProcessLifecycleOwner.Companion.get().lifecycle.addObserver(Observer)
+    }
+  }
+
+  object Observer : DefaultLifecycleObserver {
+
+    override fun onResume(owner: LifecycleOwner) {
+      super.onResume(owner)
+      activityCount++
     }
 
-    object Observer : DefaultLifecycleObserver {
-
-        override fun onResume(owner: LifecycleOwner) {
-            super.onResume(owner)
-            activityCount++
-        }
-
-        override fun onPause(owner: LifecycleOwner) {
-            super.onPause(owner)
-            activityCount--
-        }
+    override fun onPause(owner: LifecycleOwner) {
+      super.onPause(owner)
+      activityCount--
     }
+  }
 }

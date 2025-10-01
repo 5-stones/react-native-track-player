@@ -18,9 +18,9 @@ import com.facebook.react.views.imagehelper.ResourceDrawableIdHelper
 /**
  * Utility class for converting between React Native bridge data types and Android native types.
  *
- * This class provides a set of helper functions to safely extract and convert data from
- * React Native's ReadableMap and WritableMap objects to Android-specific types like Uri,
- * resource IDs, ratings, and drawable resources.
+ * This class provides a set of helper functions to safely extract and convert data from React
+ * Native's ReadableMap and WritableMap objects to Android-specific types like Uri, resource IDs,
+ * ratings, and drawable resources.
  */
 object BundleUtils {
   fun getUri(context: Context, data: ReadableMap?, key: String?): Uri? {
@@ -29,14 +29,14 @@ object BundleUtils {
     if (obj.type == ReadableType.String) {
       // Remote or Local Uri
       val uri = obj.asString()
-      if (uri?.trim { it <= ' ' }
-          .isNullOrEmpty()) throw RuntimeException("$key: The URL cannot be empty")
+      if (uri?.trim { it <= ' ' }.isNullOrEmpty())
+        throw RuntimeException("$key: The URL cannot be empty")
       return uri.toUri()
     } else if (obj.type == ReadableType.Map) {
       // require/import
       val objMap = obj.asMap()
       val uri = objMap?.getString("uri")
-      if (uri == null) return null;
+      if (uri == null) return null
       val id = ResourceDrawableIdHelper.getResourceDrawableId(context, uri)
       return if (id > 0) {
         // In production, we can obtain the resource uri
@@ -74,10 +74,9 @@ object BundleUtils {
       RatingCompat.RATING_HEART -> HeartRating(data.getBoolean(key))
       RatingCompat.RATING_THUMB_UP_DOWN -> ThumbRating(data.getBoolean(key))
       RatingCompat.RATING_PERCENTAGE -> PercentageRating(data.getDouble(key).toFloat())
-      RatingCompat.RATING_3_STARS, RatingCompat.RATING_4_STARS, RatingCompat.RATING_5_STARS -> StarRating(
-          ratingType,
-          data.getDouble(key).toFloat()
-      )
+      RatingCompat.RATING_3_STARS,
+      RatingCompat.RATING_4_STARS,
+      RatingCompat.RATING_5_STARS -> StarRating(ratingType, data.getDouble(key).toFloat())
 
       else -> null
     }

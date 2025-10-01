@@ -1,4 +1,4 @@
-@file: OptIn(UnstableApi::class)
+@file:OptIn(UnstableApi::class)
 
 package com.doublesymmetry.trackplayer.option
 
@@ -11,7 +11,8 @@ data class PlayerOptions(
   val wakeMode: PlayerWakeMode = PlayerWakeMode.NONE,
 
   /**
-   * Toggle whether the player should pause automatically when audio is rerouted from a headset to device speakers.
+   * Toggle whether the player should pause automatically when audio is rerouted from a headset to
+   * device speakers.
    */
   val handleAudioBecomingNoisy: Boolean = true,
   var repeatMode: PlayerRepeatMode = PlayerRepeatMode.ALL,
@@ -22,16 +23,19 @@ data class PlayerOptions(
   /**
    * Toggle whether or not a player action triggered from an outside source should be intercepted.
    *
-   * The sources can be: media buttons on headphones, Android Wear, Android Auto, Google Assistant, media notification, etc.
+   * The sources can be: media buttons on headphones, Android Wear, Android Auto, Google Assistant,
+   * media notification, etc.
    *
-   * Setting this to true enables the use of [onPlayerActionTriggeredExternally][com.doublesymmetry.trackplayer.player.PlayerEvents.onPlayerActionTriggeredExternally] events.
+   * Setting this to true enables the use of
+   * [onPlayerActionTriggeredExternally][com.doublesymmetry.trackplayer.player.PlayerEvents.onPlayerActionTriggeredExternally]
+   * events.
    */
-  val interceptPlayerActionsTriggeredExternally: Boolean = false
+  val interceptPlayerActionsTriggeredExternally: Boolean = false,
 )
 
-data class BufferOptions (
-    val minBuffer: Int?,
-    val maxBuffer: Int?,
-    val playBuffer: Int?,
-    val backBuffer: Int?,
+data class BufferOptions(
+  val minBuffer: Int?,
+  val maxBuffer: Int?,
+  val playBuffer: Int?,
+  val backBuffer: Int?,
 )

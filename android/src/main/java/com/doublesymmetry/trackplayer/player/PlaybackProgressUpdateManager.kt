@@ -6,15 +6,13 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class PlaybackProgressUpdateManager(
-  private val onProgressUpdate: () -> Unit
-) {
+class PlaybackProgressUpdateManager(private val onProgressUpdate: () -> Unit) {
   private val scope = MainScope()
   private var job: Job? = null
   private var updateInterval: Double? = null
 
   fun setUpdateInterval(interval: Double?) {
-    if (interval == updateInterval) return;
+    if (interval == updateInterval) return
     updateInterval = if (interval != null && interval > 0) interval else null
     stop()
     if (updateInterval != null) {
@@ -23,14 +21,15 @@ class PlaybackProgressUpdateManager(
   }
 
   fun start() {
-    if (job != null) return;
+    if (job != null) return
     updateInterval?.let { interval ->
-      job = scope.launch {
-        while (true) {
-          onProgressUpdate()
+      job =
+        scope.launch {
+          while (true) {
+            onProgressUpdate()
             delay((interval * 1000).toLong())
+          }
         }
-      }
     }
   }
 

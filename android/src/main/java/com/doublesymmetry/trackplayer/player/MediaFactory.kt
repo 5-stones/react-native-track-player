@@ -28,119 +28,123 @@ import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import androidx.media3.extractor.DefaultExtractorsFactory
 
 @OptIn(UnstableApi::class)
-class MediaFactory (
-    private val context: Context,
-    private val cache: SimpleCache?
-) : MediaSource.Factory {
+class MediaFactory(private val context: Context, private val cache: SimpleCache?) :
+  MediaSource.Factory {
 
-    companion object {
-        private const val DEFAULT_USER_AGENT = "react-native-track-player"
-    }
+  companion object {
+    private const val DEFAULT_USER_AGENT = "react-native-track-player"
+  }
 
-    private val mediaFactory = DefaultMediaSourceFactory(context)
+  private val mediaFactory = DefaultMediaSourceFactory(context)
 
-    override fun setDrmSessionManagerProvider(drmSessionManagerProvider: DrmSessionManagerProvider): MediaSource.Factory {
-        return mediaFactory.setDrmSessionManagerProvider(drmSessionManagerProvider)
-    }
+  override fun setDrmSessionManagerProvider(
+    drmSessionManagerProvider: DrmSessionManagerProvider
+  ): MediaSource.Factory {
+    return mediaFactory.setDrmSessionManagerProvider(drmSessionManagerProvider)
+  }
 
-    override fun setLoadErrorHandlingPolicy(loadErrorHandlingPolicy: LoadErrorHandlingPolicy): MediaSource.Factory {
-        return mediaFactory.setLoadErrorHandlingPolicy(loadErrorHandlingPolicy)
-    }
+  override fun setLoadErrorHandlingPolicy(
+    loadErrorHandlingPolicy: LoadErrorHandlingPolicy
+  ): MediaSource.Factory {
+    return mediaFactory.setLoadErrorHandlingPolicy(loadErrorHandlingPolicy)
+  }
 
-    override fun getSupportedTypes(): IntArray {
-        return mediaFactory.supportedTypes
-    }
+  override fun getSupportedTypes(): IntArray {
+    return mediaFactory.supportedTypes
+  }
 
-    private fun isLocalFile(uri: Uri): Boolean {
-        val scheme = uri.scheme
-        val host = uri.host
-        val isLocalhost = (scheme == "http" || scheme == "https") &&
-                (host == "localhost" || host == "127.0.0.1" || host == "[::1]")
-        return !isLocalhost && (scheme == null ||
-                scheme == ContentResolver.SCHEME_FILE ||
-                scheme == ContentResolver.SCHEME_ANDROID_RESOURCE ||
-                scheme == ContentResolver.SCHEME_CONTENT ||
-                scheme == "res" ||
-                host == null)
-    }
+  private fun isLocalFile(uri: Uri): Boolean {
+    val scheme = uri.scheme
+    val host = uri.host
+    val isLocalhost =
+      (scheme == "http" || scheme == "https") &&
+        (host == "localhost" || host == "127.0.0.1" || host == "[::1]")
+    return !isLocalhost &&
+      (scheme == null ||
+        scheme == ContentResolver.SCHEME_FILE ||
+        scheme == ContentResolver.SCHEME_ANDROID_RESOURCE ||
+        scheme == ContentResolver.SCHEME_CONTENT ||
+        scheme == "res" ||
+        host == null)
+  }
 
-    override fun createMediaSource(mediaItem: MediaItem): MediaSource {
+  override fun createMediaSource(mediaItem: MediaItem): MediaSource {
 
-        val userAgent = mediaItem.mediaMetadata.extras?.getString("user-agent") ?: DEFAULT_USER_AGENT
-        val headers = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            mediaItem.mediaMetadata.extras?.getSerializable("headers", HashMap::class.java)
-        } else {
-            mediaItem.mediaMetadata.extras?.getSerializable("headers")
+    val userAgent = mediaItem.mediaMetadata.extras?.getString("user-agent") ?: DEFAULT_USER_AGENT
+    val headers =
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        mediaItem.mediaMetadata.extras?.getSerializable("headers", HashMap::class.java)
+      } else {
+        mediaItem.mediaMetadata.extras?.getSerializable("headers")
+      }
+    val resourceId = mediaItem.mediaMetadata.extras?.getInt("resource-id")
+    // HACK: why are these capitalized?
+    val resourceType = mediaItem.mediaMetadata.extras?.getString("type")?.lowercase()
+    val uri = mediaItem.mediaMetadata.extras?.getString("uri")!!.toUri()
+    val factory: DataSource.Factory =
+      when {
+        resourceId != 0 && resourceId != null -> {
+          val raw = RawResourceDataSource(context)
+          raw.open(DataSpec(uri))
+          DataSource.Factory { raw }
         }
-        val resourceId = mediaItem.mediaMetadata.extras?.getInt("resource-id")
-        // HACK: why are these capitalized?
-        val resourceType = mediaItem.mediaMetadata.extras?.getString("type")?.lowercase()
-        val uri = mediaItem.mediaMetadata.extras?.getString("uri")!!.toUri()
-        val factory: DataSource.Factory = when {
-            resourceId != 0 && resourceId != null -> {
-                val raw = RawResourceDataSource(context)
-                raw.open(DataSpec(uri))
-                DataSource.Factory { raw }
+        isLocalFile(uri) -> {
+          DefaultDataSource.Factory(context)
+        }
+        else -> {
+          val tempFactory =
+            DefaultHttpDataSource.Factory().apply {
+              setUserAgent(userAgent)
+              setAllowCrossProtocolRedirects(true)
+
+              headers?.let { setDefaultRequestProperties(it as HashMap<String, String>) }
             }
-            isLocalFile(uri) -> {
-                DefaultDataSource.Factory(context)
-            }
-            else -> {
-                val tempFactory = DefaultHttpDataSource.Factory().apply {
-                    setUserAgent(userAgent)
-                    setAllowCrossProtocolRedirects(true)
 
-                    headers?.let {
-                        setDefaultRequestProperties(it as HashMap<String, String>)
-                    }
-                }
-
-                enableCaching(tempFactory)
-            }
+          enableCaching(tempFactory)
         }
+      }
 
-        return when (resourceType) {
-            "dash" -> createDashSource(mediaItem, factory)
-            "hls" -> createHlsSource(mediaItem, factory)
-            "smoothstreaming" -> createSsSource(mediaItem, factory)
-            else -> createProgressiveSource(mediaItem, factory)
-        }
+    return when (resourceType) {
+      "dash" -> createDashSource(mediaItem, factory)
+      "hls" -> createHlsSource(mediaItem, factory)
+      "smoothstreaming" -> createSsSource(mediaItem, factory)
+      else -> createProgressiveSource(mediaItem, factory)
     }
+  }
 
-    private fun createDashSource(mediaItem: MediaItem, factory: DataSource.Factory?): MediaSource {
-        return DashMediaSource.Factory(DefaultDashChunkSource.Factory(factory!!), factory)
-            .createMediaSource(mediaItem)
-    }
+  private fun createDashSource(mediaItem: MediaItem, factory: DataSource.Factory?): MediaSource {
+    return DashMediaSource.Factory(DefaultDashChunkSource.Factory(factory!!), factory)
+      .createMediaSource(mediaItem)
+  }
 
-    private fun createHlsSource(mediaItem: MediaItem, factory: DataSource.Factory?): MediaSource {
-        return HlsMediaSource.Factory(factory!!)
-            .createMediaSource(mediaItem)
-    }
+  private fun createHlsSource(mediaItem: MediaItem, factory: DataSource.Factory?): MediaSource {
+    return HlsMediaSource.Factory(factory!!).createMediaSource(mediaItem)
+  }
 
-    private fun createSsSource(mediaItem: MediaItem, factory: DataSource.Factory?): MediaSource {
-        return SsMediaSource.Factory(DefaultSsChunkSource.Factory(factory!!), factory)
-            .createMediaSource(mediaItem)
-    }
+  private fun createSsSource(mediaItem: MediaItem, factory: DataSource.Factory?): MediaSource {
+    return SsMediaSource.Factory(DefaultSsChunkSource.Factory(factory!!), factory)
+      .createMediaSource(mediaItem)
+  }
 
-    private fun createProgressiveSource(
-        mediaItem: MediaItem,
-        factory: DataSource.Factory
-    ): ProgressiveMediaSource {
-        return ProgressiveMediaSource.Factory(
-            factory, DefaultExtractorsFactory()
-                .setConstantBitrateSeekingEnabled(true)
-        )
-            .createMediaSource(mediaItem)
-    }
+  private fun createProgressiveSource(
+    mediaItem: MediaItem,
+    factory: DataSource.Factory,
+  ): ProgressiveMediaSource {
+    return ProgressiveMediaSource.Factory(
+        factory,
+        DefaultExtractorsFactory().setConstantBitrateSeekingEnabled(true),
+      )
+      .createMediaSource(mediaItem)
+  }
 
-    private fun enableCaching(factory: DataSource.Factory): DataSource.Factory {
-        if (cache == null) {
-            return factory
-        } else {
-            return CacheDataSource.Factory()
-                .setCache(cache)
-                .setUpstreamDataSourceFactory(factory)
-                .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-        }
+  private fun enableCaching(factory: DataSource.Factory): DataSource.Factory {
+    if (cache == null) {
+      return factory
+    } else {
+      return CacheDataSource.Factory()
+        .setCache(cache)
+        .setUpstreamDataSourceFactory(factory)
+        .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
     }
+  }
 }

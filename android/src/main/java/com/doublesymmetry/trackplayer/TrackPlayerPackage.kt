@@ -1,6 +1,5 @@
 package com.doublesymmetry.trackplayer
 
-import com.doublesymmetry.trackplayer.TrackPlayerModule
 import com.facebook.react.BaseReactPackage
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
@@ -20,14 +19,15 @@ class TrackPlayerPackage : BaseReactPackage() {
   override fun getReactModuleInfoProvider(): ReactModuleInfoProvider {
     return ReactModuleInfoProvider {
       val moduleInfos: MutableMap<String, ReactModuleInfo> = HashMap()
-      moduleInfos[TrackPlayerModule.NAME] = ReactModuleInfo(
-        TrackPlayerModule.NAME,
-        TrackPlayerModule.NAME,
-        false,  // canOverrideExistingModule
-        false,  // needsEagerInit
-        false,  // isCxxModule
-        true // isTurboModule
-      )
+      moduleInfos[TrackPlayerModule.NAME] =
+        ReactModuleInfo(
+          TrackPlayerModule.NAME,
+          TrackPlayerModule.NAME,
+          false, // canOverrideExistingModule
+          false, // needsEagerInit
+          false, // isCxxModule
+          true, // isTurboModule
+        )
       moduleInfos
     }
   }
