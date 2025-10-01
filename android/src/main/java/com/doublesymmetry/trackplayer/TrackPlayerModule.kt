@@ -15,7 +15,7 @@ import com.doublesymmetry.trackplayer.event.MediaSessionCallback
 import com.doublesymmetry.trackplayer.event.PlaybackState
 import com.doublesymmetry.trackplayer.event.bridge
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
-import com.doublesymmetry.trackplayer.model.AudioPlayerOptionsData
+import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import com.doublesymmetry.trackplayer.model.TrackFactory
 import com.doublesymmetry.trackplayer.option.Capability
@@ -47,7 +47,7 @@ import timber.log.Timber
 class TrackPlayerModule(reactContext: ReactApplicationContext) :
   NativeTrackPlayerSpec(reactContext), ServiceConnection {
   private lateinit var browser: MediaBrowser
-  private var playerOptions: AudioPlayerOptionsData = AudioPlayerOptionsData()
+  private var playerOptions: TrackPlayerOptions = TrackPlayerOptions()
   private var playerSetUpPromise: Promise? = null
   private val mainScope = MainScope()
   private var connectedService: TrackPlayerService? = null
@@ -172,7 +172,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     }
 
     playerSetUpPromise = promise
-    playerOptions = AudioPlayerOptionsData.Companion.fromBridge(data)
+    playerOptions = TrackPlayerOptions.fromBridge(data)
 
     val musicModule = this
     try {
@@ -190,7 +190,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   override fun updateOptions(data: ReadableMap?): Unit = runBlockingOnMain {
-    val options = AudioPlayerOptionsData.Companion.fromBridge(data)
+    val options = TrackPlayerOptions.fromBridge(data)
 
     // Store progress update interval for use during playback
     progressUpdateManager?.setUpdateInterval(

@@ -23,8 +23,8 @@ import androidx.media3.session.SessionCommands
 import androidx.media3.session.SessionResult
 import com.doublesymmetry.trackplayer.event.EventControllerConnection
 import com.doublesymmetry.trackplayer.extension.find
-import com.doublesymmetry.trackplayer.model.AudioPlayerOptionsData
 import com.doublesymmetry.trackplayer.model.AppKilledPlaybackBehavior
+import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
 import com.doublesymmetry.trackplayer.model.CustomCommandButton
 import com.doublesymmetry.trackplayer.option.Capability
 import com.facebook.react.bridge.Arguments
@@ -103,7 +103,7 @@ class TrackPlayerService : HeadlessJsMediaService() {
     return START_STICKY
   }
 
-  fun setupPlayer(playerOptionsData: AudioPlayerOptionsData) {
+  fun setupPlayer(playerOptionsData: TrackPlayerOptions) {
     // Check if player has already been configured (not the temporary initial player)
     if (temporaryPlayer == null) {
       print("Player setup already completed. Preventing reinitialization.")
@@ -111,7 +111,7 @@ class TrackPlayerService : HeadlessJsMediaService() {
     }
     Timber.Forest.d("Setting up player")
 
-    val options = playerOptionsData.toAudioPlayerOptions()
+    val options = playerOptionsData.toPlayerOptions()
     val oldPlayer = player
     // Replace temporary player with properly configured one
     player = TrackPlayer(this@TrackPlayerService, options)
@@ -120,18 +120,16 @@ class TrackPlayerService : HeadlessJsMediaService() {
     mediaSession.player = player.forwardingPlayer
   }
 
-  fun updateOptions(options: AudioPlayerOptionsData) {
-    val androidOptions = options.androidOptions
+  fun updateOptions(options: TrackPlayerOptions) {
+    options.audioOffload?.let { audioOffload -> player.setAudioOffload(audioOffload) }
 
-    androidOptions?.audioOffload?.let { audioOffload -> player.setAudioOffload(audioOffload) }
-
-    androidOptions?.skipSilence?.let { skipSilence -> player.skipSilence = skipSilence }
+    options.skipSilence?.let { skipSilence -> player.skipSilence = skipSilence }
 
     appKilledPlaybackBehavior =
-      AppKilledPlaybackBehavior::string.find(androidOptions?.appKilledPlaybackBehavior)
-        ?: AppKilledPlaybackBehavior.CONTINUE_PLAYBACK
+      AppKilledPlaybackBehavior::string.find(options.appKilledPlaybackBehavior)
+        ?: AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
 
-    player.shuffleMode = androidOptions?.shuffle ?: false
+    player.shuffleMode = options.shuffle ?: false
 
     // Progress update events now handled by MusicModule
     val capabilities = options.capabilities ?: emptyList()

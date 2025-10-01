@@ -8,13 +8,12 @@ import com.doublesymmetry.trackplayer.option.PlayerOptions
 import com.doublesymmetry.trackplayer.option.PlayerWakeMode
 import com.facebook.react.bridge.ReadableMap
 
-data class AudioPlayerOptionsData(
+data class TrackPlayerOptions(
   val forwardJumpInterval: Double = 15.0,
   val backwardJumpInterval: Double = 15.0,
   val progressUpdateEventInterval: Double = -1.0,
   val capabilities: List<Capability>? = null,
   val notificationCapabilities: List<Capability>? = null,
-  val androidOptions: AndroidAudioPlayerOptions? = null,
 
   // Audio engine options
   val minBuffer: Double? = null,
@@ -26,10 +25,16 @@ data class AudioPlayerOptionsData(
   val handleAudioBecomingNoisy: Boolean = true,
   val autoHandleInterruptions: Boolean = true,
   val wakeMode: PlayerWakeMode = PlayerWakeMode.NONE,
+
+  // Android-specific options
+  val audioOffload: Boolean? = null,
+  val skipSilence: Boolean? = null,
+  val appKilledPlaybackBehavior: String? = null,
+  val shuffle: Boolean? = null,
 ) {
   companion object {
-    fun fromBridge(map: ReadableMap?): AudioPlayerOptionsData {
-      if (map == null) return AudioPlayerOptionsData()
+    fun fromBridge(map: ReadableMap?): TrackPlayerOptions {
+      if (map == null) return TrackPlayerOptions()
 
       val capabilities =
         map.getArray("capabilities")?.let { arr ->
@@ -53,7 +58,9 @@ data class AudioPlayerOptionsData(
           }
         }
 
-      return AudioPlayerOptionsData(
+      val androidMap = if (map.hasKey("android")) map.getMap("android") else null
+
+      return TrackPlayerOptions(
         forwardJumpInterval =
           if (map.hasKey("forwardJumpInterval")) map.getDouble("forwardJumpInterval") else 15.0,
         backwardJumpInterval =
@@ -64,9 +71,6 @@ data class AudioPlayerOptionsData(
           else -1.0,
         capabilities = capabilities,
         notificationCapabilities = notificationCapabilities,
-        androidOptions =
-          if (map.hasKey("android")) AndroidAudioPlayerOptions.fromBridge(map.getMap("android"))
-          else null,
 
         // Audio engine options
         minBuffer = if (map.hasKey("minBuffer")) map.getDouble("minBuffer") else null,
@@ -90,11 +94,25 @@ data class AudioPlayerOptionsData(
                 "Invalid wakeMode value: $value (valid range: 0-${PlayerWakeMode.entries.size - 1})"
               )
           } else PlayerWakeMode.NONE,
+
+        // Android-specific options
+        audioOffload =
+          if (androidMap?.hasKey("audioOffload") == true) androidMap.getBoolean("audioOffload")
+          else null,
+        skipSilence =
+          if (androidMap?.hasKey("skipSilence") == true) androidMap.getBoolean("skipSilence")
+          else null,
+        appKilledPlaybackBehavior =
+          if (androidMap?.hasKey("appKilledPlaybackBehavior") == true)
+            androidMap.getString("appKilledPlaybackBehavior")
+          else null,
+        shuffle =
+          if (androidMap?.hasKey("shuffle") == true) androidMap.getBoolean("shuffle") else null,
       )
     }
   }
 
-  fun toAudioPlayerOptions(): PlayerOptions {
+  fun toPlayerOptions(): PlayerOptions {
     return PlayerOptions(
       audioContentType = audioContentType,
       bufferOptions =
@@ -107,33 +125,8 @@ data class AudioPlayerOptionsData(
       cacheSizeKb = maxCacheSize.toLong(),
       handleAudioBecomingNoisy = handleAudioBecomingNoisy,
       interceptPlayerActionsTriggeredExternally = true,
-      skipSilence = androidOptions?.skipSilence ?: false,
+      skipSilence = skipSilence ?: false,
       wakeMode = wakeMode,
     )
-  }
-}
-
-data class AndroidAudioPlayerOptions(
-  val audioOffload: Boolean? = null,
-  val skipSilence: Boolean? = null,
-  val appKilledPlaybackBehavior: String? = null,
-  val pauseOnInterruption: Boolean? = null,
-  val shuffle: Boolean? = null,
-) {
-  companion object {
-    fun fromBridge(map: ReadableMap?): AndroidAudioPlayerOptions {
-      if (map == null) return AndroidAudioPlayerOptions()
-
-      return AndroidAudioPlayerOptions(
-        audioOffload = if (map.hasKey("audioOffload")) map.getBoolean("audioOffload") else null,
-        skipSilence = if (map.hasKey("skipSilence")) map.getBoolean("skipSilence") else null,
-        appKilledPlaybackBehavior =
-          if (map.hasKey("appKilledPlaybackBehavior")) map.getString("appKilledPlaybackBehavior")
-          else null,
-        pauseOnInterruption =
-          if (map.hasKey("pauseOnInterruption")) map.getBoolean("pauseOnInterruption") else null,
-        shuffle = if (map.hasKey("shuffle")) map.getBoolean("shuffle") else null,
-      )
-    }
   }
 }
