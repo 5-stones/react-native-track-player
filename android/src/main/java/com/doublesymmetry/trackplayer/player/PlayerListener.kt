@@ -144,13 +144,13 @@ class PlayerListener(private val trackPlayer: TrackPlayer) : Player.Listener {
                     if (state != null && state != trackPlayer.playerState) {
                         // Clear error when recovering from ERROR state to a successful state
                         if (trackPlayer.playerState == AudioPlayerState.ERROR && state != AudioPlayerState.ERROR) {
-                            trackPlayer.clearPlaybackError()
+                            trackPlayer.playbackError = null
                         }
                         trackPlayer.setPlayerState(state)
                     }
                 }
                 Player.EVENT_MEDIA_ITEM_TRANSITION -> {
-                    trackPlayer.clearPlaybackError()
+                    trackPlayer.playbackError = null
                     if (trackPlayer.currentItem != null) {
                         trackPlayer.setPlayerState(AudioPlayerState.LOADING)
                         if (trackPlayer.isPlaying) {

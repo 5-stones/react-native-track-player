@@ -117,19 +117,10 @@ class TrackPlayer(
         get() = if (exoPlayer.currentMediaItemIndex == C.INDEX_UNSET) null
             else exoPlayer.currentMediaItemIndex
 
-    val isEmpty: Boolean
-        get() = exoPlayer.mediaItemCount == 0
-
     var shuffleMode
         get() = exoPlayer.shuffleModeEnabled
         set(v) {
             exoPlayer.shuffleModeEnabled = v
-        }
-
-    val nextIndex: Int?
-        get() {
-            return if (exoPlayer.nextMediaItemIndex == C.INDEX_UNSET) null
-            else exoPlayer.nextMediaItemIndex
         }
 
     val items: List<Track>
@@ -228,7 +219,7 @@ class TrackPlayer(
      * @param item The [Track] to replace the current one.
      */
     fun load(item: Track) {
-        if (isEmpty) {
+        if (exoPlayer.mediaItemCount == 0) {
             add(item)
         } else {
             val index = exoPlayer.currentMediaItemIndex
@@ -409,9 +400,5 @@ class TrackPlayer(
             playerState = state
             events.stateChange.emit(PlaybackState(state, playbackError))
         }
-    }
-
-    internal fun clearPlaybackError() {
-        playbackError = null
     }
 }
