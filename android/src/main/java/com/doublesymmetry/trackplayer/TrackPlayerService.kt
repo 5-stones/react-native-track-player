@@ -24,6 +24,7 @@ import androidx.media3.session.SessionResult
 import com.doublesymmetry.trackplayer.event.EventControllerConnection
 import com.doublesymmetry.trackplayer.extension.find
 import com.doublesymmetry.trackplayer.model.AudioPlayerOptionsData
+import com.doublesymmetry.trackplayer.model.AppKilledPlaybackBehavior
 import com.doublesymmetry.trackplayer.model.CustomCommandButton
 import com.doublesymmetry.trackplayer.option.Capability
 import com.facebook.react.bridge.Arguments
@@ -90,12 +91,6 @@ class TrackPlayerService : HeadlessJsMediaService() {
         )
         .build()
     super.onCreate()
-  }
-
-  enum class AppKilledPlaybackBehavior(val string: String) {
-    CONTINUE_PLAYBACK("continue-playback"),
-    PAUSE_PLAYBACK("pause-playback"),
-    STOP_PLAYBACK_AND_REMOVE_NOTIFICATION("stop-playback-and-remove-notification"),
   }
 
   private var appKilledPlaybackBehavior =
