@@ -95,7 +95,6 @@ const callbackByEvent = {
   'remote-jump-forward': TrackPlayer.onRemoteJumpForward,
   'remote-jump-backward': TrackPlayer.onRemoteJumpBackward,
   'remote-set-rating': TrackPlayer.onRemoteSetRating,
-  'android-playback-resume': TrackPlayer.onAndroidPlaybackResume,
   'remote-like': TrackPlayer.onRemoteLike,
   'remote-dislike': TrackPlayer.onRemoteDislike,
   'remote-bookmark': TrackPlayer.onRemoteBookmark,

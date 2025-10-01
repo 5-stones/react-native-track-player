@@ -128,7 +128,9 @@ Fired when the user changes the position of the timeline. Only fired if the [`Ca
 | position | `number` | The position to seek to in seconds |
 
 ### `RemoteSetRating`
-Fired when the user changes the rating for the track. Only fired if the [`Capability.SetRating`](./constants/capability.md) is allowed.
+Fired when a media controller sets a rating for the current track. Common sources include Android Auto thumbs up/down buttons and lockscreen rating widgets. Only fired if the [`Capability.SetRating`](./constants/capability.md) is allowed.
+
+Use this event to sync ratings with your backend or update your app's UI.
 
 | Param  | Type     | Description   |
 | ------ | -------- | ------------- |

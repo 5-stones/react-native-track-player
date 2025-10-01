@@ -12,7 +12,6 @@ export interface Spec extends TurboModule {
   // events
   readonly onAndroidControllerConnected: EventEmitter<UnsafeObject>;
   readonly onAndroidControllerDisconnected: EventEmitter<UnsafeObject>;
-  readonly onAndroidPlaybackResume: EventEmitter<UnsafeObject>;
   readonly onMetadataChapterReceived: EventEmitter<UnsafeObject>;
   readonly onMetadataCommonReceived: EventEmitter<UnsafeObject>;
   readonly onMetadataTimedReceived: EventEmitter<UnsafeObject>;

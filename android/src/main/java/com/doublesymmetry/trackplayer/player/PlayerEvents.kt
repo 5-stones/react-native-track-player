@@ -46,5 +46,4 @@ class PlayerEvents {
     val onRatingChanged = event<Any>(replay = 0)
     val onControllerConnected = event<EventControllerConnection>(replay = 0)
     val onControllerDisconnected = event<String>(replay = 0)
-    val onPlaybackResume = event<String>(replay = 0)
 }

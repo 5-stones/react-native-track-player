@@ -470,7 +470,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       observeRatingChanged()
       observeControllerConnected()
       observeControllerDisconnected()
-      observePlaybackResume()
     }
 
     private fun observeStateChange() {
@@ -683,15 +682,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       }
     }
 
-    private fun observePlaybackResume() {
-      mainScope.launch {
-        player.events.onPlaybackResume.collect { packageName ->
-          emitOnAndroidPlaybackResume(Arguments.createMap().apply {
-            putString("package", packageName)
-          })
-        }
-      }
-    }
   }
 
 }

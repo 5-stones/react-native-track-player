@@ -381,16 +381,6 @@ class TrackPlayerService : HeadlessJsMediaService() {
             return super.onCustomCommand(session, controller, command, args)
         }
 
-
-
-        override fun onPlaybackResumption(
-            mediaSession: MediaSession,
-            controller: MediaSession.ControllerInfo
-        ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
-            player.events.onPlaybackResume.emit(controller.packageName)
-            return super.onPlaybackResumption(mediaSession, controller)
-        }
-
         override fun onSetRating(
             session: MediaSession,
             controller: MediaSession.ControllerInfo,
