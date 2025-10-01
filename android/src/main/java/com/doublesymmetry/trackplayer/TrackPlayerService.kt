@@ -142,7 +142,6 @@ class TrackPlayerService : HeadlessJsMediaService() {
         appKilledPlaybackBehavior =
             AppKilledPlaybackBehavior::string.find(androidOptions?.appKilledPlaybackBehavior) ?: AppKilledPlaybackBehavior.CONTINUE_PLAYBACK
 
-        player.options.alwaysPauseOnInterruption = androidOptions?.pauseOnInterruption ?: false
         player.shuffleMode = androidOptions?.shuffle ?: false
 
         // Progress update events now handled by MusicModule

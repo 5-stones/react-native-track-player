@@ -2,7 +2,6 @@ package com.doublesymmetry.trackplayer.player
 
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Metadata
-import com.doublesymmetry.trackplayer.event.AudioFocusChange
 import com.doublesymmetry.trackplayer.event.AudioItemTransition
 import com.doublesymmetry.trackplayer.event.EventControllerConnection
 import com.doublesymmetry.trackplayer.event.MediaSessionCallback
@@ -41,7 +40,6 @@ class PlayerEvents {
     val playWhenReadyChange = event<PlayWhenReadyChange>(replay = 1)
     val audioItemTransition = event<AudioItemTransition>(replay = 1)
     val positionChanged = event<PositionChangedReason?>(replay = 1)
-    val onAudioFocusChanged = event<AudioFocusChange>(replay = 1)
     val onCommonMetadata = event<MediaMetadata>(replay = 1)
     val onTimedMetadata = event<Metadata>(replay = 1)
     val onPlayerActionTriggeredExternally = event<MediaSessionCallback>(replay = 0)

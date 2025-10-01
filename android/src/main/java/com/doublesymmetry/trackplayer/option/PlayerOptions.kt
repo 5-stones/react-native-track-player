@@ -14,12 +14,6 @@ data class PlayerOptions(
    * Toggle whether the player should pause automatically when audio is rerouted from a headset to device speakers.
    */
   val handleAudioBecomingNoisy: Boolean = true,
-
-  /**
-   * Whether audio focus should be managed automatically. See https://medium.com/google-exoplayer/easy-audio-focus-with-exoplayer-a2dcbbe4640e
-   */
-  val handleAudioFocus: Boolean = true,
-  var alwaysPauseOnInterruption: Boolean = true,
   var repeatMode: PlayerRepeatMode = PlayerRepeatMode.ALL,
   val bufferOptions: BufferOptions = BufferOptions(null, null, null, null),
   val parseEmbeddedArtwork: Boolean = false,

@@ -122,12 +122,6 @@ export enum Event {
 
   RemoteSetRating = 'remote-set-rating',
   /**
-   * Fired when the app needs to handle an audio interruption.
-   * See https://rntp.dev/docs/api/events#remoteduck
-   **/
-
-  RemoteDuck = 'remote-duck',
-  /**
    * (iOS only) Fired when the user presses the like button in the now playing
    * center.
    * See https://rntp.dev/docs/api/events#remotelike-ios-only

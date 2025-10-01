@@ -9,11 +9,6 @@ export interface AndroidOptions {
   appKilledPlaybackBehavior?: AppKilledPlaybackBehavior;
 
   /**
-   * Whether the remote-duck event will be triggered on every interruption
-   */
-  alwaysPauseOnInterruption?: boolean;
-
-  /**
    * Time in seconds to wait once the player should transition to not
    * considering the service as in the foreground. If playback resumes within
    * this grace period, the service remains in the foreground state.

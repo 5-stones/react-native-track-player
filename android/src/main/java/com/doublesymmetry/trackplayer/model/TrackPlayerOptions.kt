@@ -84,7 +84,6 @@ data class AudioPlayerOptionsData(
             ),
             cacheSizeKb = maxCacheSize.toLong(),
             handleAudioBecomingNoisy = handleAudioBecomingNoisy,
-            handleAudioFocus = autoHandleInterruptions,
             interceptPlayerActionsTriggeredExternally = true,
             skipSilence = androidOptions?.skipSilence ?: false,
             wakeMode = wakeMode

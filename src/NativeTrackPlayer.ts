@@ -25,7 +25,6 @@ export interface Spec extends TurboModule {
   readonly onPlaybackState: EventEmitter<UnsafeObject>;
   readonly onRemoteBookmark: EventEmitter<UnsafeObject>;
   readonly onRemoteDislike: EventEmitter<UnsafeObject>;
-  readonly onRemoteDuck: EventEmitter<UnsafeObject>;
   readonly onRemoteJumpBackward: EventEmitter<UnsafeObject>;
   readonly onRemoteJumpForward: EventEmitter<UnsafeObject>;
   readonly onRemoteLike: EventEmitter<UnsafeObject>;

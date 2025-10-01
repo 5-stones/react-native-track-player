@@ -6,7 +6,6 @@ export * from './PlaybackErrorEvent';
 export * from './PlaybackPlayWhenReadyChangedEvent';
 export * from './PlaybackProgressUpdatedEvent';
 export * from './PlaybackQueueEndedEvent';
-export * from './RemoteDuckEvent';
 export * from './RemoteJumpBackwardEvent';
 export * from './RemoteJumpForwardEvent';
 export * from './RemotePlayIdEvent';

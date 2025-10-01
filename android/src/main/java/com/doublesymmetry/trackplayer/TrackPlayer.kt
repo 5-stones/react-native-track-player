@@ -18,7 +18,6 @@ import com.doublesymmetry.trackplayer.event.PlaybackError
 import com.doublesymmetry.trackplayer.event.PlaybackState
 import com.doublesymmetry.trackplayer.option.PlayerOptions
 import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
-import com.doublesymmetry.trackplayer.player.AudioFocusManager
 import com.doublesymmetry.trackplayer.player.PlayerEvents
 import com.doublesymmetry.trackplayer.player.ForwardingPlayer
 import com.doublesymmetry.trackplayer.player.PlayerListener
@@ -45,10 +44,6 @@ class TrackPlayer(
     private var playerListener: PlayerListener
     private var cache: SimpleCache? = null
     val events = PlayerEvents()
-
-    var wasDucking = false
-        internal set
-    private val focusManager: AudioFocusManager = AudioFocusManager(this)
 
     val currentItem: Track?
         get() = exoPlayer.currentMediaItem?.let { Track.fromMediaItem(it) }
@@ -85,12 +80,10 @@ class TrackPlayer(
             else exoPlayer.bufferedPosition
         }
 
-    private var volumeMultiplier = 1f
-
     var volume: Float
         get() = exoPlayer.volume
         set(value) {
-            exoPlayer.volume = value * volumeMultiplier
+            exoPlayer.volume = value
         }
 
     var playbackSpeed: Float
@@ -224,7 +217,7 @@ class TrackPlayer(
             .setUsage(C.USAGE_MEDIA)
             .setContentType(options.audioContentType.toExoPlayer())
             .build()
-        exoPlayer.setAudioAttributes(audioAttributes, options.handleAudioFocus)
+        exoPlayer.setAudioAttributes(audioAttributes, true)
         forwardingPlayer = ForwardingPlayer(exoPlayer, events)
         playerListener = PlayerListener(this)
         player.addListener(playerListener)
@@ -394,7 +387,6 @@ class TrackPlayer(
      * Stops and destroys the player. Only call this when you are finished using the player, otherwise use [pause].
      */
     fun destroy() {
-        focusManager.abandonAudioFocusIfHeld()
         stop()
         player.removeListener(playerListener)
         exoPlayer.release()
@@ -416,24 +408,10 @@ class TrackPlayer(
         if (state != playerState) {
             playerState = state
             events.stateChange.emit(PlaybackState(state, playbackError))
-            if (!options.handleAudioFocus) {
-                when (state) {
-                    AudioPlayerState.IDLE,
-                    AudioPlayerState.ERROR -> focusManager.abandonAudioFocusIfHeld()
-                    AudioPlayerState.READY -> focusManager.requestAudioFocus()
-                    else -> {}
-                }
-            }
         }
     }
 
     internal fun clearPlaybackError() {
         playbackError = null
-    }
-
-    // Helper method for AudioFocusManager to update volume multiplier
-    internal fun setVolumeMultiplier(multiplier: Float) {
-        volumeMultiplier = multiplier
-        volume = volume  // Trigger volume recalculation
     }
 }

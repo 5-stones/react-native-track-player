@@ -465,7 +465,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       observePositionChanged()
       observeQueueEnded()
       observePlaybackError()
-      observeAudioFocusChanged()
       observeCommonMetadata()
       observeTimedMetadata()
       observeRatingChanged()
@@ -602,17 +601,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       mainScope.launch {
         player.events.playbackError.collect { error ->
           emitOnPlaybackError(error.toBridge())
-        }
-      }
-    }
-
-    private fun observeAudioFocusChanged() {
-      mainScope.launch {
-        player.events.onAudioFocusChanged.collect { focusChangeData ->
-          emitOnRemoteDuck(Arguments.createMap().apply {
-            putBoolean("permanent", focusChangeData.isFocusLostPermanently)
-            putBoolean("paused", focusChangeData.isPaused)
-          })
         }
       }
     }
