@@ -215,8 +215,9 @@ class TrackPlayer(
     }
 
     /**
-     * Will replace the current item with a new one and load it into the player.
-     * @param item The [Track] to replace the current one.
+     * Loads a track into the player. If there is a current item, it will be replaced.
+     * If the queue is empty, the track will be added.
+     * @param item The [Track] to load.
      */
     fun load(item: Track) {
         if (exoPlayer.mediaItemCount == 0) {
@@ -395,6 +396,12 @@ class TrackPlayer(
         exoPlayer.seekTo(positionMs)
     }
 
+    /**
+     * Updates the player state and emits a state change event if the state has changed.
+     * Only emits an event if the new state differs from the current state.
+     *
+     * @param state The new player state to set
+     */
     internal fun setPlayerState(state: AudioPlayerState) {
         if (state != playerState) {
             playerState = state
