@@ -208,13 +208,13 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       throw Exception("The track index is out of bounds")
     }
     val index = if (insertBeforeIndexInt == -1) player.items.size else insertBeforeIndexInt
-    player.add(tracks.map { it.toAudioItem() }, index)
+    player.add(tracks, index)
     index.toDouble()
   }
 
   override fun load(data: ReadableMap?): Unit = runBlockingOnMain {
     data?.let {
-      player.load(trackFactory.fromBridge(it).toAudioItem())
+      player.load(trackFactory.fromBridge(it))
     }
   }
 
@@ -239,13 +239,8 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   override fun updateMetadataForTrack(index: Double, map: ReadableMap?): Unit = runBlockingOnMain {
-    if (index < 0 || index >= player.items.size) {
-      throw Exception("The index is out of bounds")
-    }
-
     map?.let {
-      val currentTrack = player.items[index.toInt()].track
-        ?: throw Exception("Track not found at index ${index.toInt()}")
+      val currentTrack = player.getItem(index.toInt())
       val updatedTrack = currentTrack.updateMetadata(
         title = it.getString("title") ?: currentTrack.title,
         artist = it.getString("artist") ?: currentTrack.artist,
@@ -258,7 +253,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
           ?: currentTrack.rating,
         mediaId = it.getString("mediaId") ?: currentTrack.mediaId
       )
-      player.replaceItem(index.toInt(), updatedTrack.toAudioItem())
+      player.replaceItem(index.toInt(), updatedTrack)
     }
   }
 
@@ -269,7 +264,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
 
     map?.let {
       val currentIndex = player.currentIndex ?: throw Exception("There is no current track")
-      val currentTrack = player.currentItem?.track ?: throw Exception("There is no current track")
+      val currentTrack = player.currentItem ?: throw Exception("There is no current track")
       val updatedTrack = currentTrack.updateMetadata(
         title = it.getString("title") ?: currentTrack.title,
         artist = it.getString("artist") ?: currentTrack.artist,
@@ -282,7 +277,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
           ?: currentTrack.rating,
         mediaId = it.getString("mediaId") ?: currentTrack.mediaId
       )
-      player.replaceItem(currentIndex, updatedTrack.toAudioItem())
+      player.replaceItem(currentIndex, updatedTrack)
     }
   }
 
@@ -379,22 +374,21 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   override fun getTrack(index: Double): WritableMap? = runBlockingOnMain {
-    val indexInt = index.toInt()
-    if (indexInt >= 0 && indexInt < player.items.size) {
-      player.items[indexInt].track?.toBridge()
-    } else {
+    try {
+      player.getItem(index.toInt()).toBridge()
+    } catch (e: IllegalArgumentException) {
       null
     }
   }
 
   override fun getQueue(): WritableArray = runBlockingOnMain {
-    Arguments.fromList(player.items.mapNotNull { it.track?.toBridge() })
+    Arguments.fromList(player.items.map { it.toBridge() })
   }
 
   override fun setQueue(data: ReadableArray?): Unit = runBlockingOnMain {
     data?.let {
       player.clear()
-      player.add(trackFactory.tracksFromBridge(data).map { it.toAudioItem() })
+      player.add(trackFactory.tracksFromBridge(data))
     }
   }
 
@@ -403,7 +397,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   override fun getActiveTrack(): WritableMap? = runBlockingOnMain {
-    player.currentItem?.track?.toBridge()
+    player.currentItem?.toBridge()
   }
 
   override fun getProgress(): WritableMap = runBlockingOnMain {
@@ -502,13 +496,13 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
             // Add current track info
             player.currentIndex?.let { currentIndex ->
               putInt("index", currentIndex)
-              player.currentItem?.track?.toBridge()?.let { putMap("track", it) }
+              player.currentItem?.toBridge()?.let { putMap("track", it) }
             }
           })
 
           // Update last track info for next transition
           lastTrackIndex = player.currentIndex
-          lastTrack = player.currentItem?.track?.toBridge()
+          lastTrack = player.currentItem?.toBridge()
         }
       }
     }

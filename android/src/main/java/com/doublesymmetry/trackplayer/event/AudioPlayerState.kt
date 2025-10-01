@@ -4,13 +4,13 @@ import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.WritableMap
 
 enum class AudioPlayerState {
-    /** The current [com.doublesymmetry.trackplayer.model.AudioItem] is being loaded for playback. */
+    /** The current [com.doublesymmetry.trackplayer.model.Track] is being loaded for playback. */
     LOADING,
 
-    /** The current [com.doublesymmetry.trackplayer.model.AudioItem] is loaded, and the player is ready to start playing. */
+    /** The current [com.doublesymmetry.trackplayer.model.Track] is loaded, and the player is ready to start playing. */
     READY,
 
-    /** The current [com.doublesymmetry.trackplayer.model.AudioItem] is currently buffering. */
+    /** The current [com.doublesymmetry.trackplayer.model.Track] is currently buffering. */
     BUFFERING,
 
     /** The player is paused. */
@@ -22,7 +22,7 @@ enum class AudioPlayerState {
     /** The player is playing. */
     PLAYING,
 
-    /** No [com.doublesymmetry.trackplayer.model.AudioItem] is loaded and the player is doing nothing. */
+    /** No [com.doublesymmetry.trackplayer.model.Track] is loaded and the player is doing nothing. */
     IDLE,
 
     /** Playback stopped due to the end of the queue being reached. */

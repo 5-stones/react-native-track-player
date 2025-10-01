@@ -1,12 +1,12 @@
 package com.doublesymmetry.trackplayer.event
 
 /**
- * Use these events to track when and why the positionMs of an [com.doublesymmetry.trackplayer.model.AudioItem] changes.
- * Examples include changes to [com.doublesymmetry.trackplayer.model.AudioItem] queue, seeking, skipping, etc.
+ * Use these events to track when and why the positionMs of an [com.doublesymmetry.trackplayer.model.Track] changes.
+ * Examples include changes to [com.doublesymmetry.trackplayer.model.Track] queue, seeking, skipping, etc.
  */
 sealed class PositionChangedReason(val oldPosition: Long, val newPosition: Long) {
     /**
-     * Position has changed because the player has automatically transitioned to the next [com.doublesymmetry.trackplayer.model.AudioItem].
+     * Position has changed because the player has automatically transitioned to the next [com.doublesymmetry.trackplayer.model.Track].
      *
      * @see [AudioItemTransitionReason]
      */
@@ -18,7 +18,7 @@ sealed class PositionChangedReason(val oldPosition: Long, val newPosition: Long)
     class QUEUE_CHANGED(oldPosition: Long, newPosition: Long) : PositionChangedReason(oldPosition, newPosition)
 
     /**
-     * Position has changed because a seek has occurred within the current [com.doublesymmetry.trackplayer.model.AudioItem], or another one.
+     * Position has changed because a seek has occurred within the current [com.doublesymmetry.trackplayer.model.Track], or another one.
      */
     class SEEK(oldPosition: Long, newPosition: Long) : PositionChangedReason(oldPosition, newPosition)
 

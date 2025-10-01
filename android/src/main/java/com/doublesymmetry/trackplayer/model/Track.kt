@@ -3,16 +3,20 @@ package com.doublesymmetry.trackplayer.model
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
-import com.facebook.react.bridge.ReadableMap
-import com.facebook.react.bridge.ReadableArray
-import com.facebook.react.bridge.WritableMap
-import com.facebook.react.bridge.Arguments
+import android.os.Bundle
 import androidx.annotation.OptIn
-import androidx.media3.common.util.UnstableApi
+import androidx.core.net.toUri
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Rating
-import com.doublesymmetry.trackplayer.util.BundleUtils
+import androidx.media3.common.util.UnstableApi
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toMilliseconds
+import com.doublesymmetry.trackplayer.util.BundleUtils
+import com.facebook.react.bridge.Arguments
+import com.facebook.react.bridge.ReadableArray
+import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.ReadableType
+import com.facebook.react.bridge.WritableMap
 
 @OptIn(UnstableApi::class)
 class Track private constructor(
@@ -36,19 +40,33 @@ class Track private constructor(
     val rating: Rating?,
     val mediaId: String?
 ) {
-    fun toAudioItem(): AudioItem {
-        return AudioItem(
-            audioUrl = uri?.toString() ?: "",
-            type = type,
-            artist = artist,
-            title = title,
-            albumTitle = album,
-            artwork = artwork,
-            duration = duration?.toMilliseconds(),
-            options = AudioItemOptions(headers?.let { HashMap(it) }, userAgent, resourceId),
-            mediaId = mediaId,
-            track = this
-        )
+    fun toMediaItem(): MediaItem {
+        val extras = Bundle().apply {
+            headers?.let {
+                putSerializable("headers", HashMap(it))
+            }
+            userAgent?.let {
+                putString("user-agent", it)
+            }
+            resourceId?.let {
+                putInt("resource-id", it)
+            }
+            putString("type", type.toString())
+            putString("uri", uri?.toString() ?: "")
+        }
+        val mediaMetadata = MediaMetadata.Builder()
+            .setTitle(title)
+            .setArtist(artist)
+            .setArtworkUri(artwork?.toUri())
+            .setExtras(extras)
+            .build()
+
+        return MediaItem.Builder()
+            .setMediaId(mediaId ?: uri?.toString() ?: "")
+            .setUri(uri)
+            .setMediaMetadata(mediaMetadata)
+            .setTag(this)
+            .build()
     }
 
     fun toBridge(): WritableMap {
@@ -115,6 +133,10 @@ class Track private constructor(
     }
 
     companion object {
+        fun fromMediaItem(item: MediaItem): Track {
+            return item.localConfiguration!!.tag as Track
+        }
+
         fun fromBridge(context: Context, map: ReadableMap, ratingType: Int): Track {
             val resourceId = BundleUtils.getRawResourceId(context, map, "url")
             val uri = if (resourceId == 0) {

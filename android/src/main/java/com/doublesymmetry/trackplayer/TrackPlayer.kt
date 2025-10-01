@@ -12,7 +12,7 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.legacy.RatingCompat
-import com.doublesymmetry.trackplayer.model.AudioItem
+import com.doublesymmetry.trackplayer.model.Track
 import com.doublesymmetry.trackplayer.event.AudioPlayerState
 import com.doublesymmetry.trackplayer.event.PlaybackError
 import com.doublesymmetry.trackplayer.event.PlaybackState
@@ -54,8 +54,8 @@ class TrackPlayer(
         get() = options.alwaysPauseOnInterruption
         set(v) { options.alwaysPauseOnInterruption = v }
 
-    val currentItem: AudioItem?
-        get() = exoPlayer.currentMediaItem?.let { AudioItem.fromMediaItem(it) }
+    val currentItem: Track?
+        get() = exoPlayer.currentMediaItem?.let { Track.fromMediaItem(it) }
 
     var playbackError: PlaybackError? = null
         internal set
@@ -143,18 +143,30 @@ class TrackPlayer(
             else exoPlayer.nextMediaItemIndex
         }
 
-    val items: List<AudioItem>
+    val items: List<Track>
         get() = (0 until exoPlayer.mediaItemCount).map { index ->
-            AudioItem.fromMediaItem(exoPlayer.getMediaItemAt(index))
+            Track.fromMediaItem(exoPlayer.getMediaItemAt(index))
         }
 
-    val nextItem: AudioItem?
+    val nextItem: Track?
         get() {
             val nextIndex = exoPlayer.currentMediaItemIndex + 1
             return if (nextIndex < exoPlayer.mediaItemCount)
-                AudioItem.fromMediaItem(exoPlayer.getMediaItemAt(nextIndex))
+                Track.fromMediaItem(exoPlayer.getMediaItemAt(nextIndex))
             else null
         }
+
+    /**
+     * Get item at index with bounds checking.
+     * @param index The index of the item to retrieve.
+     * @throws IllegalArgumentException if index is out of bounds.
+     */
+    fun getItem(index: Int): Track {
+        if (index < 0 || index >= exoPlayer.mediaItemCount) {
+            throw IllegalArgumentException("Track index $index is out of bounds (size: ${exoPlayer.mediaItemCount})")
+        }
+        return Track.fromMediaItem(exoPlayer.getMediaItemAt(index))
+    }
 
     var skipSilence: Boolean
         get() = exoPlayer.skipSilenceEnabled
@@ -224,9 +236,9 @@ class TrackPlayer(
 
     /**
      * Will replace the current item with a new one and load it into the player.
-     * @param item The [AudioItem] to replace the current one.
+     * @param item The [Track] to replace the current one.
      */
-    fun load(item: AudioItem) {
+    fun load(item: Track) {
         if (isEmpty) {
             add(item)
         } else {
@@ -239,9 +251,9 @@ class TrackPlayer(
 
     /**
      * Add a single item to the queue. If the AudioPlayer has no item loaded, it will load the `item`.
-     * @param item The [AudioItem] to add.
+     * @param item The [Track] to add.
      */
-    fun add(item: AudioItem) {
+    fun add(item: Track) {
         val mediaSource = item.toMediaItem()
         exoPlayer.addMediaItem(mediaSource)
         exoPlayer.prepare()
@@ -249,9 +261,9 @@ class TrackPlayer(
 
     /**
      * Add multiple items to the queue. If the AudioPlayer has no item loaded, it will load the first item in the list.
-     * @param items The [AudioItem]s to add.
+     * @param items The [Track]s to add.
      */
-    fun add(items: List<AudioItem>) {
+    fun add(items: List<Track>) {
         val mediaItems = items.map { it.toMediaItem() }
         exoPlayer.addMediaItems(mediaItems)
         exoPlayer.prepare()
@@ -259,11 +271,11 @@ class TrackPlayer(
 
     /**
      * Add multiple items to the queue.
-     * @param items The [AudioItem]s to add.
+     * @param items The [Track]s to add.
      * @param atIndex  Index to insert items at, if no items loaded this will not automatically start playback.
      */
-    fun add(items: List<AudioItem>, atIndex: Int) {
-        val mediaItems = items.map { (it).toMediaItem() }
+    fun add(items: List<Track>, atIndex: Int) {
+        val mediaItems = items.map { it.toMediaItem() }
         exoPlayer.addMediaItems(atIndex, mediaItems)
         exoPlayer.prepare()
     }
@@ -333,7 +345,7 @@ class TrackPlayer(
     /**
      * Replaces item at index in queue.
      */
-    fun replaceItem(index: Int, item: AudioItem) {
+    fun replaceItem(index: Int, item: Track) {
         val mediaItem = item.toMediaItem()
         exoPlayer.replaceMediaItem(index, mediaItem)
     }
