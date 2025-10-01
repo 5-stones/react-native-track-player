@@ -38,7 +38,7 @@ class PlayerListener(private val trackPlayer: TrackPlayer) : Player.Listener {
         newPosition: Player.PositionInfo,
         reason: Int
     ) {
-        trackPlayer.updateOldPosition(oldPosition.positionMs)
+        trackPlayer.oldPosition = oldPosition.positionMs
 
         when (reason) {
             Player.DISCONTINUITY_REASON_AUTO_TRANSITION -> trackPlayer.events.positionChanged.emit(

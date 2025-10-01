@@ -50,10 +50,6 @@ class TrackPlayer(
         internal set
     private val focusManager: AudioFocusManager = AudioFocusManager(this)
 
-    var alwaysPauseOnInterruption: Boolean
-        get() = options.alwaysPauseOnInterruption
-        set(v) { options.alwaysPauseOnInterruption = v }
-
     val currentItem: Track?
         get() = exoPlayer.currentMediaItem?.let { Track.fromMediaItem(it) }
 
@@ -414,11 +410,6 @@ class TrackPlayer(
     fun seekBy(offset: Long, unit: TimeUnit) {
         val positionMs = exoPlayer.currentPosition + TimeUnit.MILLISECONDS.convert(offset, unit)
         exoPlayer.seekTo(positionMs)
-    }
-
-    // Helper methods for TrackPlayerListener
-    internal fun updateOldPosition(position: Long) {
-        oldPosition = position
     }
 
     internal fun setPlayerState(state: AudioPlayerState) {
