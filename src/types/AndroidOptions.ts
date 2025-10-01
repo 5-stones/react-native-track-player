@@ -25,7 +25,7 @@ export interface AndroidOptions {
    * enables exoplayer's skipSilence parser
    * @default false
    */
-  androidSkipSilence?: boolean;
+  skipSilence?: boolean;
 
   /**
    * enables exoplayer's shuffle mode
