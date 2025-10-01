@@ -33,7 +33,7 @@ enum class CustomCommandButton(
   ),
   PREVIOUS(
     customAction = "PREVIOUS",
-    capability = Capability.SKIP_TO_NEXT,
+    capability = PlayerCapability.SKIP_TO_PREVIOUS,
     commandButton =
       CommandButton.Builder()
         .setDisplayName("Previous")
@@ -43,7 +43,7 @@ enum class CustomCommandButton(
   ),
   NEXT(
     customAction = "NEXT",
-    capability = Capability.SKIP_TO_PREVIOUS,
+    capability = PlayerCapability.SKIP_TO_NEXT,
     commandButton =
       CommandButton.Builder()
         .setDisplayName("Next")
