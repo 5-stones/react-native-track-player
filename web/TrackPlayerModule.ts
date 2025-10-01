@@ -14,31 +14,31 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
   public getConstants() {
     return {
       // Capabilities
-      CAPABILITY_JUMP_BACKWARD: 0,
-      CAPABILITY_JUMP_FORWARD: 1,
-      CAPABILITY_PAUSE: 2,
-      CAPABILITY_PLAY: 3,
-      CAPABILITY_PLAY_FROM_ID: 4,
-      CAPABILITY_PLAY_FROM_SEARCH: 5,
-      CAPABILITY_SEEK_TO: 6,
-      CAPABILITY_SET_RATING: 7,
-      CAPABILITY_SKIP: 8,
-      CAPABILITY_SKIP_TO_NEXT: 9,
-      CAPABILITY_SKIP_TO_PREVIOUS: 10,
-      CAPABILITY_STOP: 11,
+      CAPABILITY_PLAY: 'play',
+      CAPABILITY_PLAY_FROM_ID: 'play-from-id',
+      CAPABILITY_PLAY_FROM_SEARCH: 'play-from-search',
+      CAPABILITY_PAUSE: 'pause',
+      CAPABILITY_STOP: 'stop',
+      CAPABILITY_SEEK_TO: 'seek-to',
+      CAPABILITY_SKIP: 'skip',
+      CAPABILITY_SKIP_TO_NEXT: 'skip-to-next',
+      CAPABILITY_SKIP_TO_PREVIOUS: 'skip-to-previous',
+      CAPABILITY_SET_RATING: 'set-rating',
+      CAPABILITY_JUMP_FORWARD: 'jump-forward',
+      CAPABILITY_JUMP_BACKWARD: 'jump-backward',
 
       // Rating Types
-      RATING_HEART: 0,
-      RATING_THUMBS_UP_DOWN: 1,
-      RATING_3_STARS: 2,
-      RATING_4_STARS: 3,
-      RATING_5_STARS: 4,
-      RATING_PERCENTAGE: 5,
+      RATING_HEART: 'heart',
+      RATING_THUMBS_UP_DOWN: 'thumbs-up-down',
+      RATING_3_STARS: '3-stars',
+      RATING_4_STARS: '4-stars',
+      RATING_5_STARS: '5-stars',
+      RATING_PERCENTAGE: 'percentage',
 
       // Pitch Algorithms
-      PITCH_ALGORITHM_LINEAR: 0,
-      PITCH_ALGORITHM_MUSIC: 1,
-      PITCH_ALGORITHM_VOICE: 2,
+      PITCH_ALGORITHM_LINEAR: 'linear',
+      PITCH_ALGORITHM_MUSIC: 'music',
+      PITCH_ALGORITHM_VOICE: 'voice',
 
       // States
       STATE_BUFFERING: 'STATE_BUFFERING',

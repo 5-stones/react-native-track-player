@@ -1,5 +1,5 @@
 export enum RepeatMode {
-  Off,
-  Track,
-  Playlist,
+  Off = 'off',
+  Track = 'track',
+  Playlist = 'queue',
 }
