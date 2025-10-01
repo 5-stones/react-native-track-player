@@ -378,20 +378,23 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
     // MARK: - AVPlayerWrapperDelegate
 
     func AVWrapper(didChangeState state: AVPlayerWrapperState) {
-        switch state {
-        case .ready, .loading:
-            setTimePitchingAlgorithmForCurrentItem()
-        default: break
-        }
-
-        switch state {
-        case .ready, .loading, .playing, .paused:
-            if (automaticallyUpdateNowPlayingInfo) {
-                updateNowPlayingPlaybackValues()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            switch state {
+            case .ready, .loading:
+                self.setTimePitchingAlgorithmForCurrentItem()
+            default: break
             }
-        default: break
+
+            switch state {
+            case .ready, .loading, .playing, .paused:
+                if (self.automaticallyUpdateNowPlayingInfo) {
+                    self.updateNowPlayingPlaybackValues()
+                }
+            default: break
+            }
+            self.event.stateChange.emit(data: state)
         }
-        event.stateChange.emit(data: state)
     }
 
     func AVWrapper(secondsElapsed seconds: Double) {

@@ -15,78 +15,42 @@ protocol QueueManagerDelegate: AnyObject {
 
 class QueueManager<T> {
 
-    fileprivate let recursiveLock = NSRecursiveLock()
-
-    fileprivate func synchronizeThrows<T>(action: () throws -> T) throws -> T {
-        recursiveLock.lock()
-        let result = try action()
-        recursiveLock.unlock()
-        return result
-    }
-
-    fileprivate func synchronize <T>(action: () -> T) -> T {
-        recursiveLock.lock()
-        let result = action()
-        recursiveLock.unlock()
-        return result
-    }
-    
     weak var delegate: QueueManagerDelegate? = nil
 
-    var _currentIndex: Int = -1
+    private func assertMainThread() {
+        assert(Thread.isMainThread, "QueueManager must be accessed from the main thread")
+    }
+
     /**
      The index of the current item. `-1` when there is no current item
      */
-    private(set) var currentIndex: Int {
-        get {
-            return synchronize {
-                return _currentIndex
-            }
-        }
-
-        set {
-            return synchronize {
-                self._currentIndex = newValue
-            }
-        }
-    }
+    private(set) var currentIndex: Int = -1
 
     /**
      All items held by the queue.
      */
-    private(set) var items: [T] = [] {
-        didSet {
-            return synchronize {
-                if oldValue.count == 0 && items.count > 0 {
-                    delegate?.onReceivedFirstItem()
-                }
-            }
-        }
-    }
+    private(set) var items: [T] = []
 
     public var nextItems: [T] {
-        return synchronize {
-            return currentIndex == -1 || currentIndex == items.count - 1
-                ? []
-                : Array(items[currentIndex + 1..<items.count])
-        }
+        assertMainThread()
+        return currentIndex == -1 || currentIndex == items.count - 1
+            ? []
+            : Array(items[currentIndex + 1..<items.count])
     }
 
     public var previousItems: [T] {
-        return synchronize {
-            return currentIndex <= 0
+        assertMainThread()
+        return currentIndex <= 0
             ? []
             : Array(items[0..<currentIndex])
-        }
     }
 
     /**
      The current item for the queue.
      */
     public var current: T? {
-        return synchronize {
-            return 0 <= _currentIndex && _currentIndex < items.count ? items[_currentIndex] : nil
-        }
+        assertMainThread()
+        return 0 <= currentIndex && currentIndex < items.count ? items[currentIndex] : nil
     }
 
     private func throwIfQueueEmpty() throws {
@@ -104,7 +68,7 @@ class QueueManager<T> {
         guard index >= (min ?? 0) && (max ?? items.count) > index else {
             throw AudioPlayerError.QueueError.invalidIndex(
                 index: index,
-                message: "\(name.prefix(1).uppercased() + name.dropFirst())) has to be positive and smaller than the count of current items (\(items.count))"
+                message: "\(name) must be non-negative and less than \(items.count)"
             )
         }
     }
@@ -115,8 +79,11 @@ class QueueManager<T> {
      - parameter item: The `AudioItem` to be added.
      */
     public func add(_ item: T) {
-        synchronize {
-            items.append(item)
+        assertMainThread()
+        let wasEmpty = items.isEmpty
+        items.append(item)
+        if wasEmpty {
+            delegate?.onReceivedFirstItem()
         }
     }
 
@@ -126,9 +93,12 @@ class QueueManager<T> {
      - parameter items: The `AudioItem`s to be added.
      */
     public func add(_ items: [T]) {
-        synchronize {
-            if (items.count == 0) { return }
-            self.items.append(contentsOf: items)
+        assertMainThread()
+        guard !items.isEmpty else { return }
+        let wasEmpty = self.items.isEmpty
+        self.items.append(contentsOf: items)
+        if wasEmpty {
+            delegate?.onReceivedFirstItem()
         }
     }
 
@@ -139,16 +109,19 @@ class QueueManager<T> {
      - parameter at: The index to insert the items at.
      */
     public func add(_ items: [T], at index: Int) throws {
-        try synchronizeThrows {
-            if (items.count == 0) { return }
-            guard index >= 0 && self.items.count >= index else {
-                throw AudioPlayerError.QueueError.invalidIndex(index: index, message: "Index to insert at has to be non-negative and equal to or smaller than the number of items: (\(items.count))")
-            }
-            // Correct index when items were inserted in front of it:
-            if (self.items.count > 1 && currentIndex >= index) {
-                currentIndex += items.count
-            }
-            self.items.insert(contentsOf: items, at: index)
+        assertMainThread()
+        guard !items.isEmpty else { return }
+        guard index >= 0 && self.items.count >= index else {
+            throw AudioPlayerError.QueueError.invalidIndex(index: index, message: "Index to insert at has to be non-negative and equal to or smaller than the number of items: (\(self.items.count))")
+        }
+        let wasEmpty = self.items.isEmpty
+        // Correct index when items were inserted in front of it:
+        if self.items.count > 1 && currentIndex >= index {
+            currentIndex += items.count
+        }
+        self.items.insert(contentsOf: items, at: index)
+        if wasEmpty {
+            delegate?.onReceivedFirstItem()
         }
     }
 
@@ -158,26 +131,24 @@ class QueueManager<T> {
     }
 
     private func skip(direction: SkipDirection, wrap: Bool) -> T? {
-        let count = items.count
-        if (current == nil || count == 0) {
-            return nil
-        }
-        if (count == 1) {
-            if (wrap) {
+        assertMainThread()
+        guard current != nil && items.count > 0 else { return nil }
+
+        if items.count == 1 {
+            if wrap {
                 delegate?.onSkippedToSameCurrentItem()
             }
-        } else {
-            var index = currentIndex + direction.rawValue
-            if (wrap) {
-                index = (items.count + index) % items.count;
-            }
-            let oldIndex = currentIndex
-            currentIndex = max(0, min(items.count - 1, index))
-            if (oldIndex != currentIndex) {
-                defer {
-                    delegate?.onCurrentItemChanged()
-                }
-            }
+            return current
+        }
+
+        var index = currentIndex + direction.rawValue
+        if wrap {
+            index = (index + items.count) % items.count
+        }
+        let oldIndex = currentIndex
+        currentIndex = max(0, min(items.count - 1, index))
+        if oldIndex != currentIndex {
+            delegate?.onCurrentItemChanged()
         }
         return current
     }
@@ -189,9 +160,7 @@ class QueueManager<T> {
      */
     @discardableResult
     public func next(wrap: Bool = false) -> T? {
-        synchronize {
-            return skip(direction: SkipDirection.next, wrap: wrap);
-        }
+        return skip(direction: .next, wrap: wrap)
     }
 
     /**
@@ -202,9 +171,7 @@ class QueueManager<T> {
      */
     @discardableResult
     public func previous(wrap: Bool = false) -> T? {
-        return synchronize {
-            return skip(direction: SkipDirection.previous, wrap: wrap);
-        }
+        return skip(direction: .previous, wrap: wrap)
     }
 
     /**
@@ -217,27 +184,17 @@ class QueueManager<T> {
      */
     @discardableResult
     public func jump(to index: Int) throws -> T {
-        var skippedToSameCurrentItem = false
-        var currentItemChanged = false
-        let result = try synchronizeThrows {
-            try throwIfQueueEmpty();
-            try throwIfIndexInvalid(index: index)
-            
-            if (index == currentIndex) {
-                skippedToSameCurrentItem = true
-            } else {
-                currentIndex = index
-                currentItemChanged = true
-            }
-            return current!
-        }
-        if (skippedToSameCurrentItem) {
+        assertMainThread()
+        try throwIfQueueEmpty()
+        try throwIfIndexInvalid(index: index)
+
+        if index == currentIndex {
             delegate?.onSkippedToSameCurrentItem()
-        }
-        if (currentItemChanged) {
+        } else {
+            currentIndex = index
             delegate?.onCurrentItemChanged()
         }
-        return result
+        return current!
     }
 
     /**
@@ -248,16 +205,16 @@ class QueueManager<T> {
      - throws: `AudioPlayerError.QueueError`
      */
     public func moveItem(fromIndex: Int, toIndex: Int) throws {
-        try synchronizeThrows {
-            try throwIfQueueEmpty();
-            try throwIfIndexInvalid(index: fromIndex, name: "fromIndex")
-            try throwIfIndexInvalid(index: toIndex, name: "toIndex", max: Int.max)
-            
-            let item = items.remove(at: fromIndex)
-            self.items.insert(item, at: min(items.count, toIndex));
-            if (fromIndex == currentIndex) {
-                currentIndex = toIndex;
-            }
+        assertMainThread()
+        try throwIfQueueEmpty()
+        try throwIfIndexInvalid(index: fromIndex, name: "fromIndex")
+        try throwIfIndexInvalid(index: toIndex, name: "toIndex", max: Int.max)
+
+        let item = items.remove(at: fromIndex)
+        items.insert(item, at: min(items.count, toIndex))
+        if fromIndex == currentIndex {
+            currentIndex = toIndex
+            delegate?.onCurrentItemChanged()
         }
     }
 
@@ -269,22 +226,15 @@ class QueueManager<T> {
      - returns: The removed item.
      */
     public func removeItem(at index: Int) throws -> T {
-        var currentItemChanged = false
-        let result = try synchronizeThrows {
-            try throwIfQueueEmpty()
-            try throwIfIndexInvalid(index: index)
-            let result = items.remove(at: index)
-            if index == currentIndex {
-                currentIndex = items.count > 0 ? currentIndex % items.count : -1
-                currentItemChanged = true
-            } else if index < currentIndex {
-                currentIndex -= 1
-            }
-            
-            return result;
-        }
-        if (currentItemChanged) {
+        assertMainThread()
+        try throwIfQueueEmpty()
+        try throwIfIndexInvalid(index: index)
+        let result = items.remove(at: index)
+        if index == currentIndex {
+            currentIndex = items.count > 0 ? currentIndex % items.count : -1
             delegate?.onCurrentItemChanged()
+        } else if index < currentIndex {
+            currentIndex -= 1
         }
         return result
     }
@@ -295,19 +245,13 @@ class QueueManager<T> {
      - parameter item: The item to set as the new current item.
      */
     public func replaceCurrentItem(with item: T) {
-        var currentItemChanged = false
-        synchronize {
-            if currentIndex == -1  {
-                add(item)
-                if (currentIndex == -1) {
-                    currentIndex = items.count - 1
-                }
-            } else {
-                items[currentIndex] = item
-                currentItemChanged = true
-            }
-        }
-        if (currentItemChanged) {
+        assertMainThread()
+        if currentIndex == -1  {
+            items.append(item)
+            currentIndex = items.count - 1
+            delegate?.onReceivedFirstItem()
+        } else {
+            items[currentIndex] = item
             delegate?.onCurrentItemChanged()
         }
     }
@@ -317,12 +261,12 @@ class QueueManager<T> {
      If no previous items exist, no action will be taken.
      */
     public func removePreviousItems() {
-        synchronize {
-            if (items.count == 0) { return };
-            guard currentIndex > 0 else { return }
-            items.removeSubrange(0..<currentIndex)
-            currentIndex = 0
-        }
+        assertMainThread()
+        guard items.count > 0 else { return }
+        guard currentIndex > 0 else { return }
+        items.removeSubrange(0..<currentIndex)
+        currentIndex = 0
+        delegate?.onCurrentItemChanged()
     }
 
     /**
@@ -330,26 +274,22 @@ class QueueManager<T> {
      If no upcoming items exist, no action will be taken.
      */
     public func removeUpcomingItems() {
-        synchronize {
-            if (items.count == 0) { return };
-            let nextIndex = currentIndex + 1
-            guard nextIndex < items.count else { return }
-            items.removeSubrange(nextIndex..<items.count)
-        }
+        assertMainThread()
+        guard items.count > 0 else { return }
+        let nextIndex = currentIndex + 1
+        guard nextIndex < items.count else { return }
+        items.removeSubrange(nextIndex..<items.count)
     }
 
     /**
      Removes all items for queue
      */
     public func clearQueue() {
-        var currentItemChanged = false
-        synchronize {
-            let itemWasNil = currentIndex == -1;
-            currentIndex = -1
-            items.removeAll()
-            currentItemChanged = !itemWasNil
-        }
-        if (currentItemChanged) {
+        assertMainThread()
+        let itemWasNil = currentIndex == -1
+        currentIndex = -1
+        items.removeAll()
+        if !itemWasNil {
             delegate?.onCurrentItemChanged()
         }
     }

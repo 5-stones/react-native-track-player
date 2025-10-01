@@ -123,6 +123,22 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
 
     // MARK: - Bridged Methods
 
+    private func ensureMainThread(_ block: @escaping () -> Void) {
+        if Thread.isMainThread {
+            block()
+        } else {
+            DispatchQueue.main.async(execute: block)
+        }
+    }
+
+    private func onMainThread<T>(_ block: () -> T) -> T {
+        if Thread.isMainThread {
+            return block()
+        } else {
+            return DispatchQueue.main.sync(execute: block)
+        }
+    }
+
     private func rejectWhenNotInitialized(reject: RCTPromiseRejectBlock) -> Bool {
         let rejected = !hasInitialized;
         if (rejected) {
@@ -131,164 +147,152 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
         return rejected;
     }
 
-    private func rejectWhenTrackIndexOutOfBounds(
-        index: Int,
-        min: Int? = nil,
-        max : Int? = nil,
-        message : String? = "The track index is out of bounds",
-        reject: RCTPromiseRejectBlock
-    ) -> Bool {
-        let rejected = index < (min ?? 0) || index > (max ?? player.items.count - 1);
-        if (rejected) {
-            reject("index_out_of_bounds", message, nil)
-        }
-        return rejected
-    }
-
     @objc(setupPlayer:resolver:rejecter:)
-    public func setupPlayer(config: [String: Any], resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if hasInitialized {
-            reject("player_already_initialized", "The player has already been initialized via setupPlayer.", nil)
-            return
-        }
+    public func setupPlayer(config: [String: Any], resolve: @escaping RCTPromiseResolveBlock, reject: @escaping RCTPromiseRejectBlock) {
+        ensureMainThread {
+            if self.hasInitialized {
+                reject("player_already_initialized", "The player has already been initialized via setupPlayer.", nil)
+                return
+            }
+            // configure buffer size
+            if let bufferDuration = config["minBuffer"] as? TimeInterval {
+                self.player.bufferDuration = bufferDuration
+            }
 
-        // configure buffer size
-        if let bufferDuration = config["minBuffer"] as? TimeInterval {
-            player.bufferDuration = bufferDuration
-        }
+            if let autoHandleInterruptions = config["autoHandleInterruptions"] as? Bool {
+                self.shouldResumePlaybackAfterInterruptionEnds = autoHandleInterruptions
+            }
 
-        if let autoHandleInterruptions = config["autoHandleInterruptions"] as? Bool {
-            self.shouldResumePlaybackAfterInterruptionEnds = autoHandleInterruptions
-        }
+            // configure wether control center metdata should auto update
+            self.player.automaticallyUpdateNowPlayingInfo = config["autoUpdateMetadata"] as? Bool ?? true
 
-        // configure wether control center metdata should auto update
-        player.automaticallyUpdateNowPlayingInfo = config["autoUpdateMetadata"] as? Bool ?? true
+            // configure audio session - category, options & mode
+            if
+                let sessionCategoryStr = config["iosCategory"] as? String,
+                let mappedCategory = SessionCategory(rawValue: sessionCategoryStr) {
+                self.sessionCategory = mappedCategory.mapConfigToAVAudioSessionCategory()
+            }
 
-        // configure audio session - category, options & mode
-        if
-            let sessionCategoryStr = config["iosCategory"] as? String,
-            let mappedCategory = SessionCategory(rawValue: sessionCategoryStr) {
-            sessionCategory = mappedCategory.mapConfigToAVAudioSessionCategory()
-        }
+            if
+                let sessionCategoryModeStr = config["iosCategoryMode"] as? String,
+                let mappedCategoryMode = SessionCategoryMode(rawValue: sessionCategoryModeStr) {
+                self.sessionCategoryMode = mappedCategoryMode.mapConfigToAVAudioSessionCategoryMode()
+            }
 
-        if
-            let sessionCategoryModeStr = config["iosCategoryMode"] as? String,
-            let mappedCategoryMode = SessionCategoryMode(rawValue: sessionCategoryModeStr) {
-            sessionCategoryMode = mappedCategoryMode.mapConfigToAVAudioSessionCategoryMode()
-        }
+            if
+                let sessionCategoryPolicyStr = config["iosCategoryPolicy"] as? String,
+                let mappedCategoryPolicy = SessionCategoryPolicy(rawValue: sessionCategoryPolicyStr) {
+                self.sessionCategoryPolicy = mappedCategoryPolicy.mapConfigToAVAudioSessionCategoryPolicy()
+            }
 
-        if
-            let sessionCategoryPolicyStr = config["iosCategoryPolicy"] as? String,
-            let mappedCategoryPolicy = SessionCategoryPolicy(rawValue: sessionCategoryPolicyStr) {
-            sessionCategoryPolicy = mappedCategoryPolicy.mapConfigToAVAudioSessionCategoryPolicy()
-        }
+            let sessionCategoryOptsStr = config["iosCategoryOptions"] as? [String]
+            let mappedCategoryOpts = sessionCategoryOptsStr?.compactMap { SessionCategoryOptions(rawValue: $0)?.mapConfigToAVAudioSessionCategoryOptions() } ?? []
+            self.sessionCategoryOptions = AVAudioSession.CategoryOptions(mappedCategoryOpts)
 
-        let sessionCategoryOptsStr = config["iosCategoryOptions"] as? [String]
-        let mappedCategoryOpts = sessionCategoryOptsStr?.compactMap { SessionCategoryOptions(rawValue: $0)?.mapConfigToAVAudioSessionCategoryOptions() } ?? []
-        sessionCategoryOptions = AVAudioSession.CategoryOptions(mappedCategoryOpts)
+            self.configureAudioSession()
 
-        configureAudioSession()
+            // setup event listeners
+            self.player.remoteCommandController.handleChangePlaybackPositionCommand = { [weak self] event in
+                if let event = event as? MPChangePlaybackPositionCommandEvent {
+                    self?.emit(event: EventType.RemoteSeek, body: ["position": event.positionTime])
+                    return MPRemoteCommandHandlerStatus.success
+                }
 
-        // setup event listeners
-        player.remoteCommandController.handleChangePlaybackPositionCommand = { [weak self] event in
-            if let event = event as? MPChangePlaybackPositionCommandEvent {
-                self?.emit(event: EventType.RemoteSeek, body: ["position": event.positionTime])
+                return MPRemoteCommandHandlerStatus.commandFailed
+            }
+
+            self.player.remoteCommandController.handleNextTrackCommand = { [weak self] _ in
+                self?.emit(event: EventType.RemoteNext)
                 return MPRemoteCommandHandlerStatus.success
             }
 
-            return MPRemoteCommandHandlerStatus.commandFailed
-        }
-
-        player.remoteCommandController.handleNextTrackCommand = { [weak self] _ in
-            self?.emit(event: EventType.RemoteNext)
-            return MPRemoteCommandHandlerStatus.success
-        }
-
-        player.remoteCommandController.handlePauseCommand = { [weak self] _ in
-            self?.emit(event: EventType.RemotePause)
-            return MPRemoteCommandHandlerStatus.success
-        }
-
-        player.remoteCommandController.handlePlayCommand = { [weak self] _ in
-            self?.emit(event: EventType.RemotePlay)
-            return MPRemoteCommandHandlerStatus.success
-        }
-
-        player.remoteCommandController.handlePreviousTrackCommand = { [weak self] _ in
-            self?.emit(event: EventType.RemotePrevious)
-            return MPRemoteCommandHandlerStatus.success
-        }
-
-        player.remoteCommandController.handleSkipBackwardCommand = { [weak self] event in
-            if let command = event.command as? MPSkipIntervalCommand,
-               let interval = command.preferredIntervals.first {
-                self?.emit(event: EventType.RemoteJumpBackward, body: ["interval": interval])
+            self.player.remoteCommandController.handlePauseCommand = { [weak self] _ in
+                self?.emit(event: EventType.RemotePause)
                 return MPRemoteCommandHandlerStatus.success
             }
 
-            return MPRemoteCommandHandlerStatus.commandFailed
-        }
-
-        player.remoteCommandController.handleSkipForwardCommand = { [weak self] event in
-            if let command = event.command as? MPSkipIntervalCommand,
-               let interval = command.preferredIntervals.first {
-                self?.emit(event: EventType.RemoteJumpForward, body: ["interval": interval])
+            self.player.remoteCommandController.handlePlayCommand = { [weak self] _ in
+                self?.emit(event: EventType.RemotePlay)
                 return MPRemoteCommandHandlerStatus.success
             }
 
-            return MPRemoteCommandHandlerStatus.commandFailed
+            self.player.remoteCommandController.handlePreviousTrackCommand = { [weak self] _ in
+                self?.emit(event: EventType.RemotePrevious)
+                return MPRemoteCommandHandlerStatus.success
+            }
+
+            self.player.remoteCommandController.handleSkipBackwardCommand = { [weak self] event in
+                if let command = event.command as? MPSkipIntervalCommand,
+                   let interval = command.preferredIntervals.first {
+                    self?.emit(event: EventType.RemoteJumpBackward, body: ["interval": interval])
+                    return MPRemoteCommandHandlerStatus.success
+                }
+
+                return MPRemoteCommandHandlerStatus.commandFailed
+            }
+
+            self.player.remoteCommandController.handleSkipForwardCommand = { [weak self] event in
+                if let command = event.command as? MPSkipIntervalCommand,
+                   let interval = command.preferredIntervals.first {
+                    self?.emit(event: EventType.RemoteJumpForward, body: ["interval": interval])
+                    return MPRemoteCommandHandlerStatus.success
+                }
+
+                return MPRemoteCommandHandlerStatus.commandFailed
+            }
+
+            self.player.remoteCommandController.handleStopCommand = { [weak self] _ in
+                self?.emit(event: EventType.RemoteStop)
+                return MPRemoteCommandHandlerStatus.success
+            }
+
+            self.player.remoteCommandController.handleTogglePlayPauseCommand = { [weak self] _ in
+                self?.emit(event: self?.player.playerState == .paused
+                    ? EventType.RemotePlay
+                    : EventType.RemotePause
+                )
+
+                return MPRemoteCommandHandlerStatus.success
+            }
+
+            self.player.remoteCommandController.handleLikeCommand = { [weak self] _ in
+                self?.emit(event: EventType.RemoteLike)
+                return MPRemoteCommandHandlerStatus.success
+            }
+
+            self.player.remoteCommandController.handleDislikeCommand = { [weak self] _ in
+                self?.emit(event: EventType.RemoteDislike)
+                return MPRemoteCommandHandlerStatus.success
+            }
+
+            self.player.remoteCommandController.handleBookmarkCommand = { [weak self] _ in
+                self?.emit(event: EventType.RemoteBookmark)
+                return MPRemoteCommandHandlerStatus.success
+            }
+
+            self.hasInitialized = true
+            resolve(NSNull())
         }
-
-        player.remoteCommandController.handleStopCommand = { [weak self] _ in
-            self?.emit(event: EventType.RemoteStop)
-            return MPRemoteCommandHandlerStatus.success
-        }
-
-        player.remoteCommandController.handleTogglePlayPauseCommand = { [weak self] _ in
-            self?.emit(event: self?.player.playerState == .paused
-                ? EventType.RemotePlay
-                : EventType.RemotePause
-            )
-
-            return MPRemoteCommandHandlerStatus.success
-        }
-
-        player.remoteCommandController.handleLikeCommand = { [weak self] _ in
-            self?.emit(event: EventType.RemoteLike)
-            return MPRemoteCommandHandlerStatus.success
-        }
-
-        player.remoteCommandController.handleDislikeCommand = { [weak self] _ in
-            self?.emit(event: EventType.RemoteDislike)
-            return MPRemoteCommandHandlerStatus.success
-        }
-
-        player.remoteCommandController.handleBookmarkCommand = { [weak self] _ in
-            self?.emit(event: EventType.RemoteBookmark)
-            return MPRemoteCommandHandlerStatus.success
-        }
-
-        hasInitialized = true
-        resolve(NSNull())
     }
 
 
     private func configureAudioSession() {
+        ensureMainThread {
+            // deactivate the session when there is no current item to be played
+            if (self.player.currentItem == nil) {
+                try? self.audioSessionController.deactivateSession()
+                return
+            }
 
-        // deactivate the session when there is no current item to be played
-        if (player.currentItem == nil) {
-            try? audioSessionController.deactivateSession()
-            return
-        }
-
-        // activate the audio session when there is an item to be played
-        // and the player has been configured to start when it is ready loading:
-        if (player.playWhenReady) {
-            try? audioSessionController.activateSession()
-            if #available(iOS 11.0, *) {
-                try? AVAudioSession.sharedInstance().setCategory(sessionCategory, mode: sessionCategoryMode, policy: sessionCategoryPolicy, options: sessionCategoryOptions)
-            } else {
-                try? AVAudioSession.sharedInstance().setCategory(sessionCategory, mode: sessionCategoryMode, options: sessionCategoryOptions)
+            // activate the audio session when there is an item to be played
+            // and the player has been configured to start when it is ready loading:
+            if (self.player.playWhenReady) {
+                try? self.audioSessionController.activateSession()
+                if #available(iOS 11.0, *) {
+                    try? AVAudioSession.sharedInstance().setCategory(self.sessionCategory, mode: self.sessionCategoryMode, policy: self.sessionCategoryPolicy, options: self.sessionCategoryOptions)
+                } else {
+                    try? AVAudioSession.sharedInstance().setCategory(self.sessionCategory, mode: self.sessionCategoryMode, options: self.sessionCategoryOptions)
+                }
             }
         }
     }
@@ -301,31 +305,32 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
 
     @objc
     public func updateOptions(options: [String: Any]) {
-        guard hasInitialized else { return }
-
-        var capabilitiesStr = options["capabilities"] as? [String] ?? []
-        if (capabilitiesStr.contains("play") && capabilitiesStr.contains("pause")) {
-            capabilitiesStr.append("toggle-play-pause");
-        }
-
-        forwardJumpInterval = options["forwardJumpInterval"] as? NSNumber ?? forwardJumpInterval
-        backwardJumpInterval = options["backwardJumpInterval"] as? NSNumber ?? backwardJumpInterval
-
-        player.remoteCommands = capabilitiesStr
-            .compactMap { Capability(rawValue: $0) }
-            .map { capability in
-                capability.mapToPlayerCommand(
-                    forwardJumpInterval: forwardJumpInterval,
-                    backwardJumpInterval: backwardJumpInterval,
-                    likeOptions: options["likeOptions"] as? [String: Any],
-                    dislikeOptions: options["dislikeOptions"] as? [String: Any],
-                    bookmarkOptions: options["bookmarkOptions"] as? [String: Any]
-                )
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            var capabilitiesStr = options["capabilities"] as? [String] ?? []
+            if (capabilitiesStr.contains("play") && capabilitiesStr.contains("pause")) {
+                capabilitiesStr.append("toggle-play-pause");
             }
 
-        configureProgressUpdateEvent(
-            interval: ((options["progressUpdateEventInterval"] as? NSNumber) ?? 0).doubleValue
-        )
+            self.forwardJumpInterval = options["forwardJumpInterval"] as? NSNumber ?? self.forwardJumpInterval
+            self.backwardJumpInterval = options["backwardJumpInterval"] as? NSNumber ?? self.backwardJumpInterval
+
+            self.player.remoteCommands = capabilitiesStr
+                .compactMap { Capability(rawValue: $0) }
+                .map { capability in
+                    capability.mapToPlayerCommand(
+                        forwardJumpInterval: self.forwardJumpInterval,
+                        backwardJumpInterval: self.backwardJumpInterval,
+                        likeOptions: options["likeOptions"] as? [String: Any],
+                        dislikeOptions: options["dislikeOptions"] as? [String: Any],
+                        bookmarkOptions: options["bookmarkOptions"] as? [String: Any]
+                    )
+                }
+
+            self.configureProgressUpdateEvent(
+                interval: ((options["progressUpdateEventInterval"] as? NSNumber) ?? 0).doubleValue
+            )
+        }
     }
 
     private func configureProgressUpdateEvent(interval: Double) {
@@ -337,270 +342,332 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
 
     @objc
     public func add(trackDicts: [[String: Any]], before trackIndex: NSNumber) -> Int {
-        guard hasInitialized else { return -1 }
-        // -1 means no index was passed and therefore should be inserted at the end.
-        let index = trackIndex.intValue == -1 ? player.items.count : trackIndex.intValue
-        guard index >= 0 && index <= player.items.count else { return -1 }
+        return onMainThread {
+            guard self.hasInitialized else { return -1 }
+            // -1 means no index was passed and therefore should be inserted at the end.
+            let index = trackIndex.intValue == -1 ? player.items.count : trackIndex.intValue
+            guard index >= 0 && index <= player.items.count else { return -1 }
 
-        var tracks = [Track]()
-        for trackDict in trackDicts {
-            guard let track = Track(dictionary: trackDict) else { return -1 }
-            tracks.append(track)
+            var tracks = [Track]()
+            for trackDict in trackDicts {
+                guard let track = Track(dictionary: trackDict) else { return -1 }
+                tracks.append(track)
+            }
+
+            try? player.add(items: tracks, at: index)
+            return index
         }
-
-        try? player.add(items: tracks, at: index)
-        return index
     }
 
     @objc
     public func load(trackDict: [String: Any]) {
-        guard hasInitialized else { return }
         guard let track = Track(dictionary: trackDict) else { return }
-        player.load(item: track)
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.load(item: track)
+        }
     }
 
     @objc
     public func remove(tracks indexes: [Int]) {
-        guard hasInitialized else { return }
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            // Validate all indexes first
+            for index in indexes {
+                guard index >= 0 && index < self.player.items.count else { return }
+            }
 
-        // Validate all indexes first
-        for index in indexes {
-            guard index >= 0 && index < player.items.count else { return }
-        }
-
-        // Sort the indexes in descending order so we can safely remove them one by one
-        // without having the next index possibly newly pointing to another item than intended:
-        for index in indexes.sorted().reversed() {
-            try? player.removeItem(at: index)
+            // Sort the indexes in descending order so we can safely remove them one by one
+            // without having the next index possibly newly pointing to another item than intended:
+            for index in indexes.sorted().reversed() {
+                try? self.player.removeItem(at: index)
+            }
         }
     }
 
     @objc
     public func move(fromIndex: Int, toIndex: Int) {
-        guard hasInitialized else { return }
-        guard fromIndex >= 0 && fromIndex < player.items.count else { return }
-        guard toIndex >= 0 else { return }
-        try? player.moveItem(fromIndex: fromIndex, toIndex: toIndex)
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            guard fromIndex >= 0 && fromIndex < self.player.items.count else { return }
+            guard toIndex >= 0 else { return }
+            try? self.player.moveItem(fromIndex: fromIndex, toIndex: toIndex)
+        }
     }
 
 
     @objc
     public func removeUpcomingTracks() {
-        guard hasInitialized else { return }
-        player.removeUpcomingItems()
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.removeUpcomingItems()
+        }
     }
 
     @objc
     public func skip(to trackIndex: Int, initialTime: Double) {
-        guard hasInitialized else { return }
-        guard trackIndex >= 0 && trackIndex < player.items.count else { return }
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            guard trackIndex >= 0 && trackIndex < self.player.items.count else { return }
 
-        print("Skipping to track:", trackIndex)
-        try? player.jumpToItem(atIndex: trackIndex, playWhenReady: player.playerState == .playing)
+            print("Skipping to track:", trackIndex)
+            try? self.player.jumpToItem(atIndex: trackIndex, playWhenReady: self.player.playerState == .playing)
 
-        // if an initialTime is passed then seek to it
-        if (initialTime >= 0) {
-            self.seekTo(time: initialTime)
+            // if an initialTime is passed then seek to it
+            if (initialTime >= 0) {
+                self.seekTo(time: initialTime)
+            }
         }
     }
 
     @objc
     public func skipToNext(initialTime: Double) {
-        guard hasInitialized else { return }
-        player.next()
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.next()
 
-        // if an initialTime is passed then seek to it
-        if (initialTime >= 0) {
-            self.seekTo(time: initialTime)
+            // if an initialTime is passed then seek to it
+            if (initialTime >= 0) {
+                self.seekTo(time: initialTime)
+            }
         }
     }
 
     @objc
     public func skipToPrevious(initialTime: Double) {
-        guard hasInitialized else { return }
-        player.previous()
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.previous()
 
-        // if an initialTime is passed then seek to it
-        if (initialTime >= 0) {
-            self.seekTo(time: initialTime)
+            // if an initialTime is passed then seek to it
+            if (initialTime >= 0) {
+                self.seekTo(time: initialTime)
+            }
         }
     }
 
     @objc
     public func reset() {
-        guard hasInitialized else { return }
-        player.stop()
-        player.clear()
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.stop()
+            self.player.clear()
+        }
     }
 
     @objc
     public func play() {
-        guard hasInitialized else { return }
-        player.play()
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.play()
+        }
     }
 
     @objc
     public func pause() {
-        guard hasInitialized else { return }
-        player.pause()
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.pause()
+        }
     }
 
     @objc
     public func setPlayWhenReady(playWhenReady: Bool) {
-        guard hasInitialized else { return }
-        player.playWhenReady = playWhenReady
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.playWhenReady = playWhenReady
+        }
     }
 
     @objc
     public func getPlayWhenReady() -> Bool {
-        guard hasInitialized else { return false }
-        return player.playWhenReady
+        return onMainThread {
+            guard self.hasInitialized else { return false }
+            return player.playWhenReady
+        }
     }
 
     @objc
     public func stop() {
-        guard hasInitialized else { return }
-        player.stop()
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.stop()
+        }
     }
 
     @objc
     public func seekTo(time: Double) {
-        guard hasInitialized else { return }
-        player.seek(to: time)
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.seek(to: time)
+        }
     }
 
     @objc
     public func seekBy(offset: Double) {
-        guard hasInitialized else { return }
-        player.seek(by: offset)
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.seek(by: offset)
+        }
     }
 
     @objc
     public func retry() {
-        guard hasInitialized else { return }
-        player.reload(startFromCurrentTime: true)
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.reload(startFromCurrentTime: true)
+        }
     }
 
     @objc
     public func setRepeatMode(repeatMode: NSString) {
-        guard hasInitialized else { return }
-        player.repeatMode = RepeatMode(rawValue: repeatMode as String) ?? .off
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.repeatMode = RepeatMode(rawValue: repeatMode as String) ?? .off
+        }
     }
 
     @objc
     public func getRepeatMode() -> String {
-        guard hasInitialized else { return "off" }
-        return player.repeatMode.rawValue
+        return onMainThread {
+            guard self.hasInitialized else { return "off" }
+            return player.repeatMode.rawValue
+        }
     }
 
     @objc
     public func setVolume(level: Float) {
-        guard hasInitialized else { return }
-        player.volume = level
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.volume = level
+        }
     }
 
     @objc
     public func getVolume() -> Float {
-        guard hasInitialized else { return 1.0 }
-        return player.volume
+        return onMainThread {
+            guard self.hasInitialized else { return 1.0 }
+            return player.volume
+        }
     }
 
     @objc
     public func setRate(rate: Float) {
-        guard hasInitialized else { return }
-        player.rate = rate
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            self.player.rate = rate
+        }
     }
 
     @objc
     public func getRate() -> Float {
-        guard hasInitialized else { return 1.0 }
-        return player.rate
+        return onMainThread {
+            guard self.hasInitialized else { return 1.0 }
+            return player.rate
+        }
     }
 
     @objc
     public func getTrack(index: Double) -> [String: Any]? {
-        guard hasInitialized else { return nil }
-        let indexInt = Int(index)
-        if (indexInt >= 0 && indexInt < player.items.count) {
-            let track = player.items[indexInt]
-            return (track as? Track)?.toObject()
+        return onMainThread {
+            guard self.hasInitialized else { return nil }
+            let indexInt = Int(index)
+            if (indexInt >= 0 && indexInt < player.items.count) {
+                let track = player.items[indexInt]
+                return (track as? Track)?.toObject()
+            }
+            return nil
         }
-        return nil
     }
 
     @objc
     public func getQueue() -> [[String: Any]] {
-        guard hasInitialized else { return [] }
-        return player.items.map { ($0 as! Track).toObject() }
+        return onMainThread {
+            guard self.hasInitialized else { return [] }
+            return player.items.compactMap { ($0 as? Track)?.toObject() }
+        }
     }
 
     @objc
     public func setQueue(trackDicts: [[String: Any]]) {
-        guard hasInitialized else { return }
-
-        var tracks = [Track]()
-        for trackDict in trackDicts {
-            guard let track = Track(dictionary: trackDict) else { return }
-            tracks.append(track)
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            var tracks = [Track]()
+            for trackDict in trackDicts {
+                guard let track = Track(dictionary: trackDict) else { return }
+                tracks.append(track)
+            }
+            self.player.clear()
+            try? self.player.add(items: tracks)
         }
-        player.clear()
-        player.add(items: tracks)
     }
 
     @objc
     public func getActiveTrack() -> [String: Any]? {
-        guard hasInitialized else { return nil }
-        let index = player.currentIndex
-        if (index >= 0 && index < player.items.count) {
-            let track = player.items[index]
-            return (track as? Track)?.toObject()
+        return onMainThread {
+            guard self.hasInitialized else { return nil }
+            let index = player.currentIndex
+            if (index >= 0 && index < player.items.count) {
+                let track = player.items[index]
+                return (track as? Track)?.toObject()
+            }
+            return nil
         }
-        return nil
     }
 
     @objc
     public func getActiveTrackIndex() -> NSNumber? {
-        guard hasInitialized else { return nil }
-        let index = player.currentIndex
-        if index < 0 || index >= player.items.count {
-            return nil
+        return onMainThread {
+            guard self.hasInitialized else { return nil }
+            let index = player.currentIndex
+            if index < 0 || index >= player.items.count {
+                return nil
+            }
+            return NSNumber(value: index)
         }
-        return NSNumber(value: index)
     }
 
     @objc
     public func getProgress() -> [String: Any] {
-        guard hasInitialized else { return [:] }
-        return [
-            "position": player.currentTime,
-            "duration": player.duration,
-            "buffered": player.bufferedPosition
-        ]
+        return onMainThread {
+            guard self.hasInitialized else { return [:] }
+            return [
+                "position": player.currentTime,
+                "duration": player.duration,
+                "buffered": player.bufferedPosition
+            ]
+        }
     }
 
     @objc
     public func getPlaybackState() -> [String: Any] {
-        guard hasInitialized else { return [:] }
-        return getPlaybackStateBodyKeyValues(state: player.playerState)
+        return onMainThread {
+            guard self.hasInitialized else { return [:] }
+            return getPlaybackStateBodyKeyValues(state: player.playerState)
+        }
     }
 
     @objc
     public func updateMetadata(for trackIndex: Int, metadata: [String: Any]) {
-        guard hasInitialized else { return }
-        guard trackIndex >= 0 && trackIndex < player.items.count else { return }
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            guard trackIndex >= 0 && trackIndex < self.player.items.count else { return }
+            guard let track = self.player.items[trackIndex] as? Track else { return }
 
-        let track : Track = player.items[trackIndex] as! Track
-        track.updateMetadata(dictionary: metadata)
+            track.updateMetadata(dictionary: metadata)
 
-        if (player.currentIndex == trackIndex) {
-            Metadata.update(for: player, with: metadata)
+            if (self.player.currentIndex == trackIndex) {
+                Metadata.update(for: self.player, with: metadata)
+            }
         }
     }
 
     @objc
     public func updateNowPlayingMetadata(metadata: [String: Any]) {
-        guard hasInitialized else { return }
-        Metadata.update(for: player, with: metadata)
+        ensureMainThread {
+            guard self.hasInitialized else { return }
+            Metadata.update(for: self.player, with: metadata)
+        }
     }
 
     private func getPlaybackStateErrorKeyValues() -> Dictionary<String, Any> {
@@ -643,12 +710,14 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
     // MARK: - QueuedAudioPlayer Event Handlers
 
     func handleAudioPlayerStateChange(state: AVPlayerWrapperState) {
-        emit(event: EventType.PlaybackState, body: getPlaybackStateBodyKeyValues(state: state))
-        if (state == .ended) {
-            emit(event: EventType.PlaybackQueueEnded, body: [
-                "track": player.currentIndex,
-                "position": player.currentTime,
-            ] as [String : Any])
+        ensureMainThread {
+            self.emit(event: EventType.PlaybackState, body: self.getPlaybackStateBodyKeyValues(state: state))
+            if (state == .ended) {
+                self.emit(event: EventType.PlaybackQueueEnded, body: [
+                    "track": self.player.currentIndex,
+                    "position": self.player.currentTime,
+                ] as [String : Any])
+            }
         }
     }
 
@@ -678,43 +747,40 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
         lastIndex: Int?,
         lastPosition: Double?
     ) {
-
-        if let item = item {
-            DispatchQueue.main.async {
-                UIApplication.shared.beginReceivingRemoteControlEvents();
+        ensureMainThread {
+            if let item = item {
+                UIApplication.shared.beginReceivingRemoteControlEvents()
+                // Update now playing controller with isLiveStream option from track
+                if self.player.automaticallyUpdateNowPlayingInfo {
+                    let isTrackLiveStream = (item as? Track)?.isLiveStream ?? false
+                    self.player.nowPlayingInfoController.set(keyValue: NowPlayingInfoProperty.isLiveStream(isTrackLiveStream))
+                }
+            } else {
+                UIApplication.shared.endReceivingRemoteControlEvents()
             }
-            // Update now playing controller with isLiveStream option from track
-            if self.player.automaticallyUpdateNowPlayingInfo {
-                let isTrackLiveStream = (item as? Track)?.isLiveStream ?? false
-                self.player.nowPlayingInfoController.set(keyValue: NowPlayingInfoProperty.isLiveStream(isTrackLiveStream))
+
+            if ((item != nil && lastItem == nil) || item == nil) {
+                self.configureAudioSession();
             }
-        } else {
-            DispatchQueue.main.async {
-                UIApplication.shared.endReceivingRemoteControlEvents();
+
+            var a: Dictionary<String, Any> = ["lastPosition": lastPosition ?? 0]
+            if let lastIndex = lastIndex {
+                a["lastIndex"] = lastIndex
             }
-        }
 
-        if ((item != nil && lastItem == nil) || item == nil) {
-            configureAudioSession();
-        }
+            if let lastTrack = (lastItem as? Track)?.toObject() {
+                a["lastTrack"] = lastTrack
+            }
 
-        var a: Dictionary<String, Any> = ["lastPosition": lastPosition ?? 0]
-        if let lastIndex = lastIndex {
-            a["lastIndex"] = lastIndex
-        }
+            if let index = index {
+                a["index"] = index
+            }
 
-        if let lastTrack = (lastItem as? Track)?.toObject() {
-            a["lastTrack"] = lastTrack
+            if let track = (item as? Track)?.toObject() {
+                a["track"] = track
+            }
+            self.emit(event: EventType.PlaybackActiveTrackChanged, body: a)
         }
-
-        if let index = index {
-            a["index"] = index
-        }
-
-        if let track = (item as? Track)?.toObject() {
-            a["track"] = track
-        }
-        emit(event: EventType.PlaybackActiveTrackChanged, body: a)
     }
 
     func handleAudioPlayerSecondElapse(seconds: Double) {
@@ -723,16 +789,19 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
         // additionally, there are certain instances in which this event is emitted
         // _after_ a manipulation to the queu causing no currentItem to exist (see reset)
         // in which case we shouldn't emit anything or we'll get an exception.
-        if !shouldEmitProgressEvent || player.currentItem == nil { return }
-        emit(
-            event: EventType.PlaybackProgressUpdated,
-            body: [
-                "position": player.currentTime,
-                "duration": player.duration,
-                "buffered": player.bufferedPosition,
-                "track": player.currentIndex,
-            ]
-        )
+        guard shouldEmitProgressEvent else { return }
+        ensureMainThread {
+            guard self.player.currentItem != nil else { return }
+            self.emit(
+                event: EventType.PlaybackProgressUpdated,
+                body: [
+                    "position": self.player.currentTime,
+                    "duration": self.player.duration,
+                    "buffered": self.player.bufferedPosition,
+                    "track": self.player.currentIndex,
+                ]
+            )
+        }
     }
 
     func handlePlayWhenReadyChange(playWhenReady: Bool) {

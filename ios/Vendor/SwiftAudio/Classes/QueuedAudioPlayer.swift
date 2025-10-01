@@ -187,18 +187,21 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     // MARK: - AVPlayerWrapperDelegate
 
     override func AVWrapperItemDidPlayToEndTime() {
-        event.playbackEnd.emit(data: .playedUntilEnd)
-        if (repeatMode == .track) {
-            self.pause()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.event.playbackEnd.emit(data: .playedUntilEnd)
+            if (self.repeatMode == .track) {
+                self.pause()
 
-            // quick workaround for race condition - schedule a call after 2 frames
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.016 * 2) { [weak self] in self?.replay() }
-        } else if (repeatMode == .queue) {
-            _ = queue.next(wrap: true)
-        } else if (currentIndex != items.count - 1) {
-            _ = queue.next(wrap: false)
-        } else {
-            wrapper.state = .ended
+                // quick workaround for race condition - schedule a call after 2 frames
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.016 * 2) { [weak self] in self?.replay() }
+            } else if (self.repeatMode == .queue) {
+                _ = self.queue.next(wrap: true)
+            } else if (self.currentIndex != self.items.count - 1) {
+                _ = self.queue.next(wrap: false)
+            } else {
+                self.wrapper.state = .ended
+            }
         }
     }
 
