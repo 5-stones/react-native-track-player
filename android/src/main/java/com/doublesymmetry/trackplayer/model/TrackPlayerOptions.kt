@@ -93,7 +93,6 @@ data class AudioPlayerOptionsData(
 
 data class AndroidAudioPlayerOptions(
     val audioOffload: Boolean? = null,
-    val stopForegroundGracePeriod: Int? = null,
     val skipSilence: Boolean? = null,
     val appKilledPlaybackBehavior: String? = null,
     val pauseOnInterruption: Boolean? = null,
@@ -105,7 +104,6 @@ data class AndroidAudioPlayerOptions(
 
             return AndroidAudioPlayerOptions(
                 audioOffload = if (map.hasKey("audioOffload")) map.getBoolean("audioOffload") else null,
-                stopForegroundGracePeriod = if (map.hasKey("stopForegroundGracePeriod")) map.getInt("stopForegroundGracePeriod") else null,
                 skipSilence = if (map.hasKey("skipSilence")) map.getBoolean("skipSilence") else null,
                 appKilledPlaybackBehavior = if (map.hasKey("appKilledPlaybackBehavior")) map.getString("appKilledPlaybackBehavior") else null,
                 pauseOnInterruption = if (map.hasKey("pauseOnInterruption")) map.getBoolean("pauseOnInterruption") else null,

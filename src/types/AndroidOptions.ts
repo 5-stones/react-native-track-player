@@ -9,14 +9,6 @@ export interface AndroidOptions {
   appKilledPlaybackBehavior?: AppKilledPlaybackBehavior;
 
   /**
-   * Time in seconds to wait once the player should transition to not
-   * considering the service as in the foreground. If playback resumes within
-   * this grace period, the service remains in the foreground state.
-   * Defaults to 5 seconds.
-   */
-  stopForegroundGracePeriod?: number;
-
-  /**
    * https://developer.android.com/media/media3/exoplayer/track-selection#audioOffload
    */
   audioOffload?: boolean;
