@@ -3,7 +3,7 @@ package com.doublesymmetry.trackplayer.model
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toMilliseconds
 import com.doublesymmetry.trackplayer.option.AudioContentType
 import com.doublesymmetry.trackplayer.option.BufferOptions
-import com.doublesymmetry.trackplayer.option.Capability
+import com.doublesymmetry.trackplayer.option.PlayerCapability
 import com.doublesymmetry.trackplayer.option.PlayerOptions
 import com.doublesymmetry.trackplayer.option.PlayerWakeMode
 import com.facebook.react.bridge.ReadableMap
@@ -12,8 +12,9 @@ data class TrackPlayerOptions(
   val forwardJumpInterval: Double = 15.0,
   val backwardJumpInterval: Double = 15.0,
   val progressUpdateEventInterval: Double = -1.0,
-  val capabilities: List<Capability>? = null,
-  val notificationCapabilities: List<Capability>? = null,
+  val ratingType: RatingType? = null,
+  val capabilities: List<PlayerCapability>? = null,
+  val notificationCapabilities: List<PlayerCapability>? = null,
 
   // Audio engine options
   val minBuffer: Double? = null,
@@ -39,22 +40,18 @@ data class TrackPlayerOptions(
       val capabilities =
         map.getArray("capabilities")?.let { arr ->
           (0 until arr.size()).map { index ->
-            val value = arr.getInt(index)
-            Capability.entries.getOrNull(value)
-              ?: throw IllegalArgumentException(
-                "Invalid capability value: $value (valid range: 0-${Capability.entries.size - 1})"
-              )
+            val value = arr.getString(index)
+            PlayerCapability.fromString(value)
+              ?: throw IllegalArgumentException("Invalid capability value: $value")
           }
         }
 
       val notificationCapabilities =
         map.getArray("notificationCapabilities")?.let { arr ->
           (0 until arr.size()).map { index ->
-            val value = arr.getInt(index)
-            Capability.entries.getOrNull(value)
-              ?: throw IllegalArgumentException(
-                "Invalid notificationCapability value: $value (valid range: 0-${Capability.entries.size - 1})"
-              )
+            val value = arr.getString(index)
+            PlayerCapability.fromString(value)
+              ?: throw IllegalArgumentException("Invalid notificationCapability value: $value")
           }
         }
 
@@ -69,6 +66,7 @@ data class TrackPlayerOptions(
           if (map.hasKey("progressUpdateEventInterval"))
             map.getDouble("progressUpdateEventInterval")
           else -1.0,
+        ratingType = map.getString("ratingType")?.let { RatingType.fromString(it) },
         capabilities = capabilities,
         notificationCapabilities = notificationCapabilities,
 

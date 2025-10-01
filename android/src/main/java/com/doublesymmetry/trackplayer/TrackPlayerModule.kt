@@ -15,10 +15,11 @@ import com.doublesymmetry.trackplayer.event.MediaSessionCallback
 import com.doublesymmetry.trackplayer.event.PlaybackState
 import com.doublesymmetry.trackplayer.event.bridge
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
+import com.doublesymmetry.trackplayer.model.RatingType
 import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import com.doublesymmetry.trackplayer.model.TrackFactory
-import com.doublesymmetry.trackplayer.option.Capability
+import com.doublesymmetry.trackplayer.option.PlayerCapability
 import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
 import com.doublesymmetry.trackplayer.player.PlaybackProgressUpdateManager
 import com.doublesymmetry.trackplayer.util.AppForegroundTracker
@@ -119,18 +120,18 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   override fun getTypedExportedConstants(): Map<String, Any> {
     return HashMap<String, Any>().apply {
       // Capabilities
-      this["CAPABILITY_PLAY"] = Capability.PLAY.ordinal
-      this["CAPABILITY_PLAY_FROM_ID"] = Capability.PLAY_FROM_ID.ordinal
-      this["CAPABILITY_PLAY_FROM_SEARCH"] = Capability.PLAY_FROM_SEARCH.ordinal
-      this["CAPABILITY_PAUSE"] = Capability.PAUSE.ordinal
-      this["CAPABILITY_STOP"] = Capability.STOP.ordinal
-      this["CAPABILITY_SEEK_TO"] = Capability.SEEK_TO.ordinal
-      this["CAPABILITY_SKIP"] = OnErrorAction.SKIP.ordinal
-      this["CAPABILITY_SKIP_TO_NEXT"] = Capability.SKIP_TO_NEXT.ordinal
-      this["CAPABILITY_SKIP_TO_PREVIOUS"] = Capability.SKIP_TO_PREVIOUS.ordinal
-      this["CAPABILITY_SET_RATING"] = Capability.SET_RATING.ordinal
-      this["CAPABILITY_JUMP_FORWARD"] = Capability.JUMP_FORWARD.ordinal
-      this["CAPABILITY_JUMP_BACKWARD"] = Capability.JUMP_BACKWARD.ordinal
+      this["CAPABILITY_PLAY"] = PlayerCapability.PLAY.string
+      this["CAPABILITY_PLAY_FROM_ID"] = PlayerCapability.PLAY_FROM_ID.string
+      this["CAPABILITY_PLAY_FROM_SEARCH"] = PlayerCapability.PLAY_FROM_SEARCH.string
+      this["CAPABILITY_PAUSE"] = PlayerCapability.PAUSE.string
+      this["CAPABILITY_STOP"] = PlayerCapability.STOP.string
+      this["CAPABILITY_SEEK_TO"] = PlayerCapability.SEEK_TO.string
+      this["CAPABILITY_SKIP"] = PlayerCapability.SKIP.string
+      this["CAPABILITY_SKIP_TO_NEXT"] = PlayerCapability.SKIP_TO_NEXT.string
+      this["CAPABILITY_SKIP_TO_PREVIOUS"] = PlayerCapability.SKIP_TO_PREVIOUS.string
+      this["CAPABILITY_SET_RATING"] = PlayerCapability.SET_RATING.string
+      this["CAPABILITY_JUMP_FORWARD"] = PlayerCapability.JUMP_FORWARD.string
+      this["CAPABILITY_JUMP_BACKWARD"] = PlayerCapability.JUMP_BACKWARD.string
 
       // States
       this["STATE_NONE"] = AudioPlayerState.IDLE.bridge
@@ -142,22 +143,22 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       this["STATE_LOADING"] = AudioPlayerState.LOADING.bridge
 
       // Rating Types
-      this["RATING_HEART"] = RatingCompat.RATING_HEART
-      this["RATING_THUMBS_UP_DOWN"] = RatingCompat.RATING_THUMB_UP_DOWN
-      this["RATING_3_STARS"] = RatingCompat.RATING_3_STARS
-      this["RATING_4_STARS"] = RatingCompat.RATING_4_STARS
-      this["RATING_5_STARS"] = RatingCompat.RATING_5_STARS
-      this["RATING_PERCENTAGE"] = RatingCompat.RATING_PERCENTAGE
+      this["RATING_HEART"] = RatingType.HEART.string
+      this["RATING_THUMBS_UP_DOWN"] = RatingType.THUMBS_UP_DOWN.string
+      this["RATING_3_STARS"] = RatingType.THREE_STARS.string
+      this["RATING_4_STARS"] = RatingType.FOUR_STARS.string
+      this["RATING_5_STARS"] = RatingType.FIVE_STARS.string
+      this["RATING_PERCENTAGE"] = RatingType.PERCENTAGE.string
 
       // Repeat Modes
-      this["REPEAT_OFF"] = Player.REPEAT_MODE_OFF
-      this["REPEAT_TRACK"] = Player.REPEAT_MODE_ONE
-      this["REPEAT_QUEUE"] = Player.REPEAT_MODE_ALL
+      this["REPEAT_OFF"] = PlayerRepeatMode.OFF.string
+      this["REPEAT_TRACK"] = PlayerRepeatMode.ONE.string
+      this["REPEAT_QUEUE"] = PlayerRepeatMode.ALL.string
 
       // Pitch Algorithm: No-op on android
-      this["PITCH_ALGORITHM_LINEAR"] = -1
-      this["PITCH_ALGORITHM_MUSIC"] = -2
-      this["PITCH_ALGORITHM_VOICE"] = -3
+      this["PITCH_ALGORITHM_LINEAR"] = "linear"
+      this["PITCH_ALGORITHM_MUSIC"] = "music"
+      this["PITCH_ALGORITHM_VOICE"] = "voice"
     }
   }
 
@@ -334,16 +335,13 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
 
   override fun getRate(): Double = runBlockingOnMain { player.playbackSpeed.toDouble() }
 
-  override fun setRepeatMode(mode: Double) = runBlockingOnMain {
-    val value = mode.toInt()
+  override fun setRepeatMode(mode: String) = runBlockingOnMain {
     player.repeatMode =
-      PlayerRepeatMode.entries.getOrNull(value)
-        ?: throw IllegalArgumentException(
-          "Invalid repeat mode value: $value (valid range: 0-${PlayerRepeatMode.entries.size - 1})"
-        )
+      PlayerRepeatMode.fromString(mode)
+        ?: throw IllegalArgumentException("Invalid repeat mode value: $mode")
   }
 
-  override fun getRepeatMode(): Double = runBlockingOnMain { player.repeatMode.ordinal.toDouble() }
+  override fun getRepeatMode(): String = runBlockingOnMain { player.repeatMode.string }
 
   override fun setPlayWhenReady(playWhenReady: Boolean) = runBlockingOnMain {
     player.playWhenReady = playWhenReady

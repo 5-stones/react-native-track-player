@@ -68,8 +68,8 @@ export interface Spec extends TurboModule {
   updateNowPlayingMetadata(metadata: UnsafeObject): void;
   setQueue(tracks: UnsafeObject[]): void;
   getQueue(): UnsafeObject[];
-  setRepeatMode(mode: number): void;
-  getRepeatMode(): number;
+  setRepeatMode(mode: string): void;
+  getRepeatMode(): string;
   getTrack(index: number): UnsafeObject | undefined;
   getActiveTrackIndex(): number | undefined;
   getActiveTrack(): UnsafeObject | undefined;
@@ -81,18 +81,18 @@ export interface Spec extends TurboModule {
   // constants
   getConstants: () => {
     // Capabilities
-    CAPABILITY_PLAY: number;
-    CAPABILITY_PLAY_FROM_ID: number;
-    CAPABILITY_PLAY_FROM_SEARCH: number;
-    CAPABILITY_PAUSE: number;
-    CAPABILITY_STOP: number;
-    CAPABILITY_SEEK_TO: number;
-    CAPABILITY_SKIP: number;
-    CAPABILITY_SKIP_TO_NEXT: number;
-    CAPABILITY_SKIP_TO_PREVIOUS: number;
-    CAPABILITY_SET_RATING: number;
-    CAPABILITY_JUMP_FORWARD: number;
-    CAPABILITY_JUMP_BACKWARD: number;
+    CAPABILITY_PLAY: string;
+    CAPABILITY_PLAY_FROM_ID: string;
+    CAPABILITY_PLAY_FROM_SEARCH: string;
+    CAPABILITY_PAUSE: string;
+    CAPABILITY_STOP: string;
+    CAPABILITY_SEEK_TO: string;
+    CAPABILITY_SKIP: string;
+    CAPABILITY_SKIP_TO_NEXT: string;
+    CAPABILITY_SKIP_TO_PREVIOUS: string;
+    CAPABILITY_SET_RATING: string;
+    CAPABILITY_JUMP_FORWARD: string;
+    CAPABILITY_JUMP_BACKWARD: string;
 
     // States
     STATE_NONE: string;
@@ -104,22 +104,22 @@ export interface Spec extends TurboModule {
     STATE_LOADING: string;
 
     // Rating Types
-    RATING_HEART: number;
-    RATING_THUMBS_UP_DOWN: number;
-    RATING_3_STARS: number;
-    RATING_4_STARS: number;
-    RATING_5_STARS: number;
-    RATING_PERCENTAGE: number;
+    RATING_HEART: string;
+    RATING_THUMBS_UP_DOWN: string;
+    RATING_3_STARS: string;
+    RATING_4_STARS: string;
+    RATING_5_STARS: string;
+    RATING_PERCENTAGE: string;
 
     // Repeat Modes
-    REPEAT_OFF: number;
-    REPEAT_TRACK: number;
-    REPEAT_QUEUE: number;
+    REPEAT_OFF: string;
+    REPEAT_TRACK: string;
+    REPEAT_QUEUE: string;
 
     // Pitch Algorithms - iOS
-    PITCH_ALGORITHM_LINEAR: number;
-    PITCH_ALGORITHM_MUSIC: number;
-    PITCH_ALGORITHM_VOICE: number;
+    PITCH_ALGORITHM_LINEAR: string;
+    PITCH_ALGORITHM_MUSIC: string;
+    PITCH_ALGORITHM_VOICE: string;
   };
 
   // android methods

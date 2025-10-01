@@ -9,5 +9,7 @@
 import Foundation
 
 enum PitchAlgorithm: String {
-    case linear, music, voice
+    case linear = "linear"
+    case music = "music"
+    case voice = "voice"
 }

@@ -79,8 +79,8 @@ RCT_EXPORT_MODULE()
   return @([nativeTrackPlayer getRate]);
 }
 
-- (NSNumber *)getRepeatMode {
-  return @([nativeTrackPlayer getRepeatMode]);
+- (NSString *)getRepeatMode {
+  return [nativeTrackPlayer getRepeatMode];
 }
 
 - (NSDictionary * _Nullable)getTrack:(double)index {
@@ -143,8 +143,8 @@ RCT_EXPORT_MODULE()
   [nativeTrackPlayer setRateWithRate:rate];
 }
 
-- (void)setRepeatMode:(double)mode {
-  [nativeTrackPlayer setRepeatModeWithRepeatMode:@(mode)];
+- (void)setRepeatMode:(NSString *)mode {
+  [nativeTrackPlayer setRepeatModeWithRepeatMode:mode];
 }
 
 - (void)setVolume:(double)level {

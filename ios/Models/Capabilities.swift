@@ -10,7 +10,18 @@ import Foundation
 import SwiftAudioEx
 
 enum Capability: String {
-    case play, pause, togglePlayPause, stop, next, previous, jumpForward, jumpBackward, seek, like, dislike, bookmark
+    case play = "play"
+    case pause = "pause"
+    case togglePlayPause = "toggle-play-pause"
+    case stop = "stop"
+    case next = "skip-to-next"
+    case previous = "skip-to-previous"
+    case jumpForward = "jump-forward"
+    case jumpBackward = "jump-backward"
+    case seek = "seek-to"
+    case like = "like"
+    case dislike = "dislike"
+    case bookmark = "bookmark"
 
     func mapToPlayerCommand(forwardJumpInterval: NSNumber?,
                             backwardJumpInterval: NSNumber?,

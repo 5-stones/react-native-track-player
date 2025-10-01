@@ -1,19 +1,25 @@
 package com.doublesymmetry.trackplayer.option
 
-enum class Capability {
-  PLAY,
-  PLAY_FROM_ID,
-  PLAY_FROM_SEARCH,
-  PAUSE,
-  STOP,
-  SEEK_TO,
-  SKIP,
-  SKIP_TO_NEXT,
-  SKIP_TO_PREVIOUS,
-  JUMP_FORWARD,
-  JUMP_BACKWARD,
-  SET_RATING,
-  LIKE,
-  DISLIKE,
-  BOOKMARK,
+enum class PlayerCapability(val string: String) {
+  PLAY("play"),
+  PLAY_FROM_ID("play-from-id"),
+  PLAY_FROM_SEARCH("play-from-search"),
+  PAUSE("pause"),
+  STOP("stop"),
+  SEEK_TO("seek-to"),
+  SKIP("skip"),
+  SKIP_TO_NEXT("skip-to-next"),
+  SKIP_TO_PREVIOUS("skip-to-previous"),
+  JUMP_FORWARD("jump-forward"),
+  JUMP_BACKWARD("jump-backward"),
+  SET_RATING("set-rating"),
+  LIKE("like"),
+  DISLIKE("dislike"),
+  BOOKMARK("bookmark");
+
+  companion object {
+    fun fromString(value: String): PlayerCapability? {
+      return entries.find { it.string == value }
+    }
+  }
 }

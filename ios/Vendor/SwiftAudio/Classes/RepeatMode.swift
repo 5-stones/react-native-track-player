@@ -8,8 +8,8 @@
 
 import Foundation
 
-public enum RepeatMode: Int {
-    case off
-    case track
-    case queue
+public enum RepeatMode: String {
+    case off = "off"
+    case track = "track"
+    case queue = "queue"
 }

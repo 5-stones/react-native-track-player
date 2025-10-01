@@ -26,7 +26,7 @@ import com.doublesymmetry.trackplayer.extension.find
 import com.doublesymmetry.trackplayer.model.AppKilledPlaybackBehavior
 import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
 import com.doublesymmetry.trackplayer.model.CustomCommandButton
-import com.doublesymmetry.trackplayer.option.Capability
+import com.doublesymmetry.trackplayer.option.PlayerCapability
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.jstasks.HeadlessJsTaskConfig
 import com.google.common.util.concurrent.ListenableFuture
@@ -125,6 +125,8 @@ class TrackPlayerService : HeadlessJsMediaService() {
 
     options.skipSilence?.let { skipSilence -> player.skipSilence = skipSilence }
 
+    options.ratingType?.let { ratingType -> player.ratingType = ratingType.compat }
+
     appKilledPlaybackBehavior =
       AppKilledPlaybackBehavior::string.find(options.appKilledPlaybackBehavior)
         ?: AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
@@ -155,16 +157,16 @@ class TrackPlayerService : HeadlessJsMediaService() {
         )
     notificationCapabilities.forEach {
       when (it) {
-        Capability.PLAY,
-        Capability.PAUSE -> {
+        PlayerCapability.PLAY,
+        PlayerCapability.PAUSE -> {
           playerCommandsBuilder.add(Player.COMMAND_PLAY_PAUSE)
         }
 
-        Capability.STOP -> {
+        PlayerCapability.STOP -> {
           playerCommandsBuilder.add(Player.COMMAND_STOP)
         }
 
-        Capability.SEEK_TO -> {
+        PlayerCapability.SEEK_TO -> {
           playerCommandsBuilder.add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
         }
 

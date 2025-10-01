@@ -4,16 +4,16 @@ import android.os.Bundle
 import androidx.media3.session.CommandButton
 import androidx.media3.session.R
 import androidx.media3.session.SessionCommand
-import com.doublesymmetry.trackplayer.option.Capability
+import com.doublesymmetry.trackplayer.option.PlayerCapability
 
 enum class CustomCommandButton(
   val customAction: String,
-  val capability: Capability,
+  val capability: PlayerCapability,
   val commandButton: CommandButton,
 ) {
   JUMP_BACKWARD(
     customAction = "JUMP_BACKWARD",
-    capability = Capability.JUMP_BACKWARD,
+    capability = PlayerCapability.JUMP_BACKWARD,
     commandButton =
       CommandButton.Builder()
         .setDisplayName("Jump Backward")
@@ -23,7 +23,7 @@ enum class CustomCommandButton(
   ),
   JUMP_FORWARD(
     customAction = "JUMP_FORWARD",
-    capability = Capability.JUMP_FORWARD,
+    capability = PlayerCapability.JUMP_FORWARD,
     commandButton =
       CommandButton.Builder()
         .setDisplayName("Jump Forward")

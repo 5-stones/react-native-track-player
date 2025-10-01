@@ -306,7 +306,7 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
 
         var capabilitiesStr = options["capabilities"] as? [String] ?? []
         if (capabilitiesStr.contains("play") && capabilitiesStr.contains("pause")) {
-            capabilitiesStr.append("togglePlayPause");
+            capabilitiesStr.append("toggle-play-pause");
         }
 
         forwardJumpInterval = options["forwardJumpInterval"] as? NSNumber ?? forwardJumpInterval
@@ -483,14 +483,14 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
     }
 
     @objc
-    public func setRepeatMode(repeatMode: NSNumber) {
+    public func setRepeatMode(repeatMode: NSString) {
         guard hasInitialized else { return }
-        player.repeatMode = SwiftAudioEx.RepeatMode(rawValue: repeatMode.intValue) ?? .off
+        player.repeatMode = SwiftAudioEx.RepeatMode(rawValue: repeatMode as String) ?? .off
     }
 
     @objc
-    public func getRepeatMode() -> Int {
-        guard hasInitialized else { return 0 }
+    public func getRepeatMode() -> String {
+        guard hasInitialized else { return "off" }
         return player.repeatMode.rawValue
     }
 
