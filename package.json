@@ -50,6 +50,7 @@
     }
   ],
   "scripts": {
+    "android:format": "cd example/android && ./gradlew :react-native-track-player:format",
     "android:ide": "cd example/android && open -a 'Android Studio' .",
     "android:logs": "react-native log-android",
     "build": "yarn prepare",
