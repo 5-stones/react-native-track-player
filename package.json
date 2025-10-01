@@ -126,7 +126,7 @@
     "release-it": "^17.10.0",
     "shaka-player": "^4.15.4",
     "turbo": "^1.10.7",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.3"
   },
   "funding": "https://github.com/doublesymmetry/react-native-track-player?sponsor=1",
   "workspaces": [
