@@ -60,7 +60,6 @@ class TrackPlayerService : HeadlessJsMediaService() {
         sWakeLock?.release()
     }
 
-    @ExperimentalCoroutinesApi
     override fun onCreate() {
         Timber.Forest.plant(object : Timber.DebugTree() {
             override fun createStackElementTag(element: StackTraceElement): String? {
@@ -109,7 +108,6 @@ class TrackPlayerService : HeadlessJsMediaService() {
         return START_STICKY
     }
 
-    @MainThread
     fun setupPlayer(playerOptionsData: AudioPlayerOptionsData) {
         // Check if player has already been configured (not the temporary initial player)
         if (temporaryPlayer == null) {
@@ -127,7 +125,6 @@ class TrackPlayerService : HeadlessJsMediaService() {
         mediaSession.player = player.forwardingPlayer
     }
 
-    @MainThread
     fun updateOptions(options: AudioPlayerOptionsData) {
         val androidOptions = options.androidOptions
 
@@ -210,7 +207,6 @@ class TrackPlayerService : HeadlessJsMediaService() {
         return HeadlessJsTaskConfig(TASK_KEY, Arguments.createMap(), 0, true)
     }
 
-    @MainThread
     override fun onBind(intent: Intent?): IBinder? {
         return if (intent?.action != null) {
             super.onBind(intent)
@@ -225,7 +221,6 @@ class TrackPlayerService : HeadlessJsMediaService() {
         super.onUpdateNotification(session, true)
     }
 
-    @MainThread
     override fun onTaskRemoved(rootIntent: Intent?) {
         onUnbind(rootIntent)
         Timber.Forest.d("player = $player, appKilledPlaybackBehavior = $appKilledPlaybackBehavior")
@@ -290,12 +285,10 @@ class TrackPlayerService : HeadlessJsMediaService() {
         return mediaSession
     }
 
-    @MainThread
     override fun onHeadlessJsTaskFinish(taskId: Int) {
         // This is empty so ReactNative doesn't kill this service
     }
 
-    @MainThread
     override fun onDestroy() {
         if (::player.isInitialized) {
             Timber.Forest.d("Releasing media session and destroying player")
@@ -306,7 +299,6 @@ class TrackPlayerService : HeadlessJsMediaService() {
         super.onDestroy()
     }
 
-    @MainThread
     inner class MusicBinder : Binder() {
         val service = this@TrackPlayerService
     }
