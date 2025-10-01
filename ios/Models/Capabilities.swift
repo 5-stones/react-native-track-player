@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import SwiftAudioEx
 
 enum Capability: String {
     case play = "play"

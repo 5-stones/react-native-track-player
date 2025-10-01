@@ -1,7 +1,6 @@
 // TrackPlayer.swift
 import Foundation
 import MediaPlayer
-import SwiftAudioEx
 import React
 
 @objc(NativeTrackPlayerImpl)
@@ -468,7 +467,7 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
     @objc
     public func setRepeatMode(repeatMode: NSString) {
         guard hasInitialized else { return }
-        player.repeatMode = SwiftAudioEx.RepeatMode(rawValue: repeatMode as String) ?? .off
+        player.repeatMode = RepeatMode(rawValue: repeatMode as String) ?? .off
     }
 
     @objc
