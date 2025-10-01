@@ -180,7 +180,7 @@ RCT_EXPORT_MODULE()
 }
 
 - (void)updateOptions:(NSDictionary *)options {
-  [nativeTrackPlayer updateOptionsSyncWithOptions:options];
+  [nativeTrackPlayer updateOptionsWithOptions:options];
 }
 
 // event listeners
@@ -252,12 +252,40 @@ RCT_EXPORT_MODULE()
   [self emitOnRemoteSetRating:body];
 }
 
+- (void)emitRemotePlayId:(NSDictionary *)body {
+  [self emitOnRemotePlayId:body];
+}
+
+- (void)emitRemotePlaySearch:(NSDictionary *)body {
+  [self emitOnRemotePlaySearch:body];
+}
+
+- (void)emitRemoteSkip:(NSDictionary *)body {
+  [self emitOnRemoteSkip:body];
+}
+
+- (void)emitRemoteLike:(NSDictionary *)body {
+  [self emitOnRemoteLike:body];
+}
+
+- (void)emitRemoteDislike:(NSDictionary *)body {
+  [self emitOnRemoteDislike:body];
+}
+
+- (void)emitRemoteBookmark:(NSDictionary *)body {
+  [self emitOnRemoteBookmark:body];
+}
+
 - (void)emitMetadataTimedReceived:(NSDictionary *)body {
   [self emitOnMetadataTimedReceived:body];
 }
 
 - (void)emitMetadataCommonReceived:(NSDictionary *)body {
   [self emitOnMetadataCommonReceived:body];
+}
+
+- (void)emitMetadataChapterReceived:(NSDictionary *)body {
+  [self emitOnMetadataChapterReceived:body];
 }
 
 - (void)emitPlaybackMetadata:(NSDictionary *)body {

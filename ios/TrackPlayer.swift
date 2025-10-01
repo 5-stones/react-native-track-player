@@ -64,6 +64,8 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
             delegate?.emitPlaybackQueueEnded(bodyDict)
         case .PlaybackError:
             delegate?.emitPlaybackError(bodyDict)
+        case .PlaybackMetadata:
+            delegate?.emitPlaybackMetadata(bodyDict)
         case .RemotePlay:
             delegate?.emitRemotePlay(bodyDict)
         case .RemotePause:
@@ -78,6 +80,28 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
             delegate?.emitRemoteJumpForward(bodyDict)
         case .RemoteJumpBackward:
             delegate?.emitRemoteJumpBackward(bodyDict)
+        case .RemoteStop:
+            delegate?.emitRemoteStop(bodyDict)
+        case .RemoteSetRating:
+            delegate?.emitRemoteSetRating(bodyDict)
+        case .RemotePlayId:
+            delegate?.emitRemotePlayId(bodyDict)
+        case .RemotePlaySearch:
+            delegate?.emitRemotePlaySearch(bodyDict)
+        case .RemoteSkip:
+            delegate?.emitRemoteSkip(bodyDict)
+        case .RemoteLike:
+            delegate?.emitRemoteLike(bodyDict)
+        case .RemoteDislike:
+            delegate?.emitRemoteDislike(bodyDict)
+        case .RemoteBookmark:
+            delegate?.emitRemoteBookmark(bodyDict)
+        case .MetadataChapterReceived:
+            delegate?.emitMetadataChapterReceived(bodyDict)
+        case .MetadataTimedReceived:
+            delegate?.emitMetadataTimedReceived(bodyDict)
+        case .MetadataCommonReceived:
+            delegate?.emitMetadataCommonReceived(bodyDict)
         default:
             // Log unmapped events - these should be added to the switch statement
             print("[TrackPlayer] Unmapped event: \(event.rawValue)")
@@ -275,15 +299,8 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
         resolve(player != nil)
     }
 
-    @objc(updateOptions:resolver:rejecter:)
-    public func update(options: [String: Any], resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
-        if (rejectWhenNotInitialized(reject: reject)) { return }
-        updateOptionsSync(options: options)
-        resolve(NSNull())
-    }
-
     @objc
-    public func updateOptionsSync(options: [String: Any]) {
+    public func updateOptions(options: [String: Any]) {
         guard hasInitialized else { return }
 
         var capabilitiesStr = options["capabilities"] as? [String] ?? []
@@ -527,7 +544,7 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
             tracks.append(track)
         }
         player.clear()
-        try? player.add(items: tracks)
+        player.add(items: tracks)
     }
 
     @objc
@@ -746,8 +763,15 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
     func emitRemoteJumpBackward(_ body: [String: Any])
     func emitRemoteStop(_ body: [String: Any])
     func emitRemoteSetRating(_ body: [String: Any])
+    func emitRemotePlayId(_ body: [String: Any])
+    func emitRemotePlaySearch(_ body: [String: Any])
+    func emitRemoteSkip(_ body: [String: Any])
+    func emitRemoteLike(_ body: [String: Any])
+    func emitRemoteDislike(_ body: [String: Any])
+    func emitRemoteBookmark(_ body: [String: Any])
     func emitMetadataTimedReceived(_ body: [String: Any])
     func emitMetadataCommonReceived(_ body: [String: Any])
+    func emitMetadataChapterReceived(_ body: [String: Any])
     func emitPlaybackMetadata(_ body: [String: Any])
 }
 
@@ -793,6 +817,13 @@ extension NativeTrackPlayerImpl {
             "REPEAT_OFF": RepeatMode.off.rawValue,
             "REPEAT_TRACK": RepeatMode.track.rawValue,
             "REPEAT_QUEUE": RepeatMode.queue.rawValue,
+
+            "RATING_HEART": RatingType.heart.rawValue,
+            "RATING_THUMBS_UP_DOWN": RatingType.thumbsUpDown.rawValue,
+            "RATING_3_STARS": RatingType.threeStars.rawValue,
+            "RATING_4_STARS": RatingType.fourStars.rawValue,
+            "RATING_5_STARS": RatingType.fiveStars.rawValue,
+            "RATING_PERCENTAGE": RatingType.percentage.rawValue,
         ]
     }
 
