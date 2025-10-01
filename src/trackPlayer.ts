@@ -359,7 +359,7 @@ export function setRate(rate: number): void {
  * @see https://rntp.dev/docs/api/constants/repeat-mode
  */
 export function setQueue(tracks: Track[]): void {
-  return TrackPlayer.setQueue(tracks);
+  return TrackPlayer.setQueue(tracks.map(resolveTrackAssets));
 }
 
 /**
