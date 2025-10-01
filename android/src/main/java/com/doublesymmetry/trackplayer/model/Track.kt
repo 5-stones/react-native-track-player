@@ -10,11 +10,8 @@ import com.facebook.react.bridge.Arguments
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.Rating
-import com.doublesymmetry.kotlinaudio.models.AudioItem
-import com.doublesymmetry.kotlinaudio.models.AudioItemOptions
-import com.doublesymmetry.kotlinaudio.models.MediaType
-import com.doublesymmetry.trackplayer.utils.BundleUtils
-import com.doublesymmetry.trackplayer.extensions.NumberExt.Companion.toMilliseconds
+import com.doublesymmetry.trackplayer.util.BundleUtils
+import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toMilliseconds
 import com.facebook.react.bridge.ReadableType
 
 @OptIn(UnstableApi::class)

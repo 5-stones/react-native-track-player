@@ -1,6 +1,6 @@
 package com.doublesymmetry.trackplayer
 
-import com.doublesymmetry.trackplayer.module.MusicModule
+import com.doublesymmetry.trackplayer.TrackPlayerModule
 import com.facebook.react.BaseReactPackage
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
@@ -10,8 +10,8 @@ import java.util.HashMap
 
 class TrackPlayerPackage : BaseReactPackage() {
   override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? {
-    return if (name == MusicModule.NAME) {
-      MusicModule(reactContext)
+    return if (name == TrackPlayerModule.NAME) {
+      TrackPlayerModule(reactContext)
     } else {
       null
     }
@@ -20,9 +20,9 @@ class TrackPlayerPackage : BaseReactPackage() {
   override fun getReactModuleInfoProvider(): ReactModuleInfoProvider {
     return ReactModuleInfoProvider {
       val moduleInfos: MutableMap<String, ReactModuleInfo> = HashMap()
-      moduleInfos[MusicModule.NAME] = ReactModuleInfo(
-        MusicModule.NAME,
-        MusicModule.NAME,
+      moduleInfos[TrackPlayerModule.NAME] = ReactModuleInfo(
+        TrackPlayerModule.NAME,
+        TrackPlayerModule.NAME,
         false,  // canOverrideExistingModule
         false,  // needsEagerInit
         false,  // isCxxModule

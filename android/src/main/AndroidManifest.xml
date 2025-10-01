@@ -11,7 +11,7 @@
 
         <!-- The main service, handles playback, playlists and media buttons -->
         <service
-            android:name="com.doublesymmetry.trackplayer.service.MusicService"
+            android:name="com.doublesymmetry.trackplayer.TrackPlayerService"
             android:enabled="true"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
