@@ -110,8 +110,6 @@ dependencies {
   implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
 
   api 'com.jakewharton.timber:timber:5.0.1'
-
-  implementation 'androidx.test:rules:1.6.1'
 }
 
 react {
