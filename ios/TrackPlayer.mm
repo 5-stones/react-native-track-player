@@ -244,10 +244,6 @@ RCT_EXPORT_MODULE()
   [self emitOnRemoteJumpBackward:body];
 }
 
-- (void)emitRemoteDuck:(NSDictionary *)body {
-  [self emitOnRemoteDuck:body];
-}
-
 - (void)emitRemoteStop:(NSDictionary *)body {
   [self emitOnRemoteStop:body];
 }

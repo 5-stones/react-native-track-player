@@ -1,7 +1,6 @@
 import Foundation
 
 enum EventType: String, CaseIterable {
-    case RemoteDuck = "remote-duck"
     case RemoteSeek = "remote-seek"
     case RemoteNext = "remote-next"
     case RemotePrevious = "remote-previous"

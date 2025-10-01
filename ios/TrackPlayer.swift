@@ -79,8 +79,6 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
             delegate?.emitRemoteJumpForward(bodyDict)
         case .RemoteJumpBackward:
             delegate?.emitRemoteJumpBackward(bodyDict)
-        case .RemoteDuck:
-            delegate?.emitRemoteDuck(bodyDict)
         default:
             // Log unmapped events - these should be added to the switch statement
             print("[TrackPlayer] Unmapped event: \(event.rawValue)")
@@ -92,25 +90,10 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
     public func handleInterruption(type: InterruptionType) {
         switch type {
         case .began:
-            // Interruption began, take appropriate actions (save state, update user interface)
-            emit(event: EventType.RemoteDuck, body: [
-                "paused": true
-            ])
+            break
         case let .ended(shouldResume):
-            if shouldResume {
-                if (shouldResumePlaybackAfterInterruptionEnds) {
-                    player.play()
-                }
-                // Interruption Ended - playback should resume
-                emit(event: EventType.RemoteDuck, body: [
-                    "paused": false
-                ])
-            } else {
-                // Interruption Ended - playback should NOT resume
-                emit(event: EventType.RemoteDuck, body: [
-                    "paused": true,
-                    "permanent": true
-                ])
+            if shouldResume && shouldResumePlaybackAfterInterruptionEnds {
+                player.play()
             }
         }
     }
@@ -762,7 +745,6 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
     func emitRemoteSeek(_ body: [String: Any])
     func emitRemoteJumpForward(_ body: [String: Any])
     func emitRemoteJumpBackward(_ body: [String: Any])
-    func emitRemoteDuck(_ body: [String: Any])
     func emitRemoteStop(_ body: [String: Any])
     func emitRemoteSetRating(_ body: [String: Any])
     func emitMetadataTimedReceived(_ body: [String: Any])
