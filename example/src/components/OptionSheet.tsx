@@ -18,7 +18,7 @@ export function OptionSheet() {
           { label: 'Track', value: RepeatMode.Track },
           { label: 'Queue', value: RepeatMode.Queue },
         ]}
-        initialValue={playerOptions.repeatMode}
+        initialValue={TrackPlayer.getRepeatMode()}
         onSelect={(repeatMode) => {
           TrackPlayer.setRepeatMode(repeatMode);
         }}
