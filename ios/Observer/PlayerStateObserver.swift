@@ -26,15 +26,15 @@ class PlayerStateObserver: NSObject {
     private let timeControlStatusChangeOptions: NSKeyValueObservingOptions = [.new]
     private(set) var isObserving: Bool = false
 
-    weak var audioPlayer: AudioPlayer?
-    weak var player: AVPlayer? {
+    weak var player: AudioPlayer?
+    weak var avPlayer: AVPlayer? {
         willSet {
             stopObserving()
         }
     }
 
-    init(audioPlayer: AudioPlayer) {
-        self.audioPlayer = audioPlayer
+    init(player: AudioPlayer) {
+        self.player = player
     }
 
     deinit {
@@ -46,17 +46,17 @@ class PlayerStateObserver: NSObject {
      */
     func startObserving() {
         if (isObserving) { return };
-        guard let player = player else {
+        guard let avPlayer = avPlayer else {
             return
         }
         isObserving = true
-        player.addObserver(
+        avPlayer.addObserver(
             self,
             forKeyPath: AVPlayerKeyPath.status,
             options: statusChangeOptions,
             context: &PlayerStateObserver.context
         )
-        player.addObserver(
+        avPlayer.addObserver(
             self,
             forKeyPath: AVPlayerKeyPath.timeControlStatus,
             options: timeControlStatusChangeOptions,
@@ -65,11 +65,11 @@ class PlayerStateObserver: NSObject {
     }
 
     func stopObserving() {
-        guard let player = player, isObserving else {
+        guard let avPlayer = avPlayer, isObserving else {
             return
         }
-        player.removeObserver(self, forKeyPath: AVPlayerKeyPath.status, context: &PlayerStateObserver.context)
-        player.removeObserver(self, forKeyPath: AVPlayerKeyPath.timeControlStatus, context: &PlayerStateObserver.context)
+        avPlayer.removeObserver(self, forKeyPath: AVPlayerKeyPath.status, context: &PlayerStateObserver.context)
+        avPlayer.removeObserver(self, forKeyPath: AVPlayerKeyPath.timeControlStatus, context: &PlayerStateObserver.context)
         isObserving = false
     }
 
@@ -98,14 +98,14 @@ class PlayerStateObserver: NSObject {
         } else {
             status = .unknown
         }
-        audioPlayer?.playerStatusDidChange(status)
+        player?.playerStatusDidChange(status)
     }
 
     private func handleTimeControlStatusChange(_ change: [NSKeyValueChangeKey: Any]?) {
         let status: AVPlayer.TimeControlStatus
         if let statusNumber = change?[.newKey] as? NSNumber {
             status = AVPlayer.TimeControlStatus(rawValue: statusNumber.intValue)!
-            audioPlayer?.playerDidChangeTimeControlStatus(status)
+            player?.playerDidChangeTimeControlStatus(status)
         }
     }
 }

@@ -25,10 +25,10 @@ class PlayerItemPropertyObserver: NSObject {
     private(set) var isObserving: Bool = false
 
     private(set) weak var observingItem: AVPlayerItem?
-    weak var audioPlayer: AudioPlayer?
+    weak var player: AudioPlayer?
 
-    init(audioPlayer: AudioPlayer) {
-        self.audioPlayer = audioPlayer
+    init(player: AudioPlayer) {
+        self.player = player
         super.init()
     }
     
@@ -83,17 +83,17 @@ class PlayerItemPropertyObserver: NSObject {
         switch observedKeyPath {
         case AVPlayerItemKeyPath.duration:
             if let duration = change?[.newKey] as? CMTime {
-                audioPlayer?.handleDurationUpdate(duration.seconds)
+                player?.handleDurationUpdate(duration.seconds)
             }
 
         case AVPlayerItemKeyPath.loadedTimeRanges:
             if let ranges = change?[.newKey] as? [NSValue], let duration = ranges.first?.timeRangeValue.duration {
-                audioPlayer?.handleDurationUpdate(duration.seconds)
+                player?.handleDurationUpdate(duration.seconds)
             }
 
         case AVPlayerItemKeyPath.playbackLikelyToKeepUp:
             if let playbackLikelyToKeepUp = change?[.newKey] as? Bool {
-                audioPlayer?.itemDidUpdatePlaybackLikelyToKeepUp(playbackLikelyToKeepUp)
+                player?.itemDidUpdatePlaybackLikelyToKeepUp(playbackLikelyToKeepUp)
             }
 
         default: break
@@ -105,7 +105,7 @@ class PlayerItemPropertyObserver: NSObject {
 extension PlayerItemPropertyObserver: AVPlayerItemMetadataOutputPushDelegate {
     func metadataOutput(_ output: AVPlayerItemMetadataOutput, didOutputTimedMetadataGroups groups: [AVTimedMetadataGroup], from track: AVPlayerItemTrack?) {
         if output == currentMetadataOutput {
-            audioPlayer?.handleTimedMetadataReceived(groups)
+            player?.handleTimedMetadataReceived(groups)
         }
     }
 }

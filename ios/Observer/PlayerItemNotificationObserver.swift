@@ -16,12 +16,12 @@ class PlayerItemNotificationObserver {
     private let notificationCenter: NotificationCenter = NotificationCenter.default
 
     private(set) weak var observingItem: AVPlayerItem?
-    weak var audioPlayer: AudioPlayer?
+    weak var player: AudioPlayer?
 
     private(set) var isObserving: Bool = false
 
-    init(audioPlayer: AudioPlayer) {
-        self.audioPlayer = audioPlayer
+    init(player: AudioPlayer) {
+        self.player = player
     }
 
     deinit {
@@ -85,14 +85,14 @@ class PlayerItemNotificationObserver {
     }
     
     @objc private func itemDidPlayToEndTime() {
-        audioPlayer?.handleItemDidPlayToEndTime()
+        player?.handleItemDidPlayToEndTime()
     }
 
     @objc private func itemFailedToPlayToEndTime() {
-        audioPlayer?.itemFailedToPlayToEndTime()
+        player?.itemFailedToPlayToEndTime()
     }
 
     @objc private func itemPlaybackStalled() {
-        audioPlayer?.handleItemPlaybackStalled()
+        player?.handleItemPlaybackStalled()
     }
 }

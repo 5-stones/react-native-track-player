@@ -279,10 +279,10 @@ public class AudioPlayer {
         self.nowPlayingInfoController = nowPlayingInfoController
         self.remoteCommandController = remoteCommandController
 
-        playerTimeObserver = PlayerTimeObserver(audioPlayer: self, periodicObserverTimeInterval: _timeEventFrequency.getTime())
-        playerObserver = PlayerStateObserver(audioPlayer: self)
-        playerItemNotificationObserver = PlayerItemNotificationObserver(audioPlayer: self)
-        playerItemObserver = PlayerItemPropertyObserver(audioPlayer: self)
+        playerTimeObserver = PlayerTimeObserver(player: self, periodicObserverTimeInterval: _timeEventFrequency.getTime())
+        playerObserver = PlayerStateObserver(player: self)
+        playerItemNotificationObserver = PlayerItemNotificationObserver(player: self)
+        playerItemObserver = PlayerItemPropertyObserver(player: self)
 
         self.remoteCommandController.audioPlayer = self
 
@@ -584,10 +584,10 @@ public class AudioPlayer {
         // disabled since we're not making use of video playback
         avPlayer.allowsExternalPlayback = false
 
-        playerObserver.player = avPlayer
+        playerObserver.avPlayer = avPlayer
         playerObserver.startObserving()
 
-        playerTimeObserver.player = avPlayer
+        playerTimeObserver.avPlayer = avPlayer
         playerTimeObserver.registerForBoundaryTimeEvents()
         playerTimeObserver.registerForPeriodicTimeEvents()
 
