@@ -19,10 +19,6 @@ class PlayerItemNotificationObserver {
 
   private(set) var isObserving: Bool = false
 
-  init(player: AudioPlayer) {
-    self.player = player
-  }
-
   deinit {
     stopObservingCurrentItem()
   }

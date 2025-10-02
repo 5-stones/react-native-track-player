@@ -30,18 +30,12 @@ yarn ios
 ## Key Architecture Patterns
 
 ### Observer Pattern
-Observers are initialized with player reference and call methods directly:
+Observers call AudioPlayer methods directly via weak player references:
 
 ```swift
-// Initialization (matches Android's PlayerListener(this) pattern)
-playerObserver = PlayerStateObserver(player: self)
-playerTimeObserver = PlayerTimeObserver(player: self, periodicObserverTimeInterval: interval)
-
 // Usage - observers call AudioPlayer methods directly
 player?.handleSecondElapsed(time.seconds)
 player?.playerStatusDidChange(status)
 player?.handleDurationUpdate(duration)
 player?.handleItemDidPlayToEndTime()
 ```
-
-This matches Android where `PlayerListener(trackPlayer)` is passed in the constructor and calls methods directly on TrackPlayer.

@@ -26,11 +26,6 @@ class PlayerItemPropertyObserver: NSObject {
   private(set) weak var observingItem: AVPlayerItem?
   weak var player: AudioPlayer?
 
-  init(player: AudioPlayer) {
-    self.player = player
-    super.init()
-  }
-
   deinit {
     stopObservingCurrentItem()
   }

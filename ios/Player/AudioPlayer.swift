@@ -37,10 +37,32 @@ public class AudioPlayer {
   }
 
   private var avPlayer = AVPlayer()
-  private let playerObserver: PlayerStateObserver
-  let playerTimeObserver: PlayerTimeObserver
-  private let playerItemNotificationObserver: PlayerItemNotificationObserver
-  private let playerItemObserver: PlayerItemPropertyObserver
+
+  private lazy var playerObserver: PlayerStateObserver = {
+    let observer = PlayerStateObserver()
+    observer.player = self
+    return observer
+  }()
+
+  private lazy var playerTimeObserver: PlayerTimeObserver = {
+    let observer = PlayerTimeObserver(
+      periodicObserverTimeInterval: _timeEventFrequency.getTime()
+    )
+    observer.player = self
+    return observer
+  }()
+
+  private lazy var playerItemNotificationObserver: PlayerItemNotificationObserver = {
+    let observer = PlayerItemNotificationObserver()
+    observer.player = self
+    return observer
+  }()
+
+  private lazy var playerItemObserver: PlayerItemPropertyObserver = {
+    let observer = PlayerItemPropertyObserver()
+    observer.player = self
+    return observer
+  }()
   private var pendingSeek: PendingSeek?
   private var asset: AVAsset?
   private var item: AVPlayerItem?
@@ -281,15 +303,6 @@ public class AudioPlayer {
   ) {
     self.nowPlayingInfoController = nowPlayingInfoController
     self.remoteCommandController = remoteCommandController
-
-    playerTimeObserver = PlayerTimeObserver(
-      player: self,
-      periodicObserverTimeInterval: _timeEventFrequency.getTime()
-    )
-    playerObserver = PlayerStateObserver(player: self)
-    playerItemNotificationObserver = PlayerItemNotificationObserver(player: self)
-    playerItemObserver = PlayerItemPropertyObserver(player: self)
-
     self.remoteCommandController.audioPlayer = self
 
     setupAVPlayer()

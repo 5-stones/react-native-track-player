@@ -32,10 +32,6 @@ class PlayerStateObserver: NSObject {
     }
   }
 
-  init(player: AudioPlayer) {
-    self.player = player
-  }
-
   deinit {
     stopObserving()
   }

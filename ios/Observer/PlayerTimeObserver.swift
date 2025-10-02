@@ -39,8 +39,7 @@ class PlayerTimeObserver {
 
   weak var player: AudioPlayer?
 
-  init(player: AudioPlayer, periodicObserverTimeInterval: CMTime) {
-    self.player = player
+  init(periodicObserverTimeInterval: CMTime) {
     self.periodicObserverTimeInterval = periodicObserverTimeInterval
   }
 
