@@ -1,5 +1,5 @@
 //
-//  AudioPlayerTimeEventObserver.swift
+//  PlayerTimeObserver.swift
 //  SwiftAudio
 //
 //  Created by Jørgen Henrichsen on 09/03/2018.
@@ -9,7 +9,7 @@
 import Foundation
 import AVFoundation
 
-protocol AVPlayerTimeObserverDelegate: AnyObject {
+protocol PlayerTimeObserverDelegate: AnyObject {
     func audioDidStart()
     func timeEvent(time: CMTime)
 }
@@ -17,8 +17,8 @@ protocol AVPlayerTimeObserverDelegate: AnyObject {
 /**
  Class for observing time-based events from the AVPlayer
  */
-class AVPlayerTimeObserver {
-    
+class PlayerTimeObserver {
+
     /// The time to use as start boundary time. Cannot be zero.
     private static let startBoundaryTime: CMTime = CMTime(value: 1, timescale: 1000)
     
@@ -42,7 +42,7 @@ class AVPlayerTimeObserver {
         }
     }
     
-    weak var delegate: AVPlayerTimeObserverDelegate?
+    weak var delegate: PlayerTimeObserverDelegate?
     
     init(periodicObserverTimeInterval: CMTime) {
         self.periodicObserverTimeInterval = periodicObserverTimeInterval
@@ -62,7 +62,7 @@ class AVPlayerTimeObserver {
         }
         unregisterForBoundaryTimeEvents()
         boundaryTimeStartObserverToken = player.addBoundaryTimeObserver(
-            forTimes: [AVPlayerTimeObserver.startBoundaryTime].map({
+            forTimes: [PlayerTimeObserver.startBoundaryTime].map({
                 NSValue(time: $0)
             }),
             queue: nil,

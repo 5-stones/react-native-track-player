@@ -1,5 +1,5 @@
 //
-//  AVPlayerItemNotificationObserver.swift
+//  PlayerItemNotificationObserver.swift
 //  SwiftAudio
 //
 //  Created by Jørgen Henrichsen on 12/03/2018.
@@ -8,7 +8,7 @@
 import Foundation
 import AVFoundation
 
-protocol AVPlayerItemNotificationObserverDelegate: AnyObject {
+protocol PlayerItemNotificationObserverDelegate: AnyObject {
     func itemDidPlayToEndTime()
     func itemFailedToPlayToEndTime()
     func itemPlaybackStalled()
@@ -16,15 +16,15 @@ protocol AVPlayerItemNotificationObserverDelegate: AnyObject {
 
 /**
  Observes notifications posted by an AVPlayerItem.
- 
+
  Currently only listening for the AVPlayerItemDidPlayToEndTime notification.
  */
-class AVPlayerItemNotificationObserver {
+class PlayerItemNotificationObserver {
     
     private let notificationCenter: NotificationCenter = NotificationCenter.default
     
     private(set) weak var observingItem: AVPlayerItem?
-    weak var delegate: AVPlayerItemNotificationObserverDelegate?
+    weak var delegate: PlayerItemNotificationObserverDelegate?
     
     private(set) var isObserving: Bool = false
     

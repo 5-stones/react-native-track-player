@@ -36,10 +36,10 @@ public class AudioPlayer {
     }
 
     fileprivate var avPlayer = AVPlayer()
-    private let playerObserver = AVPlayerObserver()
-    internal let playerTimeObserver: AVPlayerTimeObserver
-    private let playerItemNotificationObserver = AVPlayerItemNotificationObserver()
-    private let playerItemObserver = AVPlayerItemObserver()
+    private let playerObserver = PlayerStateObserver()
+    internal let playerTimeObserver: PlayerTimeObserver
+    private let playerItemNotificationObserver = PlayerItemNotificationObserver()
+    private let playerItemObserver = PlayerItemPropertyObserver()
     private var pendingSeek: PendingSeek?
     fileprivate var asset: AVAsset? = nil
     fileprivate var item: AVPlayerItem? = nil
@@ -279,7 +279,7 @@ public class AudioPlayer {
         self.nowPlayingInfoController = nowPlayingInfoController
         self.remoteCommandController = remoteCommandController
 
-        playerTimeObserver = AVPlayerTimeObserver(periodicObserverTimeInterval: _timeEventFrequency.getTime())
+        playerTimeObserver = PlayerTimeObserver(periodicObserverTimeInterval: _timeEventFrequency.getTime())
 
         self.remoteCommandController.audioPlayer = self
 
@@ -802,9 +802,9 @@ public class AudioPlayer {
 
 // MARK: - AVPlayer Observer Protocol Conformances
 
-extension AudioPlayer: AVPlayerObserverDelegate {
+extension AudioPlayer: PlayerStateObserverDelegate {
 
-    // MARK: - AVPlayerObserverDelegate
+    // MARK: - PlayerStateObserverDelegate
 
     func player(didChangeTimeControlStatus status: AVPlayer.TimeControlStatus) {
         switch status {
@@ -849,9 +849,9 @@ extension AudioPlayer: AVPlayerObserverDelegate {
     }
 }
 
-extension AudioPlayer: AVPlayerTimeObserverDelegate {
+extension AudioPlayer: PlayerTimeObserverDelegate {
 
-    // MARK: - AVPlayerTimeObserverDelegate
+    // MARK: - PlayerTimeObserverDelegate
 
     func audioDidStart() {
         state = .playing
@@ -863,8 +863,8 @@ extension AudioPlayer: AVPlayerTimeObserverDelegate {
 
 }
 
-extension AudioPlayer: AVPlayerItemNotificationObserverDelegate {
-    // MARK: - AVPlayerItemNotificationObserverDelegate
+extension AudioPlayer: PlayerItemNotificationObserverDelegate {
+    // MARK: - PlayerItemNotificationObserverDelegate
 
     func itemFailedToPlayToEndTime() {
         playbackFailed(error: AudioPlayerError.PlaybackError.playbackFailed)
@@ -881,8 +881,8 @@ extension AudioPlayer: AVPlayerItemNotificationObserverDelegate {
 
 }
 
-extension AudioPlayer: AVPlayerItemObserverDelegate {
-    // MARK: - AVPlayerItemObserverDelegate
+extension AudioPlayer: PlayerItemPropertyObserverDelegate {
+    // MARK: - PlayerItemPropertyObserverDelegate
 
     func item(didUpdatePlaybackLikelyToKeepUp playbackLikelyToKeepUp: Bool) {
         if (playbackLikelyToKeepUp && state != .playing) {

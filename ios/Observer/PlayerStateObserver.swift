@@ -1,5 +1,5 @@
 //
-//  AudioPlayerObserver.swift
+//  PlayerStateObserver.swift
 //  SwiftAudio
 //
 //  Created by Jørgen Henrichsen on 09/03/2018.
@@ -9,13 +9,13 @@
 import Foundation
 import AVFoundation
 
-protocol AVPlayerObserverDelegate: AnyObject {
-    
+protocol PlayerStateObserverDelegate: AnyObject {
+
     /**
      Called when the AVPlayer.status changes.
      */
     func player(statusDidChange status: AVPlayer.Status)
-    
+
     /**
      Called when the AVPlayer.timeControlStatus changes.
      */
@@ -25,7 +25,7 @@ protocol AVPlayerObserverDelegate: AnyObject {
 /**
  Observing an AVPlayers status changes.
  */
-class AVPlayerObserver: NSObject {
+class PlayerStateObserver: NSObject {
 
     private static var context = 0
     private let main: DispatchQueue = .main
@@ -39,7 +39,7 @@ class AVPlayerObserver: NSObject {
     private let timeControlStatusChangeOptions: NSKeyValueObservingOptions = [.new]
     private(set) var isObserving: Bool = false
 
-    weak var delegate: AVPlayerObserverDelegate?
+    weak var delegate: PlayerStateObserverDelegate?
     weak var player: AVPlayer? {
         willSet {
             stopObserving()
@@ -83,7 +83,7 @@ class AVPlayerObserver: NSObject {
     }
 
     override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
-        guard context == &AVPlayerObserver.context, let observedKeyPath = keyPath else {
+        guard context == &PlayerStateObserver.context, let observedKeyPath = keyPath else {
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
             return
         }

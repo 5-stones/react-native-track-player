@@ -1,5 +1,5 @@
 //
-//  AVPlayerItemObserver.swift
+//  PlayerItemPropertyObserver.swift
 //  SwiftAudio
 //
 //  Created by Jørgen Henrichsen on 28/07/2018.
@@ -8,13 +8,13 @@
 import Foundation
 import AVFoundation
 
-protocol AVPlayerItemObserverDelegate: AnyObject {
-    
+protocol PlayerItemPropertyObserverDelegate: AnyObject {
+
     /**
      Called when the duration of the observed item is updated.
      */
     func item(didUpdateDuration duration: Double)
-    
+
     /**
      Called when the playback of the observed item is or is no longer likely to keep up.
      */
@@ -23,14 +23,14 @@ protocol AVPlayerItemObserverDelegate: AnyObject {
      Called when the observed item receives metadata
      */
     func item(didReceiveTimedMetadata metadata: [AVTimedMetadataGroup])
-    
+
 }
 
 /**
  Observing an AVPlayers status changes.
  */
-class AVPlayerItemObserver: NSObject {
-    
+class PlayerItemPropertyObserver: NSObject {
+
     private static var context = 0
     private var currentMetadataOutput: AVPlayerItemMetadataOutput?
     
@@ -43,7 +43,7 @@ class AVPlayerItemObserver: NSObject {
     private(set) var isObserving: Bool = false
     
     private(set) weak var observingItem: AVPlayerItem?
-    weak var delegate: AVPlayerItemObserverDelegate?
+    weak var delegate: PlayerItemPropertyObserverDelegate?
     
     override init() {
         super.init()
@@ -63,9 +63,9 @@ class AVPlayerItemObserver: NSObject {
         
         self.isObserving = true
         self.observingItem = item
-        item.addObserver(self, forKeyPath: AVPlayerItemKeyPath.duration, options: [.new], context: &AVPlayerItemObserver.context)
-        item.addObserver(self, forKeyPath: AVPlayerItemKeyPath.loadedTimeRanges, options: [.new], context: &AVPlayerItemObserver.context)
-        item.addObserver(self, forKeyPath: AVPlayerItemKeyPath.playbackLikelyToKeepUp, options: [.new], context: &AVPlayerItemObserver.context)
+        item.addObserver(self, forKeyPath: AVPlayerItemKeyPath.duration, options: [.new], context: &PlayerItemPropertyObserver.context)
+        item.addObserver(self, forKeyPath: AVPlayerItemKeyPath.loadedTimeRanges, options: [.new], context: &PlayerItemPropertyObserver.context)
+        item.addObserver(self, forKeyPath: AVPlayerItemKeyPath.playbackLikelyToKeepUp, options: [.new], context: &PlayerItemPropertyObserver.context)
         
         // Create and add a new metadata output to the item.
         let metadataOutput = AVPlayerItemMetadataOutput()
@@ -79,9 +79,9 @@ class AVPlayerItemObserver: NSObject {
             return
         }
         
-        observingItem.removeObserver(self, forKeyPath: AVPlayerItemKeyPath.duration, context: &AVPlayerItemObserver.context)
-        observingItem.removeObserver(self, forKeyPath: AVPlayerItemKeyPath.loadedTimeRanges, context: &AVPlayerItemObserver.context)
-        observingItem.removeObserver(self, forKeyPath: AVPlayerItemKeyPath.playbackLikelyToKeepUp, context: &AVPlayerItemObserver.context)
+        observingItem.removeObserver(self, forKeyPath: AVPlayerItemKeyPath.duration, context: &PlayerItemPropertyObserver.context)
+        observingItem.removeObserver(self, forKeyPath: AVPlayerItemKeyPath.loadedTimeRanges, context: &PlayerItemPropertyObserver.context)
+        observingItem.removeObserver(self, forKeyPath: AVPlayerItemKeyPath.playbackLikelyToKeepUp, context: &PlayerItemPropertyObserver.context)
         
         // Remove all metadata outputs from the item.
         observingItem.removeAllMetadataOutputs()
@@ -92,7 +92,7 @@ class AVPlayerItemObserver: NSObject {
     }
     
     override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
-        guard context == &AVPlayerItemObserver.context, let observedKeyPath = keyPath else {
+        guard context == &PlayerItemPropertyObserver.context, let observedKeyPath = keyPath else {
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
             return
         }
