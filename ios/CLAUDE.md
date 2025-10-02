@@ -1,20 +1,9 @@
 # iOS Development Guide
 
-## After Adding/Removing Files
+## Quick Commands
 
-When you add or remove Swift/Objective-C files in the iOS codebase, you need to reinstall CocoaPods:
-
-```bash
-cd example/ios
-pod install
-```
-
-Then build the project:
-
-```bash
-cd example
-yarn ios
-```
+- `yarn ios:rebuild` - Rebuild and run with pod install (required after adding/removing files)
+- `yarn ios:format` - Format Swift code
 
 ## Project Structure
 
