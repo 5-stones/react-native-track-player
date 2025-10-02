@@ -8,17 +8,54 @@
 import Foundation
 import MediaPlayer
 
-public typealias AudioPlayerState = AVPlayerWrapperState
-
-public class AudioPlayer: AVPlayerWrapperDelegate {
-    /// The wrapper around the underlying AVPlayer
-    let wrapper: AVPlayerWrapperProtocol = AVPlayerWrapper()
-
+public class AudioPlayer {
     public let nowPlayingInfoController: NowPlayingInfoControllerProtocol
     public let remoteCommandController: RemoteCommandController
     public let event = EventHolder()
 
     private(set) var currentItem: AudioItem?
+
+    // MARK: - AVPlayer Properties (from AVPlayerWrapper)
+
+    /// Represents a seek operation that's pending while an item loads
+    private struct PendingSeek {
+        let time: TimeInterval
+        let completion: ((Bool) -> Void)?
+
+        func execute(on player: AVPlayer, delegate: AudioPlayer?) {
+            let cmTime = CMTimeMakeWithSeconds(time, preferredTimescale: 1000)
+            player.seek(to: cmTime, toleranceBefore: CMTime.zero, toleranceAfter: CMTime.zero) { finished in
+                delegate?.handleSeekCompleted(to: Double(self.time), didFinish: finished)
+                self.completion?(finished)
+            }
+        }
+
+        func cancel() {
+            completion?(false)
+        }
+    }
+
+    fileprivate var avPlayer = AVPlayer()
+    private let playerObserver = AVPlayerObserver()
+    internal let playerTimeObserver: AVPlayerTimeObserver
+    private let playerItemNotificationObserver = AVPlayerItemNotificationObserver()
+    private let playerItemObserver = AVPlayerItemObserver()
+    private var pendingSeek: PendingSeek?
+    fileprivate var asset: AVAsset? = nil
+    fileprivate var item: AVPlayerItem? = nil
+    fileprivate var url: URL? = nil
+    fileprivate var urlOptions: [String: Any]? = nil
+    fileprivate let stateQueue = DispatchQueue(
+        label: "AudioPlayer.stateQueue",
+        attributes: .concurrent
+    )
+    fileprivate(set) var playbackError: AudioPlayerError.PlaybackError? = nil
+    var _state: AudioPlayerState = AudioPlayerState.idle
+    fileprivate(set) var lastPlayerTimeControlStatus: AVPlayer.TimeControlStatus = AVPlayer.TimeControlStatus.paused
+    private var _rate: Float = 1.0
+    var _playWhenReady: Bool = false
+    var _bufferDuration: TimeInterval = 0
+    var _timeEventFrequency: TimeEventFrequency = .everySecond
 
     /**
      Set this to false to disable automatic updating of now playing info for control center and lock screen.
@@ -70,38 +107,83 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
         }
     }
 
+    // MARK: - AVPlayer State and Computed Properties
+
+    var state: AudioPlayerState {
+        get {
+            var state: AudioPlayerState!
+            stateQueue.sync {
+                state = _state
+            }
+            return state
+        }
+        set {
+            stateQueue.async(flags: .barrier) { [weak self] in
+                guard let self = self else { return }
+                let currentState = self._state
+                if (currentState != newValue) {
+                    self._state = newValue
+                    self.handleStateChange(newValue)
+                }
+            }
+        }
+    }
+
+    var currentAVPlayerItem: AVPlayerItem? {
+        avPlayer.currentItem
+    }
+
+    var playbackActive: Bool {
+        switch state {
+        case .idle, .stopped, .ended, .failed:
+            return false
+        default: return true
+        }
+    }
+
+    var reasonForWaitingToPlay: AVPlayer.WaitingReason? {
+        avPlayer.reasonForWaitingToPlay
+    }
+
     // MARK: - Getters from AVPlayerWrapper
 
-    public var playbackError: AudioPlayerError.PlaybackError? {
-        wrapper.playbackError
-    }
-    
     /**
      The elapsed playback time of the current item.
      */
     public var currentTime: Double {
-        wrapper.currentTime
+        let seconds = avPlayer.currentTime().seconds
+        return seconds.isNaN ? 0 : seconds
     }
 
     /**
      The duration of the current AudioItem.
      */
     public var duration: Double {
-        wrapper.duration
+        if let seconds = currentAVPlayerItem?.asset.duration.seconds, !seconds.isNaN {
+            return seconds
+        }
+        else if let seconds = currentAVPlayerItem?.duration.seconds, !seconds.isNaN {
+            return seconds
+        }
+        else if let seconds = currentAVPlayerItem?.seekableTimeRanges.last?.timeRangeValue.duration.seconds,
+                !seconds.isNaN {
+            return seconds
+        }
+        return 0.0
     }
 
     /**
      The bufferedPosition of the current AudioItem.
      */
     public var bufferedPosition: Double {
-        wrapper.bufferedPosition
+        currentAVPlayerItem?.loadedTimeRanges.last?.timeRangeValue.end.seconds ?? 0
     }
 
     /**
      The current state of the underlying `AudioPlayer`.
      */
     public var playerState: AudioPlayerState {
-        wrapper.state
+        state
     }
 
     // MARK: - Setters for AVPlayerWrapper
@@ -110,22 +192,31 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
      Whether the player should start playing automatically when the item is ready.
      */
     public var playWhenReady: Bool {
-        get { wrapper.playWhenReady }
+        get { _playWhenReady }
         set {
-            wrapper.playWhenReady = newValue
+            let oldValue = _playWhenReady
+            _playWhenReady = newValue
+            if (newValue == true && (state == .failed || state == .stopped)) {
+                reload(startFromCurrentTime: state == .failed)
+            }
+            applyAVPlayerRate()
+
+            if oldValue != newValue {
+                handlePlayWhenReadyChange(newValue)
+            }
         }
     }
-    
+
     /**
      The amount of seconds to be buffered by the player. Default value is 0 seconds, this means the AVPlayer will choose an appropriate level of buffering. Setting `bufferDuration` to larger than zero automatically disables `automaticallyWaitsToMinimizeStalling`. Setting it back to zero automatically enables `automaticallyWaitsToMinimizeStalling`.
 
      [Read more from Apple Documentation](https://developer.apple.com/documentation/avfoundation/avplayeritem/1643630-preferredforwardbufferduration)
      */
     public var bufferDuration: TimeInterval {
-        get { wrapper.bufferDuration }
+        get { _bufferDuration }
         set {
-            wrapper.bufferDuration = newValue
-            wrapper.automaticallyWaitsToMinimizeStalling = wrapper.bufferDuration == 0
+            _bufferDuration = newValue
+            avPlayer.automaticallyWaitsToMinimizeStalling = _bufferDuration == 0
         }
     }
 
@@ -135,37 +226,41 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
      [Read more from Apple Documentation](https://developer.apple.com/documentation/avfoundation/avplayer/1643482-automaticallywaitstominimizestal)
      */
     public var automaticallyWaitsToMinimizeStalling: Bool {
-        get { wrapper.automaticallyWaitsToMinimizeStalling }
+        get { avPlayer.automaticallyWaitsToMinimizeStalling }
         set {
             if (newValue) {
-                wrapper.bufferDuration = 0
+                _bufferDuration = 0
             }
-            wrapper.automaticallyWaitsToMinimizeStalling = newValue
+            avPlayer.automaticallyWaitsToMinimizeStalling = newValue
         }
     }
-    
+
     /**
      Set this to decide how often the player should call the delegate with time progress events.
      */
     public var timeEventFrequency: TimeEventFrequency {
-        get { wrapper.timeEventFrequency }
-        set { wrapper.timeEventFrequency = newValue }
+        get { _timeEventFrequency }
+        set {
+            _timeEventFrequency = newValue
+            playerTimeObserver.periodicObserverTimeInterval = newValue.getTime()
+        }
     }
 
     public var volume: Float {
-        get { wrapper.volume }
-        set { wrapper.volume = newValue }
+        get { avPlayer.volume }
+        set { avPlayer.volume = newValue }
     }
 
     public var isMuted: Bool {
-        get { wrapper.isMuted }
-        set { wrapper.isMuted = newValue }
+        get { avPlayer.isMuted }
+        set { avPlayer.isMuted = newValue }
     }
 
     public var rate: Float {
-        get { wrapper.rate }
+        get { _rate }
         set {
-            wrapper.rate = newValue
+            _rate = newValue
+            applyAVPlayerRate()
             if (automaticallyUpdateNowPlayingInfo) {
                 updateNowPlayingPlaybackValues()
             }
@@ -184,8 +279,16 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
         self.nowPlayingInfoController = nowPlayingInfoController
         self.remoteCommandController = remoteCommandController
 
-        wrapper.delegate = self
+        playerTimeObserver = AVPlayerTimeObserver(periodicObserverTimeInterval: _timeEventFrequency.getTime())
+
         self.remoteCommandController.audioPlayer = self
+
+        playerObserver.delegate = self
+        playerTimeObserver.delegate = self
+        playerItemNotificationObserver.delegate = self
+        playerItemObserver.delegate = self
+
+        setupAVPlayer()
     }
 
     // MARK: - Player Actions
@@ -210,10 +313,10 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
                 ])
                 loadNowPlayingMetaValues()
             }
-            
+
             enableRemoteCommands(forItem: item)
-            
-            wrapper.load(
+
+            loadFromString(
                 from: item.getSourceUrl(),
                 type: item.getSourceType(),
                 playWhenReady: self.playWhenReady,
@@ -227,29 +330,38 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
      Toggle playback status.
      */
     public func togglePlaying() {
-        wrapper.togglePlaying()
+        switch avPlayer.timeControlStatus {
+        case .playing, .waitingToPlayAtSpecifiedRate:
+            pause()
+        case .paused:
+            play()
+        @unknown default:
+            fatalError("Unknown AVPlayer.timeControlStatus")
+        }
     }
 
     /**
      Start playback
      */
     public func play() {
-        wrapper.play()
+        playWhenReady = true
     }
 
     /**
      Pause playback
      */
     public func pause() {
-        wrapper.pause()
+        playWhenReady = false
     }
 
     /**
      Stop playback
      */
     public func stop() {
-        let wasActive = wrapper.playbackActive
-        wrapper.stop()
+        let wasActive = playbackActive
+        state = .stopped
+        clearCurrentItem()
+        playWhenReady = false
         if (wasActive) {
             event.playbackEnd.emit(data: .playerStopped)
         }
@@ -259,14 +371,25 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
      Reload the current item.
      */
     public func reload(startFromCurrentTime: Bool) {
-        wrapper.reload(startFromCurrentTime: startFromCurrentTime)
+        var time : Double? = nil
+        if (startFromCurrentTime) {
+            if let currentItem = currentAVPlayerItem {
+                if (!currentItem.duration.isIndefinite) {
+                    time = currentItem.currentTime().seconds
+                }
+            }
+        }
+        loadAVPlayer()
+        if let time = time {
+            seek(to: time)
+        }
     }
-    
+
     /**
      Seek to a specific time in the item.
      */
     public func seek(to seconds: TimeInterval) {
-        wrapper.seek(to: seconds)
+        seek(to: seconds, completion: { _ in })
     }
 
     /**
@@ -276,14 +399,42 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
      - parameter completion: Called when the seek operation completes. The Bool parameter indicates whether the seek finished successfully (true) or was interrupted/deferred (false).
      */
     public func seek(to seconds: TimeInterval, completion: @escaping (Bool) -> Void) {
-        wrapper.seek(to: seconds, completion: completion)
+        // If an item is currently being loaded asynchronously, defer the seek until it's ready.
+        if state == .loading {
+            // Cancel any previous pending seek before creating a new one
+            pendingSeek?.cancel()
+            pendingSeek = PendingSeek(time: seconds, completion: completion)
+        } else if avPlayer.currentItem != nil {
+            let time = CMTimeMakeWithSeconds(seconds, preferredTimescale: 1000)
+            avPlayer.seek(to: time, toleranceBefore: CMTime.zero, toleranceAfter: CMTime.zero) { (finished) in
+                self.handleSeekCompleted(to: Double(seconds), didFinish: finished)
+                completion(finished)
+            }
+        } else {
+            // No item loaded and not loading - seek fails immediately
+            completion(false)
+        }
     }
 
     /**
      Seek by relative a time offset in the item.
      */
     public func seek(by offset: TimeInterval) {
-        wrapper.seek(by: offset)
+        // Calculate the target time based on current state
+        let targetTime: TimeInterval
+        if state == .loading {
+            // If loading, offset from pending seek (or 0 if no pending seek)
+            targetTime = (pendingSeek?.time ?? 0) + offset
+        } else if let currentItem = avPlayer.currentItem {
+            // If playing, offset from current position
+            targetTime = currentItem.currentTime().seconds + offset
+        } else {
+            // No item and not loading - nothing to seek in
+            return
+        }
+
+        // Delegate to absolute seek
+        seek(to: targetTime)
     }
     
     // MARK: - Remote Command Center
@@ -342,16 +493,16 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
      */
     func updateNowPlayingPlaybackValues() {
         nowPlayingInfoController.set(keyValues: [
-            MediaItemProperty.duration(wrapper.duration),
-            NowPlayingInfoProperty.playbackRate(wrapper.playWhenReady ? Double(wrapper.rate) : 0),
-            NowPlayingInfoProperty.elapsedPlaybackTime(wrapper.currentTime)
+            MediaItemProperty.duration(duration),
+            NowPlayingInfoProperty.playbackRate(playWhenReady ? Double(rate) : 0),
+            NowPlayingInfoProperty.elapsedPlaybackTime(currentTime)
         ])
     }
 
     public func clear() {
-        let playbackWasActive = wrapper.playbackActive
+        let playbackWasActive = playbackActive
         currentItem = nil
-        wrapper.unload()
+        unloadAVPlayer()
         nowPlayingInfoController.clear()
         if (playbackWasActive) {
             event.playbackEnd.emit(data: .cleared)
@@ -379,15 +530,203 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
 
     private func setTimePitchingAlgorithmForCurrentItem() {
         if let item = currentItem as? TimePitching {
-            wrapper.currentItem?.audioTimePitchAlgorithm = item.getPitchAlgorithmType()
+            currentAVPlayerItem?.audioTimePitchAlgorithm = item.getPitchAlgorithmType()
         } else {
-            wrapper.currentItem?.audioTimePitchAlgorithm = audioTimePitchAlgorithm
+            currentAVPlayerItem?.audioTimePitchAlgorithm = audioTimePitchAlgorithm
         }
     }
 
-    // MARK: - AVPlayerWrapperDelegate
+    // MARK: - AVPlayer Management Methods (from AVPlayerWrapper)
 
-    func AVWrapper(didChangeState state: AVPlayerWrapperState) {
+    private func applyAVPlayerRate() {
+        avPlayer.rate = _playWhenReady ? _rate : 0
+    }
+
+    private func clearCurrentItem() {
+        guard let asset = asset else { return }
+        stopObservingAVPlayerItem()
+
+        asset.cancelLoading()
+        self.asset = nil
+
+        // Clear any pending seek to prevent it from being applied to the next item that loads.
+        // Without this, a seek called before any item was loaded could incorrectly apply to
+        // an unrelated track that loads later.
+        pendingSeek?.cancel()
+        pendingSeek = nil
+
+        avPlayer.replaceCurrentItem(with: nil)
+    }
+
+    private func startObservingAVPlayer(item: AVPlayerItem) {
+        playerItemObserver.startObserving(item: item)
+        playerItemNotificationObserver.startObserving(item: item)
+    }
+
+    private func stopObservingAVPlayerItem() {
+        playerItemObserver.stopObservingCurrentItem()
+        playerItemNotificationObserver.stopObservingCurrentItem()
+    }
+
+    private func recreateAVPlayer() {
+        playbackError = nil
+        playerTimeObserver.unregisterForBoundaryTimeEvents()
+        playerTimeObserver.unregisterForPeriodicEvents()
+        playerObserver.stopObserving()
+        stopObservingAVPlayerItem()
+        clearCurrentItem()
+
+        avPlayer = AVPlayer()
+        setupAVPlayer()
+
+        handleAVPlayerRecreated()
+    }
+
+    private func setupAVPlayer() {
+        // disabled since we're not making use of video playback
+        avPlayer.allowsExternalPlayback = false
+
+        playerObserver.player = avPlayer
+        playerObserver.startObserving()
+
+        playerTimeObserver.player = avPlayer
+        playerTimeObserver.registerForBoundaryTimeEvents()
+        playerTimeObserver.registerForPeriodicTimeEvents()
+
+        applyAVPlayerRate()
+    }
+
+    private func playbackFailed(error: AudioPlayerError.PlaybackError) {
+        state = .failed
+        self.playbackError = error
+        self.handlePlaybackError(error)
+    }
+
+    func loadAVPlayer() {
+        if (state == .failed) {
+            recreateAVPlayer()
+        } else {
+            clearCurrentItem()
+        }
+        if let url = url {
+            let pendingAsset = AVURLAsset(url: url, options: urlOptions)
+            asset = pendingAsset
+            state = .loading
+
+            // Load metadata keys asynchronously and separate from playable, to allow that to execute as quickly as it can
+            let metdataKeys = ["commonMetadata", "availableChapterLocales", "availableMetadataFormats"]
+            pendingAsset.loadValuesAsynchronously(forKeys: metdataKeys, completionHandler: { [weak self] in
+                guard let self = self else { return }
+                if (pendingAsset != self.asset) { return; }
+
+                let commonData = pendingAsset.commonMetadata
+                if (!commonData.isEmpty) {
+                    self.handleCommonMetadataReceived(commonData)
+                }
+
+                if pendingAsset.availableChapterLocales.count > 0 {
+                    for locale in pendingAsset.availableChapterLocales {
+                        let chapters = pendingAsset.chapterMetadataGroups(withTitleLocale: locale, containingItemsWithCommonKeys: nil)
+                        self.handleChapterMetadataReceived(chapters)
+                    }
+                } else {
+                    for format in pendingAsset.availableMetadataFormats {
+                        let timeRange = CMTimeRange(start: CMTime(seconds: 0, preferredTimescale: 1000), end: pendingAsset.duration)
+                        let group = AVTimedMetadataGroup(items: pendingAsset.metadata(forFormat: format), timeRange: timeRange)
+                        self.handleTimedMetadataReceived([group])
+                    }
+                }
+            })
+
+            // Load playable portion of the track and commence when ready
+            let playableKeys = ["playable"]
+            pendingAsset.loadValuesAsynchronously(forKeys: playableKeys, completionHandler: { [weak self] in
+                guard let self = self else { return }
+
+                DispatchQueue.main.async {
+                    if (pendingAsset != self.asset) { return; }
+
+                    for key in playableKeys {
+                        var error: NSError?
+                        let keyStatus = pendingAsset.statusOfValue(forKey: key, error: &error)
+                        switch keyStatus {
+                        case .failed:
+                            self.playbackFailed(error: AudioPlayerError.PlaybackError.failedToLoadKeyValue)
+                            return
+                        case .cancelled, .loading, .unknown:
+                            return
+                        case .loaded:
+                            break
+                        default: break
+                        }
+                    }
+
+                    if (!pendingAsset.isPlayable) {
+                        self.playbackFailed(error: AudioPlayerError.PlaybackError.itemWasUnplayable)
+                        return;
+                    }
+
+                    let item = AVPlayerItem(
+                        asset: pendingAsset,
+                        automaticallyLoadedAssetKeys: playableKeys
+                    )
+                    self.item = item;
+                    item.preferredForwardBufferDuration = self._bufferDuration
+                    self.avPlayer.replaceCurrentItem(with: item)
+                    self.startObservingAVPlayer(item: item)
+                    self.applyAVPlayerRate()
+
+                    // Execute any pending seek operation
+                    if let pending = self.pendingSeek {
+                        self.pendingSeek = nil
+                        pending.execute(on: self.avPlayer, delegate: self)
+                    }
+                }
+            })
+        }
+    }
+
+    func loadFromURL(
+        from url: URL,
+        playWhenReady: Bool,
+        initialTime: TimeInterval? = nil,
+        options: [String : Any]? = nil
+    ) {
+        self.playWhenReady = playWhenReady
+        self.url = url
+        self.urlOptions = options
+        self.loadAVPlayer()
+        if let initialTime = initialTime {
+            self.seek(to: initialTime)
+        }
+    }
+
+    func loadFromString(
+        from url: String,
+        type: SourceType = .stream,
+        playWhenReady: Bool = false,
+        initialTime: TimeInterval? = nil,
+        options: [String : Any]? = nil
+    ) {
+        if let itemUrl = type == .file
+            ? URL(fileURLWithPath: url)
+            : URL(string: url)
+        {
+            self.loadFromURL(from: itemUrl, playWhenReady: playWhenReady, initialTime: initialTime, options: options)
+        } else {
+            clearCurrentItem()
+            playbackFailed(error: AudioPlayerError.PlaybackError.invalidSourceUrl(url))
+        }
+    }
+
+    func unloadAVPlayer() {
+        clearCurrentItem()
+        state = .idle
+    }
+
+    // MARK: - Internal Event Handlers
+
+    private func handleStateChange(_ state: AudioPlayerState) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             switch state {
@@ -407,56 +746,155 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
         }
     }
 
-    func AVWrapper(secondsElapsed seconds: Double) {
+    private func handleSecondElapsed(_ seconds: Double) {
         event.secondElapse.emit(data: seconds)
     }
 
-    func AVWrapper(failedWithError error: Error?) {
+    private func handlePlaybackError(_ error: Error?) {
         event.fail.emit(data: error)
         event.playbackEnd.emit(data: .failed)
     }
 
-    func AVWrapper(seekTo seconds: Double, didFinish: Bool) {
+    private func handleSeekCompleted(to seconds: Double, didFinish: Bool) {
         if automaticallyUpdateNowPlayingInfo {
             setNowPlayingCurrentTime(seconds: Double(seconds))
         }
         event.seek.emit(data: (seconds, didFinish))
     }
 
-    func AVWrapper(didUpdateDuration duration: Double) {
+    private func handleDurationUpdate(_ duration: Double) {
         event.updateDuration.emit(data: duration)
     }
-    
-    func AVWrapper(didReceiveCommonMetadata metadata: [AVMetadataItem]) {
+
+    private func handleCommonMetadataReceived(_ metadata: [AVMetadataItem]) {
         event.receiveCommonMetadata.emit(data: metadata)
     }
-    
-    func AVWrapper(didReceiveChapterMetadata metadata: [AVTimedMetadataGroup]) {
+
+    private func handleChapterMetadataReceived(_ metadata: [AVTimedMetadataGroup]) {
         event.receiveChapterMetadata.emit(data: metadata)
     }
-    
-    func AVWrapper(didReceiveTimedMetadata metadata: [AVTimedMetadataGroup]) {
+
+    private func handleTimedMetadataReceived(_ metadata: [AVTimedMetadataGroup]) {
         event.receiveTimedMetadata.emit(data: metadata)
     }
 
-    func AVWrapper(didChangePlayWhenReady playWhenReady: Bool) {
+    private func handlePlayWhenReadyChange(_ playWhenReady: Bool) {
         event.playWhenReadyChange.emit(data: playWhenReady)
     }
-    
-    func AVWrapperItemDidPlayToEndTime() {
+
+    func handleItemDidPlayToEndTime() {
         event.playbackEnd.emit(data: .playedUntilEnd)
-        wrapper.state = .ended
+        state = .ended
     }
 
-    func AVWrapperItemFailedToPlayToEndTime() {
-        AVWrapper(failedWithError: AudioPlayerError.PlaybackError.playbackFailed)
+    private func handleItemFailedToPlayToEndTime() {
+        handlePlaybackError(AudioPlayerError.PlaybackError.playbackFailed)
     }
 
-    func AVWrapperItemPlaybackStalled() {
+    private func handleItemPlaybackStalled() {
 
     }
-    
-    func AVWrapperDidRecreateAVPlayer() {
+
+    private func handleAVPlayerRecreated() {
         event.didRecreateAVPlayer.emit(data: ())
+    }
+}
+
+// MARK: - AVPlayer Observer Protocol Conformances
+
+extension AudioPlayer: AVPlayerObserverDelegate {
+
+    // MARK: - AVPlayerObserverDelegate
+
+    func player(didChangeTimeControlStatus status: AVPlayer.TimeControlStatus) {
+        switch status {
+        case .paused:
+            let currentState = self.state
+            if self.asset == nil && currentState != .stopped {
+                self.state = .idle
+            } else if (currentState != .failed && currentState != .stopped) {
+                // Distinguish between external pauses (bluetooth disconnect, interruption) and natural track completion:
+                if (self.playWhenReady) {
+                    // If playback pauses unexpectedly, this is likely an external interruption (bluetooth
+                    // disconnect, system interruption, etc). Set playWhenReady to false to acknowledge the pause.
+                    // However, if we're near the end of the track (within 0.5s of duration), this is likely
+                    // a natural pause from track completion. Let itemDidPlayToEndTime handle this case to
+                    // preserve auto-advance behavior between tracks in a queue/playlist.
+                    if (self.currentTime < self.duration - 0.5) {
+                        self.playWhenReady = false
+                    }
+                } else {
+                    self.state = .paused
+                }
+            }
+        case .waitingToPlayAtSpecifiedRate:
+            if self.asset != nil {
+                self.state = .buffering
+            }
+        case .playing:
+            self.state = .playing
+        @unknown default:
+            break
+        }
+    }
+
+    func player(statusDidChange status: AVPlayer.Status) {
+        if (status == .failed) {
+            let error = item!.error as NSError?
+            playbackFailed(error: error?.code == URLError.notConnectedToInternet.rawValue
+                 ? AudioPlayerError.PlaybackError.notConnectedToInternet
+                 : AudioPlayerError.PlaybackError.playbackFailed
+            )
+        }
+    }
+}
+
+extension AudioPlayer: AVPlayerTimeObserverDelegate {
+
+    // MARK: - AVPlayerTimeObserverDelegate
+
+    func audioDidStart() {
+        state = .playing
+    }
+
+    func timeEvent(time: CMTime) {
+        handleSecondElapsed(time.seconds)
+    }
+
+}
+
+extension AudioPlayer: AVPlayerItemNotificationObserverDelegate {
+    // MARK: - AVPlayerItemNotificationObserverDelegate
+
+    func itemFailedToPlayToEndTime() {
+        playbackFailed(error: AudioPlayerError.PlaybackError.playbackFailed)
+        handleItemFailedToPlayToEndTime()
+    }
+
+    func itemPlaybackStalled() {
+        handleItemPlaybackStalled()
+    }
+
+    func itemDidPlayToEndTime() {
+        handleItemDidPlayToEndTime()
+    }
+
+}
+
+extension AudioPlayer: AVPlayerItemObserverDelegate {
+    // MARK: - AVPlayerItemObserverDelegate
+
+    func item(didUpdatePlaybackLikelyToKeepUp playbackLikelyToKeepUp: Bool) {
+        if (playbackLikelyToKeepUp && state != .playing) {
+            state = .ready
+        }
+    }
+
+    func item(didUpdateDuration duration: Double) {
+        handleDurationUpdate(duration)
+    }
+
+    func item(didReceiveTimedMetadata metadata: [AVTimedMetadataGroup]) {
+        handleTimedMetadataReceived(metadata)
     }
 }

@@ -709,7 +709,7 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
 
     // MARK: - QueuedAudioPlayer Event Handlers
 
-    func handleAudioPlayerStateChange(state: AVPlayerWrapperState) {
+    func handleAudioPlayerStateChange(state: AudioPlayerState) {
         ensureMainThread {
             self.emit(event: EventType.PlaybackState, body: self.getPlaybackStateBodyKeyValues(state: state))
             if (state == .ended) {
