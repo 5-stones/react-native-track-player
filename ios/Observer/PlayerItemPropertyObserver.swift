@@ -8,44 +8,27 @@
 import Foundation
 import AVFoundation
 
-protocol PlayerItemPropertyObserverDelegate: AnyObject {
-
-    /**
-     Called when the duration of the observed item is updated.
-     */
-    func item(didUpdateDuration duration: Double)
-
-    /**
-     Called when the playback of the observed item is or is no longer likely to keep up.
-     */
-    func item(didUpdatePlaybackLikelyToKeepUp playbackLikelyToKeepUp: Bool)
-    /**
-     Called when the observed item receives metadata
-     */
-    func item(didReceiveTimedMetadata metadata: [AVTimedMetadataGroup])
-
-}
-
 /**
- Observing an AVPlayers status changes.
+ Observes player item property changes and calls AudioPlayer methods directly.
  */
 class PlayerItemPropertyObserver: NSObject {
 
     private static var context = 0
     private var currentMetadataOutput: AVPlayerItemMetadataOutput?
-    
+
     private struct AVPlayerItemKeyPath {
         static let duration = #keyPath(AVPlayerItem.duration)
         static let loadedTimeRanges = #keyPath(AVPlayerItem.loadedTimeRanges)
         static let playbackLikelyToKeepUp = #keyPath(AVPlayerItem.isPlaybackLikelyToKeepUp)
     }
-    
+
     private(set) var isObserving: Bool = false
-    
+
     private(set) weak var observingItem: AVPlayerItem?
-    weak var delegate: PlayerItemPropertyObserverDelegate?
-    
-    override init() {
+    weak var audioPlayer: AudioPlayer?
+
+    init(audioPlayer: AudioPlayer) {
+        self.audioPlayer = audioPlayer
         super.init()
     }
     
@@ -96,33 +79,33 @@ class PlayerItemPropertyObserver: NSObject {
             super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
             return
         }
-        
+
         switch observedKeyPath {
         case AVPlayerItemKeyPath.duration:
             if let duration = change?[.newKey] as? CMTime {
-                delegate?.item(didUpdateDuration: duration.seconds)
+                audioPlayer?.handleDurationUpdate(duration.seconds)
             }
-            
+
         case AVPlayerItemKeyPath.loadedTimeRanges:
             if let ranges = change?[.newKey] as? [NSValue], let duration = ranges.first?.timeRangeValue.duration {
-                delegate?.item(didUpdateDuration: duration.seconds)
+                audioPlayer?.handleDurationUpdate(duration.seconds)
             }
-            
+
         case AVPlayerItemKeyPath.playbackLikelyToKeepUp:
             if let playbackLikelyToKeepUp = change?[.newKey] as? Bool {
-                delegate?.item(didUpdatePlaybackLikelyToKeepUp: playbackLikelyToKeepUp)
+                audioPlayer?.itemDidUpdatePlaybackLikelyToKeepUp(playbackLikelyToKeepUp)
             }
-            
+
         default: break
-            
+
         }
     }
 }
 
-extension AVPlayerItemObserver: AVPlayerItemMetadataOutputPushDelegate {
+extension PlayerItemPropertyObserver: AVPlayerItemMetadataOutputPushDelegate {
     func metadataOutput(_ output: AVPlayerItemMetadataOutput, didOutputTimedMetadataGroups groups: [AVTimedMetadataGroup], from track: AVPlayerItemTrack?) {
         if output == currentMetadataOutput {
-            delegate?.item(didReceiveTimedMetadata: groups)
+            audioPlayer?.handleTimedMetadataReceived(groups)
         }
     }
 }

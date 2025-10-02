@@ -9,21 +9,8 @@
 import Foundation
 import AVFoundation
 
-protocol PlayerStateObserverDelegate: AnyObject {
-
-    /**
-     Called when the AVPlayer.status changes.
-     */
-    func player(statusDidChange status: AVPlayer.Status)
-
-    /**
-     Called when the AVPlayer.timeControlStatus changes.
-     */
-    func player(didChangeTimeControlStatus status: AVPlayer.TimeControlStatus)
-}
-
 /**
- Observing an AVPlayers status changes.
+ Observes player state changes and calls AudioPlayer methods directly.
  */
 class PlayerStateObserver: NSObject {
 
@@ -39,11 +26,15 @@ class PlayerStateObserver: NSObject {
     private let timeControlStatusChangeOptions: NSKeyValueObservingOptions = [.new]
     private(set) var isObserving: Bool = false
 
-    weak var delegate: PlayerStateObserverDelegate?
+    weak var audioPlayer: AudioPlayer?
     weak var player: AVPlayer? {
         willSet {
             stopObserving()
         }
+    }
+
+    init(audioPlayer: AudioPlayer) {
+        self.audioPlayer = audioPlayer
     }
 
     deinit {
@@ -63,13 +54,13 @@ class PlayerStateObserver: NSObject {
             self,
             forKeyPath: AVPlayerKeyPath.status,
             options: statusChangeOptions,
-            context: &AVPlayerObserver.context
+            context: &PlayerStateObserver.context
         )
         player.addObserver(
             self,
             forKeyPath: AVPlayerKeyPath.timeControlStatus,
             options: timeControlStatusChangeOptions,
-            context: &AVPlayerObserver.context
+            context: &PlayerStateObserver.context
         )
     }
 
@@ -77,8 +68,8 @@ class PlayerStateObserver: NSObject {
         guard let player = player, isObserving else {
             return
         }
-        player.removeObserver(self, forKeyPath: AVPlayerKeyPath.status, context: &AVPlayerObserver.context)
-        player.removeObserver(self, forKeyPath: AVPlayerKeyPath.timeControlStatus, context: &AVPlayerObserver.context)
+        player.removeObserver(self, forKeyPath: AVPlayerKeyPath.status, context: &PlayerStateObserver.context)
+        player.removeObserver(self, forKeyPath: AVPlayerKeyPath.timeControlStatus, context: &PlayerStateObserver.context)
         isObserving = false
     }
 
@@ -107,14 +98,14 @@ class PlayerStateObserver: NSObject {
         } else {
             status = .unknown
         }
-        delegate?.player(statusDidChange: status)
+        audioPlayer?.playerStatusDidChange(status)
     }
 
     private func handleTimeControlStatusChange(_ change: [NSKeyValueChangeKey: Any]?) {
         let status: AVPlayer.TimeControlStatus
         if let statusNumber = change?[.newKey] as? NSNumber {
             status = AVPlayer.TimeControlStatus(rawValue: statusNumber.intValue)!
-            delegate?.player(didChangeTimeControlStatus: status)
+            audioPlayer?.playerDidChangeTimeControlStatus(status)
         }
     }
 }

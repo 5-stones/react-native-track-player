@@ -8,26 +8,22 @@
 import Foundation
 import AVFoundation
 
-protocol PlayerItemNotificationObserverDelegate: AnyObject {
-    func itemDidPlayToEndTime()
-    func itemFailedToPlayToEndTime()
-    func itemPlaybackStalled()
-}
-
 /**
- Observes notifications posted by an AVPlayerItem.
-
- Currently only listening for the AVPlayerItemDidPlayToEndTime notification.
+ Observes player item notifications and calls AudioPlayer methods directly.
  */
 class PlayerItemNotificationObserver {
-    
+
     private let notificationCenter: NotificationCenter = NotificationCenter.default
-    
+
     private(set) weak var observingItem: AVPlayerItem?
-    weak var delegate: PlayerItemNotificationObserverDelegate?
-    
+    weak var audioPlayer: AudioPlayer?
+
     private(set) var isObserving: Bool = false
-    
+
+    init(audioPlayer: AudioPlayer) {
+        self.audioPlayer = audioPlayer
+    }
+
     deinit {
         stopObservingCurrentItem()
     }
@@ -89,14 +85,14 @@ class PlayerItemNotificationObserver {
     }
     
     @objc private func itemDidPlayToEndTime() {
-        delegate?.itemDidPlayToEndTime()
+        audioPlayer?.handleItemDidPlayToEndTime()
     }
 
     @objc private func itemFailedToPlayToEndTime() {
-        delegate?.itemFailedToPlayToEndTime()
+        audioPlayer?.itemFailedToPlayToEndTime()
     }
 
     @objc private func itemPlaybackStalled() {
-        delegate?.itemPlaybackStalled()
+        audioPlayer?.handleItemPlaybackStalled()
     }
 }

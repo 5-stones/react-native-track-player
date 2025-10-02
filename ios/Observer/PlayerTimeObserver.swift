@@ -9,30 +9,25 @@
 import Foundation
 import AVFoundation
 
-protocol PlayerTimeObserverDelegate: AnyObject {
-    func audioDidStart()
-    func timeEvent(time: CMTime)
-}
-
 /**
- Class for observing time-based events from the AVPlayer
+ Observes time-based player events and calls AudioPlayer methods directly.
  */
 class PlayerTimeObserver {
 
     /// The time to use as start boundary time. Cannot be zero.
     private static let startBoundaryTime: CMTime = CMTime(value: 1, timescale: 1000)
-    
+
     var boundaryTimeStartObserverToken: Any?
     var periodicTimeObserverToken: Any?
-    
+
     weak var player: AVPlayer? {
         willSet {
             unregisterForBoundaryTimeEvents()
             unregisterForPeriodicEvents()
         }
     }
-    
-    /// The frequence to receive periodic time events.
+
+    /// The frequency to receive periodic time events.
     /// Setting this to a new value will trigger a re-registering to the periodic events of the player.
     var periodicObserverTimeInterval: CMTime {
         didSet {
@@ -41,10 +36,11 @@ class PlayerTimeObserver {
             }
         }
     }
-    
-    weak var delegate: PlayerTimeObserverDelegate?
-    
-    init(periodicObserverTimeInterval: CMTime) {
+
+    weak var audioPlayer: AudioPlayer?
+
+    init(audioPlayer: AudioPlayer, periodicObserverTimeInterval: CMTime) {
+        self.audioPlayer = audioPlayer
         self.periodicObserverTimeInterval = periodicObserverTimeInterval
     }
     
@@ -67,7 +63,7 @@ class PlayerTimeObserver {
             }),
             queue: nil,
             using: { [weak self] in
-                self?.delegate?.audioDidStart()
+                self?.audioPlayer?.audioDidStart()
             }
         )
     }
@@ -93,8 +89,8 @@ class PlayerTimeObserver {
             return
         }
         unregisterForPeriodicEvents()
-        periodicTimeObserverToken = player.addPeriodicTimeObserver(forInterval: periodicObserverTimeInterval, queue: nil, using: { (time) in
-            self.delegate?.timeEvent(time: time)
+        periodicTimeObserverToken = player.addPeriodicTimeObserver(forInterval: periodicObserverTimeInterval, queue: nil, using: { [weak self] (time) in
+            self?.audioPlayer?.handleSecondElapsed(time.seconds)
         })
     }
     

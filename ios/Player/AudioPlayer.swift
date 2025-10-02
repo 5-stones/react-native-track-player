@@ -36,10 +36,10 @@ public class AudioPlayer {
     }
 
     fileprivate var avPlayer = AVPlayer()
-    private let playerObserver = PlayerStateObserver()
+    private let playerObserver: PlayerStateObserver
     internal let playerTimeObserver: PlayerTimeObserver
-    private let playerItemNotificationObserver = PlayerItemNotificationObserver()
-    private let playerItemObserver = PlayerItemPropertyObserver()
+    private let playerItemNotificationObserver: PlayerItemNotificationObserver
+    private let playerItemObserver: PlayerItemPropertyObserver
     private var pendingSeek: PendingSeek?
     fileprivate var asset: AVAsset? = nil
     fileprivate var item: AVPlayerItem? = nil
@@ -279,14 +279,12 @@ public class AudioPlayer {
         self.nowPlayingInfoController = nowPlayingInfoController
         self.remoteCommandController = remoteCommandController
 
-        playerTimeObserver = PlayerTimeObserver(periodicObserverTimeInterval: _timeEventFrequency.getTime())
+        playerTimeObserver = PlayerTimeObserver(audioPlayer: self, periodicObserverTimeInterval: _timeEventFrequency.getTime())
+        playerObserver = PlayerStateObserver(audioPlayer: self)
+        playerItemNotificationObserver = PlayerItemNotificationObserver(audioPlayer: self)
+        playerItemObserver = PlayerItemPropertyObserver(audioPlayer: self)
 
         self.remoteCommandController.audioPlayer = self
-
-        playerObserver.delegate = self
-        playerTimeObserver.delegate = self
-        playerItemNotificationObserver.delegate = self
-        playerItemObserver.delegate = self
 
         setupAVPlayer()
     }
@@ -746,7 +744,7 @@ public class AudioPlayer {
         }
     }
 
-    private func handleSecondElapsed(_ seconds: Double) {
+    internal func handleSecondElapsed(_ seconds: Double) {
         event.secondElapse.emit(data: seconds)
     }
 
@@ -762,7 +760,7 @@ public class AudioPlayer {
         event.seek.emit(data: (seconds, didFinish))
     }
 
-    private func handleDurationUpdate(_ duration: Double) {
+    internal func handleDurationUpdate(_ duration: Double) {
         event.updateDuration.emit(data: duration)
     }
 
@@ -774,7 +772,7 @@ public class AudioPlayer {
         event.receiveChapterMetadata.emit(data: metadata)
     }
 
-    private func handleTimedMetadataReceived(_ metadata: [AVTimedMetadataGroup]) {
+    internal func handleTimedMetadataReceived(_ metadata: [AVTimedMetadataGroup]) {
         event.receiveTimedMetadata.emit(data: metadata)
     }
 
@@ -787,26 +785,21 @@ public class AudioPlayer {
         state = .ended
     }
 
-    private func handleItemFailedToPlayToEndTime() {
+    internal func handleItemFailedToPlayToEndTime() {
         handlePlaybackError(AudioPlayerError.PlaybackError.playbackFailed)
     }
 
-    private func handleItemPlaybackStalled() {
+    internal func handleItemPlaybackStalled() {
 
     }
 
     private func handleAVPlayerRecreated() {
         event.didRecreateAVPlayer.emit(data: ())
     }
-}
 
-// MARK: - AVPlayer Observer Protocol Conformances
+    // MARK: - Observer Callbacks
 
-extension AudioPlayer: PlayerStateObserverDelegate {
-
-    // MARK: - PlayerStateObserverDelegate
-
-    func player(didChangeTimeControlStatus status: AVPlayer.TimeControlStatus) {
+    internal func playerDidChangeTimeControlStatus(_ status: AVPlayer.TimeControlStatus) {
         switch status {
         case .paused:
             let currentState = self.state
@@ -838,7 +831,7 @@ extension AudioPlayer: PlayerStateObserverDelegate {
         }
     }
 
-    func player(statusDidChange status: AVPlayer.Status) {
+    internal func playerStatusDidChange(_ status: AVPlayer.Status) {
         if (status == .failed) {
             let error = item!.error as NSError?
             playbackFailed(error: error?.code == URLError.notConnectedToInternet.rawValue
@@ -847,54 +840,19 @@ extension AudioPlayer: PlayerStateObserverDelegate {
             )
         }
     }
-}
 
-extension AudioPlayer: PlayerTimeObserverDelegate {
-
-    // MARK: - PlayerTimeObserverDelegate
-
-    func audioDidStart() {
+    internal func audioDidStart() {
         state = .playing
     }
 
-    func timeEvent(time: CMTime) {
-        handleSecondElapsed(time.seconds)
-    }
-
-}
-
-extension AudioPlayer: PlayerItemNotificationObserverDelegate {
-    // MARK: - PlayerItemNotificationObserverDelegate
-
-    func itemFailedToPlayToEndTime() {
+    internal func itemFailedToPlayToEndTime() {
         playbackFailed(error: AudioPlayerError.PlaybackError.playbackFailed)
         handleItemFailedToPlayToEndTime()
     }
 
-    func itemPlaybackStalled() {
-        handleItemPlaybackStalled()
-    }
-
-    func itemDidPlayToEndTime() {
-        handleItemDidPlayToEndTime()
-    }
-
-}
-
-extension AudioPlayer: PlayerItemPropertyObserverDelegate {
-    // MARK: - PlayerItemPropertyObserverDelegate
-
-    func item(didUpdatePlaybackLikelyToKeepUp playbackLikelyToKeepUp: Bool) {
+    internal func itemDidUpdatePlaybackLikelyToKeepUp(_ playbackLikelyToKeepUp: Bool) {
         if (playbackLikelyToKeepUp && state != .playing) {
             state = .ready
         }
-    }
-
-    func item(didUpdateDuration duration: Double) {
-        handleDurationUpdate(duration)
-    }
-
-    func item(didReceiveTimedMetadata metadata: [AVTimedMetadataGroup]) {
-        handleTimedMetadataReceived(metadata)
     }
 }
