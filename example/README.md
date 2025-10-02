@@ -77,63 +77,29 @@ From the root directory:
 yarn example android:ide
 ```
 
-## KotlinAudio
+## Code Formatting
 
-If you need to resolve a bug that exists in `KotlinAudio` you'll need to build
-and install a local version of `KotlinAudio` in order to do so. Here's how:
+### Swift (iOS)
 
-#### 1. Clone the `KotlinAudio` project:
-
-```sh
-git clone git@github.com:doublesymmetry/KotlinAudio.git
-```
-
-#### 2. Build and export to maven local which is the local dependency repository:
+SwiftFormat is used to format Swift code. To format Swift code:
 
 ```sh
-cd KotlinAudio
-./gradlew -x test  build publishToMavenLocal
+# Install SwiftFormat (required once)
+brew install swiftformat
+
+# Format all Swift files
+yarn ios:format
 ```
 
-Make a note of the `versionNumber` configured in the `kotlin-audio/build.gradle`
-file as you'll need this in the next step.
+Configuration is in `.swiftformat` at the project root (2-space indentation, 100 character max line length).
 
-**NOTES:**
-- The result of this is a local version of the build published here:
+### Kotlin (Android)
 
-  ```
-  Windows: C:\Users\<user_name>\.m2
-  Linux: /home/<user_name>/.m2
-  macOS: /Users/<user_name>/.m2
-  ```
-- The `-x test` skips tests for faster build. Make sure you run the test
-  before submitting a PR to the `KotlinAudio` project.
-
-#### 3. Point your RNTP dependency at the local build:
-
-Please note that `<version_number>` below will need to be replaced with the
-`versionNumber` you got from `KotlinAudio/kotlin-audio/build.gradle`.
-
-```groovy
-// react-native-track-player/android/build.gradle
-...
-
-dependencies {
-    // implementation 'com.github.DoubleSymmetry:KotlinAudio:v0.1.33' // this is remote
-    implementation 'com.github.doublesymmetry:kotlin-audio:<version_number>' // this is local
-
-    ...
-}
-```
-
-**NOTE:** there are small differences in the package naming.
-
-
-#### 4. Install the new version of RNTP in the example app and build android:
+ktfmt is used to format Kotlin code. To format Kotlin code:
 
 ```sh
-cd ./example
-yarn android
+# From the root directory
+yarn android:format
 ```
 
-:confetti_ball: You've done it. :confetti_ball:
+Configuration uses ktfmt Google Style in `android/build.gradle`.
