@@ -12,7 +12,6 @@ import MediaPlayer
  An audio player that can keep track of a queue of AudioItems.
  */
 public class QueuedAudioPlayer: AudioPlayer {
-    lazy var queue: QueueManager<AudioItem> = QueueManager<AudioItem>(player: self)
     fileprivate var lastIndex: Int = -1
     fileprivate var lastItem: AudioItem? = nil
 
@@ -23,41 +22,49 @@ public class QueuedAudioPlayer: AudioPlayer {
     /// The repeat mode for the queue player.
     public var repeatMode: RepeatMode = .off
 
+    // MARK: - Queue Properties
+
+    private func assertMainThread() {
+        assert(Thread.isMainThread, "QueuedAudioPlayer queue must be accessed from the main thread")
+    }
+
+    /**
+     The index of the current item. `-1` when there is no current item
+     */
+    private(set) var currentIndex: Int = -1
+
+    /**
+     All items held by the queue.
+     */
+    private(set) var items: [AudioItem] = []
+
     public override var currentItem: AudioItem? {
-        queue.current
-    }
-
-    /**
-     The index of the current item.
-     */
-    public var currentIndex: Int {
-        queue.currentIndex
-    }
-
-    override public func clear() {
-        queue.clearQueue()
-        super.clear()
-    }
-
-    /**
-     All items currently in the queue.
-     */
-    public var items: [AudioItem] {
-        queue.items
-    }
-
-    /**
-     The previous items held by the queue.
-     */
-    public var previousItems: [AudioItem] {
-        queue.previousItems
+        assertMainThread()
+        guard currentIndex >= 0 && currentIndex < items.count else { return nil }
+        return items[currentIndex]
     }
 
     /**
      The upcoming items in the queue.
      */
     public var nextItems: [AudioItem] {
-        queue.nextItems
+        assertMainThread()
+        guard currentIndex >= 0 && currentIndex < items.count - 1 else { return [] }
+        return Array(items[currentIndex + 1..<items.count])
+    }
+
+    /**
+     The previous items held by the queue.
+     */
+    public var previousItems: [AudioItem] {
+        assertMainThread()
+        guard currentIndex > 0 else { return [] }
+        return Array(items[0..<currentIndex])
+    }
+
+    override public func clear() {
+        clearQueue()
+        super.clear()
     }
 
     /**
@@ -67,6 +74,30 @@ public class QueuedAudioPlayer: AudioPlayer {
         currentIndex < items.count - 1
     }
 
+    // MARK: - Queue Validation
+
+    private func throwIfQueueEmpty() throws {
+        if items.count == 0 {
+            throw AudioPlayerError.QueueError.empty
+        }
+    }
+
+    private func throwIfIndexInvalid(
+        index: Int,
+        name: String = "index",
+        min: Int? = nil,
+        max: Int? = nil
+    ) throws {
+        guard index >= (min ?? 0) && (max ?? items.count) > index else {
+            throw AudioPlayerError.QueueError.invalidIndex(
+                index: index,
+                message: "\(name) must be non-negative and less than \(items.count)"
+            )
+        }
+    }
+
+    // MARK: - Queue Methods
+
     /**
      Will replace the current item with a new one and load it into the player.
 
@@ -75,7 +106,24 @@ public class QueuedAudioPlayer: AudioPlayer {
      */
     public override func load(item: AudioItem, playWhenReady: Bool? = nil) {
         handlePlayWhenReady(playWhenReady) {
-            queue.replaceCurrentItem(with: item)
+            replaceCurrentItem(with: item)
+        }
+    }
+
+    /**
+     Replace the current item with a new one. If there is no current item, it is equivalent to calling `add(item:)`, `jump(to: itemIndex)`.
+
+     - parameter item: The item to set as the new current item.
+     */
+    private func replaceCurrentItem(with item: AudioItem) {
+        assertMainThread()
+        if currentIndex == -1  {
+            items.append(item)
+            currentIndex = items.count - 1
+            try! jump(to: 0)
+        } else {
+            items[currentIndex] = item
+            handleCurrentItemChanged()
         }
     }
 
@@ -87,7 +135,16 @@ public class QueuedAudioPlayer: AudioPlayer {
      */
     public func add(item: AudioItem, playWhenReady: Bool? = nil) {
         handlePlayWhenReady(playWhenReady) {
-            queue.add(item)
+            addItem(item)
+        }
+    }
+
+    private func addItem(_ item: AudioItem) {
+        assertMainThread()
+        let wasEmpty = items.isEmpty
+        items.append(item)
+        if wasEmpty {
+            try! jump(to: 0)
         }
     }
 
@@ -99,12 +156,35 @@ public class QueuedAudioPlayer: AudioPlayer {
      */
     public func add(items: [AudioItem], playWhenReady: Bool? = nil) {
         handlePlayWhenReady(playWhenReady) {
-            queue.add(items)
+            try! addItems(items)
+        }
+    }
+
+    private func addItems(_ newItems: [AudioItem]) {
+        assertMainThread()
+        guard !newItems.isEmpty else { return }
+        let wasEmpty = self.items.isEmpty
+        self.items.append(contentsOf: newItems)
+        if wasEmpty {
+            try! jump(to: 0)
         }
     }
 
     public func add(items: [AudioItem], at index: Int) throws {
-        try queue.add(items, at: index)
+        assertMainThread()
+        guard !items.isEmpty else { return }
+        guard index >= 0 && self.items.count >= index else {
+            throw AudioPlayerError.QueueError.invalidIndex(index: index, message: "Index to insert at has to be non-negative and equal to or smaller than the number of items: (\(self.items.count))")
+        }
+        let wasEmpty = self.items.isEmpty
+        // Correct index when items were inserted in front of it:
+        if self.items.count > 1 && currentIndex >= index {
+            currentIndex += items.count
+        }
+        self.items.insert(contentsOf: items, at: index)
+        if wasEmpty {
+            try! jump(to: 0)
+        }
     }
 
     /**
@@ -113,7 +193,7 @@ public class QueuedAudioPlayer: AudioPlayer {
     public func next() {
         let lastIndex = currentIndex
         let playbackWasActive = playbackActive;
-        _ = queue.next(wrap: repeatMode == .queue)
+        _ = skip(by: 1, wrap: repeatMode == .queue)
         if (playbackWasActive && lastIndex != currentIndex || repeatMode == .queue) {
             event.playbackEnd.emit(data: .skippedToNext)
         }
@@ -125,10 +205,34 @@ public class QueuedAudioPlayer: AudioPlayer {
     public func previous() {
         let lastIndex = currentIndex
         let playbackWasActive = playbackActive;
-        _ = queue.previous(wrap: repeatMode == .queue)
+        _ = skip(by: -1, wrap: repeatMode == .queue)
         if (playbackWasActive && lastIndex != currentIndex || repeatMode == .queue) {
             event.playbackEnd.emit(data: .skippedToPrevious)
         }
+    }
+
+    private func skip(by delta: Int, wrap: Bool) -> AudioItem? {
+        assertMainThread()
+        guard currentItem != nil && items.count > 0 else { return nil }
+
+        if items.count == 1 {
+            if wrap {
+                handleSkippedToSameItem()
+            }
+            return currentItem
+        }
+
+        var index = currentIndex + delta
+        if wrap {
+            index = (index + items.count) % items.count
+        }
+        let newIndex = max(0, min(items.count - 1, index))
+
+        if newIndex != currentIndex {
+            currentIndex = newIndex
+            handleCurrentItemChanged()
+        }
+        return currentItem
     }
 
     /**
@@ -138,7 +242,16 @@ public class QueuedAudioPlayer: AudioPlayer {
      - throws: `AudioPlayerError.QueueError`
      */
     public func removeItem(at index: Int) throws {
-        try queue.removeItem(at: index)
+        assertMainThread()
+        try throwIfQueueEmpty()
+        try throwIfIndexInvalid(index: index)
+        let result = items.remove(at: index)
+        if index == currentIndex {
+            currentIndex = items.count > 0 ? currentIndex % items.count : -1
+            handleCurrentItemChanged()
+        } else if index < currentIndex {
+            currentIndex -= 1
+        }
     }
 
 
@@ -154,10 +267,24 @@ public class QueuedAudioPlayer: AudioPlayer {
             if (index == currentIndex) {
                 seek(to: 0)
             } else {
-                _ = try queue.jump(to: index)
+                _ = try jump(to: index)
             }
             event.playbackEnd.emit(data: .jumpedToIndex)
         }
+    }
+
+    private func jump(to index: Int) throws -> AudioItem {
+        assertMainThread()
+        try throwIfQueueEmpty()
+        try throwIfIndexInvalid(index: index)
+
+        if index == currentIndex {
+            handleSkippedToSameItem()
+        } else {
+            currentIndex = index
+            handleCurrentItemChanged()
+        }
+        return currentItem!
     }
 
     /**
@@ -168,21 +295,53 @@ public class QueuedAudioPlayer: AudioPlayer {
      - throws: `AudioPlayerError.QueueError`
      */
     public func moveItem(fromIndex: Int, toIndex: Int) throws {
-        try queue.moveItem(fromIndex: fromIndex, toIndex: toIndex)
+        assertMainThread()
+        try throwIfQueueEmpty()
+        try throwIfIndexInvalid(index: fromIndex, name: "fromIndex")
+        try throwIfIndexInvalid(index: toIndex, name: "toIndex", max: Int.max)
+
+        let item = items.remove(at: fromIndex)
+        items.insert(item, at: min(items.count, toIndex))
+        if fromIndex == currentIndex {
+            currentIndex = toIndex
+            handleCurrentItemChanged()
+        }
     }
 
     /**
      Remove all upcoming items, those returned by `next()`
      */
     public func removeUpcomingItems() {
-        queue.removeUpcomingItems()
+        assertMainThread()
+        guard items.count > 0 else { return }
+        let nextIndex = currentIndex + 1
+        guard nextIndex < items.count else { return }
+        items.removeSubrange(nextIndex..<items.count)
     }
 
     /**
      Remove all previous items, those returned by `previous()`
      */
     public func removePreviousItems() {
-        queue.removePreviousItems()
+        assertMainThread()
+        guard items.count > 0 else { return }
+        guard currentIndex > 0 else { return }
+        items.removeSubrange(0..<currentIndex)
+        currentIndex = 0
+        handleCurrentItemChanged()
+    }
+
+    /**
+     Removes all items from queue
+     */
+    private func clearQueue() {
+        assertMainThread()
+        let itemWasNil = currentIndex == -1
+        currentIndex = -1
+        items.removeAll()
+        if !itemWasNil {
+            handleCurrentItemChanged()
+        }
     }
 
     func replay() {
@@ -209,7 +368,7 @@ public class QueuedAudioPlayer: AudioPlayer {
         }
     }
 
-    // MARK: - QueueManager Callbacks
+    // MARK: - Queue Event Handlers
 
     func handleCurrentItemChanged() {
         let lastPosition = currentTime;
@@ -238,9 +397,5 @@ public class QueuedAudioPlayer: AudioPlayer {
         if (playWhenReady) {
             replay()
         }
-    }
-
-    func handleReceivedFirstItem() {
-        try! queue.jump(to: 0)
     }
 }
