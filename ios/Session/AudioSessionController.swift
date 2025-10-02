@@ -22,27 +22,27 @@ public protocol AudioSessionControllerDelegate: AnyObject {
  - warning: Do not combine usage of this and `AVAudioSession` directly, chose one.
  */
 public class AudioSessionController {
-    
+
     public static let shared = AudioSessionController()
-    
-    private let audioSession: AudioSession
+
+    private let audioSession = AVAudioSession.sharedInstance()
     private let notificationCenter: NotificationCenter = NotificationCenter.default
     private var _isObservingForInterruptions: Bool = false
-    
+
     /**
      True if another app is currently playing audio.
      */
     public var isOtherAudioPlaying: Bool {
         audioSession.isOtherAudioPlaying
     }
-    
+
     /**
      True if the audiosession is active.
-     
+
      - warning: This will only be correct if the audiosession is activated through this class!
      */
     public var audioSessionIsActive: Bool = false
-    
+
     /**
      Wheter notifications for interruptions are being observed or not.
      This is enabled by default.
@@ -54,7 +54,7 @@ public class AudioSessionController {
             if newValue == _isObservingForInterruptions {
                 return
             }
-            
+
             if newValue {
                 registerForInterruptionNotification()
             }
@@ -63,14 +63,13 @@ public class AudioSessionController {
             }
         }
     }
-    
+
     public weak var delegate: AudioSessionControllerDelegate?
-    
-    init(audioSession: AudioSession = AVAudioSession.sharedInstance()) {
-        self.audioSession = audioSession
+
+    init() {
         registerForInterruptionNotification()
     }
-    
+
     public func activateSession() throws {
         do {
             try audioSession.setActive(true, options: [])
@@ -78,7 +77,7 @@ public class AudioSessionController {
         }
         catch let error { throw error }
     }
-    
+
     public func deactivateSession() throws {
         do {
             try audioSession.setActive(false, options: [])
@@ -86,7 +85,7 @@ public class AudioSessionController {
         }
         catch let error { throw error }
     }
-    
+
     public func set(category: AVAudioSession.Category) throws {
         try audioSession.setCategory(category, mode: audioSession.mode, options: audioSession.categoryOptions)
     }
