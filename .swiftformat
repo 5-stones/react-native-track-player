@@ -1,0 +1,33 @@
+# SwiftFormat configuration
+# https://github.com/nicklockwood/SwiftFormat
+
+--swiftversion 5.9
+
+# Indentation (matches .ts and .kt: 2 spaces)
+--indent 2
+--tabwidth 2
+--indentcase false
+--ifdef no-indent
+
+# Wrapping
+--maxwidth 100
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--closingparen balanced
+
+# Spacing
+--trimwhitespace always
+--insertlines enabled
+--removelines enabled
+
+# Rules
+--enable isEmpty
+--enable sortImports
+--enable duplicateImports
+--enable redundantSelf
+--enable wrapSingleLineComments
+
+# Disable rules that are too opinionated
+--disable redundantReturn
+--disable trailingClosures

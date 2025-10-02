@@ -58,6 +58,7 @@
     "example": "yarn workspace react-native-track-player-example",
     "format": "prettier --check src web",
     "format:fix": "prettier --write src web",
+    "ios:format": "swiftformat ios --swiftversion 5.9",
     "ios:ide": "cd example/ios && open TrackPlayerExample.xcworkspace",
     "lint": "eslint src web --max-warnings=0",
     "prepare": "bob build",
