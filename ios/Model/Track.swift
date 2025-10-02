@@ -10,11 +10,8 @@ import AVFoundation
 import Foundation
 import MediaPlayer
 
-class Track: AudioItem, TimePitching, AssetOptionsProviding {
+class Track: AudioItem {
   let url: MediaURL
-
-  @objc var title: String?
-  @objc var artist: String?
 
   var date: String?
   var desc: String?
@@ -23,11 +20,8 @@ class Track: AudioItem, TimePitching, AssetOptionsProviding {
   var artworkURL: MediaURL?
   let headers: [String: Any]?
   var userAgent: String?
-  let pitchAlgorithm: String?
+  let pitchAlgorithmString: String?
   var isLiveStream: Bool?
-
-  var album: String?
-  var artwork: MPMediaItemArtwork?
 
   private var originalObject: [String: Any] = [:]
 
@@ -36,7 +30,15 @@ class Track: AudioItem, TimePitching, AssetOptionsProviding {
     self.url = url
     headers = dictionary["headers"] as? [String: Any]
     userAgent = dictionary["userAgent"] as? String
-    pitchAlgorithm = dictionary["pitchAlgorithm"] as? String
+    pitchAlgorithmString = dictionary["pitchAlgorithm"] as? String
+
+    super.init(
+      audioUrl: url.isLocal ? url.value.path : url.value.absoluteString,
+      artist: dictionary["artist"] as? String,
+      title: dictionary["title"] as? String,
+      album: dictionary["album"] as? String,
+      sourceType: url.isLocal ? .file : .stream
+    )
 
     updateMetadata(dictionary: dictionary)
   }
@@ -58,32 +60,36 @@ class Track: AudioItem, TimePitching, AssetOptionsProviding {
     artworkURL = MediaURL(object: dictionary["artwork"])
     isLiveStream = dictionary["isLiveStream"] as? Bool
 
+    // Set pitch algorithm based on string value
+    if let pitchAlgorithmString {
+      switch pitchAlgorithmString {
+      case PitchAlgorithm.linear.rawValue:
+        pitchAlgorithm = .varispeed
+      case PitchAlgorithm.music.rawValue:
+        pitchAlgorithm = .spectral
+      default: // voice
+        pitchAlgorithm = .timeDomain
+      }
+    }
+
+    // Set asset options
+    var options: [String: Any] = [:]
+    if let headers {
+      options["AVURLAssetHTTPHeaderFieldsKey"] = headers
+    }
+    if #available(iOS 16, *) {
+      if let userAgent {
+        options[AVURLAssetHTTPUserAgentKey] = userAgent
+      }
+    }
+    assetOptions = options.isEmpty ? nil : options
+
     originalObject = originalObject.merging(dictionary) { _, new in new }
   }
 
-  // MARK: - AudioItem Protocol
+  // MARK: - AudioItem Overrides
 
-  func getSourceUrl() -> String {
-    return url.isLocal ? url.value.path : url.value.absoluteString
-  }
-
-  func getArtist() -> String? {
-    return artist
-  }
-
-  func getTitle() -> String? {
-    return title
-  }
-
-  func getAlbumTitle() -> String? {
-    return album
-  }
-
-  func getSourceType() -> SourceType {
-    return url.isLocal ? .file : .stream
-  }
-
-  func getArtwork(_ handler: @escaping (UIImage?) -> Void) {
+  override func loadArtwork(_ handler: @escaping (UIImage?) -> Void) {
     if let artworkURL = artworkURL?.value {
       if self.artworkURL?.isLocal ?? false {
         let image = UIImage(contentsOfFile: artworkURL.path)
@@ -100,39 +106,5 @@ class Track: AudioItem, TimePitching, AssetOptionsProviding {
     } else {
       handler(nil)
     }
-  }
-
-  // MARK: - TimePitching Protocol
-
-  func getPitchAlgorithmType() -> AVAudioTimePitchAlgorithm {
-    if let pitchAlgorithm {
-      switch pitchAlgorithm {
-      case PitchAlgorithm.linear.rawValue:
-        return .varispeed
-      case PitchAlgorithm.music.rawValue:
-        return .spectral
-      default: // voice
-        return .timeDomain
-      }
-    }
-
-    return .timeDomain
-  }
-
-  // MARK: - Authorizing Protocol
-
-  func getAssetOptions() -> [String: Any] {
-    var options: [String: Any] = [:]
-    if let headers {
-      options["AVURLAssetHTTPHeaderFieldsKey"] = headers
-    }
-    if #available(iOS 16, *) {
-      if let userAgent {
-        // there is now an official, working way to set the user-agent for every request
-        // https://developer.apple.com/documentation/avfoundation/avurlassethttpuseragentkey
-        options[AVURLAssetHTTPUserAgentKey] = userAgent
-      }
-    }
-    return options
   }
 }

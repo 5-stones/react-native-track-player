@@ -7,10 +7,6 @@
 
 import Foundation
 
-public protocol RemoteCommandable {
-  func getCommands() -> [RemoteCommand]
-}
-
 public enum RemoteCommand: CustomStringConvertible, Equatable {
   case play
 

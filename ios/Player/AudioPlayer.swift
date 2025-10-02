@@ -334,11 +334,11 @@ public class AudioPlayer {
       enableRemoteCommands(forItem: item)
 
       loadFromString(
-        from: item.getSourceUrl(),
-        type: item.getSourceType(),
+        from: item.audioUrl,
+        type: item.sourceType,
         playWhenReady: self.playWhenReady,
-        initialTime: (item as? InitialTiming)?.getInitialTime(),
-        options: (item as? AssetOptionsProviding)?.getAssetOptions()
+        initialTime: item.initialTime,
+        options: item.assetOptions
       )
     }
   }
@@ -462,8 +462,8 @@ public class AudioPlayer {
   }
 
   func enableRemoteCommands(forItem item: AudioItem) {
-    if let item = item as? RemoteCommandable {
-      enableRemoteCommands(item.getCommands())
+    if let commands = item.remoteCommands {
+      enableRemoteCommands(commands)
     } else {
       enableRemoteCommands(remoteCommands)
     }
@@ -493,9 +493,9 @@ public class AudioPlayer {
     guard let item = currentItem else { return }
 
     nowPlayingInfoController.set(keyValues: [
-      MediaItemProperty.artist(item.getArtist()),
-      MediaItemProperty.title(item.getTitle()),
-      MediaItemProperty.albumTitle(item.getAlbumTitle()),
+      MediaItemProperty.artist(item.artist),
+      MediaItemProperty.title(item.title),
+      MediaItemProperty.albumTitle(item.album),
     ])
     loadArtwork(forItem: item)
   }
@@ -535,7 +535,7 @@ public class AudioPlayer {
   }
 
   private func loadArtwork(forItem item: AudioItem) {
-    item.getArtwork { image in
+    item.loadArtwork { image in
       if let image {
         let artwork = MPMediaItemArtwork(boundsSize: image.size, requestHandler: { _ in image })
         self.nowPlayingInfoController.set(keyValue: MediaItemProperty.artwork(artwork))
@@ -546,8 +546,8 @@ public class AudioPlayer {
   }
 
   private func setTimePitchingAlgorithmForCurrentItem() {
-    if let item = currentItem as? TimePitching {
-      currentAVPlayerItem?.audioTimePitchAlgorithm = item.getPitchAlgorithmType()
+    if let algorithm = currentItem?.pitchAlgorithm {
+      currentAVPlayerItem?.audioTimePitchAlgorithm = algorithm
     } else {
       currentAVPlayerItem?.audioTimePitchAlgorithm = audioTimePitchAlgorithm
     }
