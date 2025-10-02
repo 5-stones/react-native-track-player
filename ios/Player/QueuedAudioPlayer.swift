@@ -128,27 +128,6 @@ public class QueuedAudioPlayer: AudioPlayer {
     }
 
     /**
-     Add a single item to the queue.
-
-     - parameter item: The item to add.
-     - parameter playWhenReady: Optional, whether to start playback when the item is ready.
-     */
-    public func add(item: AudioItem, playWhenReady: Bool? = nil) {
-        handlePlayWhenReady(playWhenReady) {
-            addItem(item)
-        }
-    }
-
-    private func addItem(_ item: AudioItem) {
-        assertMainThread()
-        let wasEmpty = items.isEmpty
-        items.append(item)
-        if wasEmpty {
-            try! jump(to: 0)
-        }
-    }
-
-    /**
      Add items to the queue.
 
      - parameter items: The items to add to the queue.
@@ -319,18 +298,6 @@ public class QueuedAudioPlayer: AudioPlayer {
         let nextIndex = currentIndex + 1
         guard nextIndex < items.count else { return }
         items.removeSubrange(nextIndex..<items.count)
-    }
-
-    /**
-     Remove all previous items, those returned by `previous()`
-     */
-    public func removePreviousItems() {
-        assertMainThread()
-        guard items.count > 0 else { return }
-        guard currentIndex > 0 else { return }
-        items.removeSubrange(0..<currentIndex)
-        currentIndex = 0
-        handleCurrentItemChanged()
     }
 
     /**
