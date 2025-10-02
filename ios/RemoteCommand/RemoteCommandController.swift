@@ -8,9 +8,83 @@
 import Foundation
 import MediaPlayer
 
+// MARK: - Command Types
+
+public typealias RemoteCommandHandler = (MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus
+
+public enum RemoteCommand: CustomStringConvertible, Equatable {
+  case play
+
+  case pause
+
+  case stop
+
+  case togglePlayPause
+
+  case next
+
+  case previous
+
+  case changePlaybackPosition
+
+  case skipForward(preferredIntervals: [NSNumber])
+
+  case skipBackward(preferredIntervals: [NSNumber])
+
+  case like(isActive: Bool, localizedTitle: String, localizedShortTitle: String)
+
+  case dislike(isActive: Bool, localizedTitle: String, localizedShortTitle: String)
+
+  case bookmark(isActive: Bool, localizedTitle: String, localizedShortTitle: String)
+
+  public var description: String {
+    switch self {
+    case .play: return "play"
+    case .pause: return "pause"
+    case .stop: return "stop"
+    case .togglePlayPause: return "togglePlayPause"
+    case .next: return "nextTrack"
+    case .previous: return "previousTrack"
+    case .changePlaybackPosition: return "changePlaybackPosition"
+    case .skipForward: return "skipForward"
+    case .skipBackward: return "skipBackward"
+    case .like: return "like"
+    case .dislike: return "dislike"
+    case .bookmark: return "bookmark"
+    }
+  }
+
+  var key: String { description }
+
+  /**
+   All values in an array for convenience.
+   Don't use for associated values.
+   */
+  static func all() -> [RemoteCommand] {
+    return [
+      .play,
+      .pause,
+      .stop,
+      .togglePlayPause,
+      .next,
+      .previous,
+      .changePlaybackPosition,
+      .skipForward(preferredIntervals: []),
+      .skipBackward(preferredIntervals: []),
+      .like(isActive: false, localizedTitle: "", localizedShortTitle: ""),
+      .dislike(isActive: false, localizedTitle: "", localizedShortTitle: ""),
+      .bookmark(isActive: false, localizedTitle: "", localizedShortTitle: ""),
+    ]
+  }
+}
+
+// MARK: - Protocol
+
 public protocol RemoteCommandable {
   func getCommands() -> [RemoteCommand]
 }
+
+// MARK: - Controller
 
 public class RemoteCommandController {
   private let center: MPRemoteCommandCenter
@@ -31,7 +105,7 @@ public class RemoteCommandController {
 
   func enable(commands: [RemoteCommand]) {
     let commandsToDisable = enabledCommands.filter { command in
-      !commands.contains(where: { $0.description == command.description })
+      !commands.contains(command)
     }
 
     enabledCommands = commands
@@ -43,73 +117,119 @@ public class RemoteCommandController {
     commands.forEach { self.disable(command: $0) }
   }
 
-  private func enableCommand(_ command: some RemoteCommandProtocol) {
-    center[keyPath: command.commandKeyPath].isEnabled = true
-    center[keyPath: command.commandKeyPath].removeTarget(commandTargetPointers[command.id])
-    commandTargetPointers[command.id] = center[keyPath: command.commandKeyPath]
-      .addTarget(handler: self[keyPath: command.handlerKeyPath])
+  /**
+   Enables a remote command by setting it up with the provided handler.
+   Removes any existing target before adding the new one to prevent duplicate handlers.
+   */
+  private func enableRemoteCommand(
+    _ command: MPRemoteCommand,
+    key: String,
+    handler: @escaping RemoteCommandHandler
+  ) {
+    command.isEnabled = true
+    command.removeTarget(commandTargetPointers[key])
+    commandTargetPointers[key] = command.addTarget(handler: handler)
   }
 
-  private func disableCommand(_ command: some RemoteCommandProtocol) {
-    center[keyPath: command.commandKeyPath].isEnabled = false
-    center[keyPath: command.commandKeyPath].removeTarget(commandTargetPointers[command.id])
-    commandTargetPointers.removeValue(forKey: command.id)
+  /**
+   Disables a remote command and cleans up its target from the command center.
+   */
+  private func disableRemoteCommand(_ command: MPRemoteCommand, key: String) {
+    command.isEnabled = false
+    command.removeTarget(commandTargetPointers[key])
+    commandTargetPointers.removeValue(forKey: key)
   }
 
   private func enable(command: RemoteCommand) {
     switch command {
-    case .play: enableCommand(PlayBackCommand.play)
-    case .pause: enableCommand(PlayBackCommand.pause)
-    case .stop: enableCommand(PlayBackCommand.stop)
-    case .togglePlayPause: enableCommand(PlayBackCommand.togglePlayPause)
-    case .next: enableCommand(PlayBackCommand.nextTrack)
-    case .previous: enableCommand(PlayBackCommand.previousTrack)
-    case .changePlaybackPosition: enableCommand(ChangePlaybackPositionCommand
-        .changePlaybackPosition
+    case .play:
+      enableRemoteCommand(center.playCommand, key: command.key, handler: handlePlayCommand)
+    case .pause:
+      enableRemoteCommand(center.pauseCommand, key: command.key, handler: handlePauseCommand)
+    case .stop:
+      enableRemoteCommand(center.stopCommand, key: command.key, handler: handleStopCommand)
+    case .togglePlayPause:
+      enableRemoteCommand(
+        center.togglePlayPauseCommand,
+        key: command.key,
+        handler: handleTogglePlayPauseCommand
       )
-    case let .skipForward(preferredIntervals): enableCommand(SkipIntervalCommand.skipForward
-        .set(preferredIntervals: preferredIntervals)
+    case .next:
+      enableRemoteCommand(
+        center.nextTrackCommand,
+        key: command.key,
+        handler: handleNextTrackCommand
       )
-    case let .skipBackward(preferredIntervals): enableCommand(SkipIntervalCommand.skipBackward
-        .set(preferredIntervals: preferredIntervals)
+    case .previous:
+      enableRemoteCommand(
+        center.previousTrackCommand,
+        key: command.key,
+        handler: handlePreviousTrackCommand
+      )
+    case .changePlaybackPosition:
+      enableRemoteCommand(
+        center.changePlaybackPositionCommand,
+        key: command.key,
+        handler: handleChangePlaybackPositionCommand
+      )
+    case let .skipForward(preferredIntervals):
+      center.skipForwardCommand.preferredIntervals = preferredIntervals
+      enableRemoteCommand(
+        center.skipForwardCommand,
+        key: command.key,
+        handler: handleSkipForwardCommand
+      )
+    case let .skipBackward(preferredIntervals):
+      center.skipBackwardCommand.preferredIntervals = preferredIntervals
+      enableRemoteCommand(
+        center.skipBackwardCommand,
+        key: command.key,
+        handler: handleSkipBackwardCommand
       )
     case let .like(isActive, localizedTitle, localizedShortTitle):
-      enableCommand(FeedbackCommand.like.set(
-        isActive: isActive,
-        localizedTitle: localizedTitle,
-        localizedShortTitle: localizedShortTitle
-      ))
+      center.likeCommand.isActive = isActive
+      center.likeCommand.localizedTitle = localizedTitle
+      center.likeCommand.localizedShortTitle = localizedShortTitle
+      enableRemoteCommand(center.likeCommand, key: command.key, handler: handleLikeCommand)
     case let .dislike(isActive, localizedTitle, localizedShortTitle):
-      enableCommand(FeedbackCommand.dislike.set(
-        isActive: isActive,
-        localizedTitle: localizedTitle,
-        localizedShortTitle: localizedShortTitle
-      ))
+      center.dislikeCommand.isActive = isActive
+      center.dislikeCommand.localizedTitle = localizedTitle
+      center.dislikeCommand.localizedShortTitle = localizedShortTitle
+      enableRemoteCommand(center.dislikeCommand, key: command.key, handler: handleDislikeCommand)
     case let .bookmark(isActive, localizedTitle, localizedShortTitle):
-      enableCommand(FeedbackCommand.bookmark.set(
-        isActive: isActive,
-        localizedTitle: localizedTitle,
-        localizedShortTitle: localizedShortTitle
-      ))
+      center.bookmarkCommand.isActive = isActive
+      center.bookmarkCommand.localizedTitle = localizedTitle
+      center.bookmarkCommand.localizedShortTitle = localizedShortTitle
+      enableRemoteCommand(center.bookmarkCommand, key: command.key, handler: handleBookmarkCommand)
     }
   }
 
   private func disable(command: RemoteCommand) {
     switch command {
-    case .play: disableCommand(PlayBackCommand.play)
-    case .pause: disableCommand(PlayBackCommand.pause)
-    case .stop: disableCommand(PlayBackCommand.stop)
-    case .togglePlayPause: disableCommand(PlayBackCommand.togglePlayPause)
-    case .next: disableCommand(PlayBackCommand.nextTrack)
-    case .previous: disableCommand(PlayBackCommand.previousTrack)
-    case .changePlaybackPosition: disableCommand(ChangePlaybackPositionCommand
-        .changePlaybackPosition
-      )
-    case .skipForward: disableCommand(SkipIntervalCommand.skipForward)
-    case .skipBackward: disableCommand(SkipIntervalCommand.skipBackward)
-    case .like: disableCommand(FeedbackCommand.like)
-    case .dislike: disableCommand(FeedbackCommand.dislike)
-    case .bookmark: disableCommand(FeedbackCommand.bookmark)
+    case .play:
+      disableRemoteCommand(center.playCommand, key: command.key)
+    case .pause:
+      disableRemoteCommand(center.pauseCommand, key: command.key)
+    case .stop:
+      disableRemoteCommand(center.stopCommand, key: command.key)
+    case .togglePlayPause:
+      disableRemoteCommand(center.togglePlayPauseCommand, key: command.key)
+    case .next:
+      disableRemoteCommand(center.nextTrackCommand, key: command.key)
+    case .previous:
+      disableRemoteCommand(center.previousTrackCommand, key: command.key)
+    case .changePlaybackPosition:
+      disableRemoteCommand(center.changePlaybackPositionCommand, key: command.key)
+    case .skipForward:
+      disableRemoteCommand(center.skipForwardCommand, key: command.key)
+    case .skipBackward:
+      disableRemoteCommand(center.skipBackwardCommand, key: command.key)
+    case .like:
+      disableRemoteCommand(center.likeCommand, key: command.key)
+    case .dislike:
+      disableRemoteCommand(center.dislikeCommand, key: command.key)
+    case .bookmark:
+      disableRemoteCommand(center.bookmarkCommand, key: command.key)
     }
   }
 
@@ -156,7 +276,7 @@ public class RemoteCommandController {
   {
     if let audioPlayer {
       audioPlayer.stop()
-      return .success
+      return MPRemoteCommandHandlerStatus.success
     }
     return MPRemoteCommandHandlerStatus.commandFailed
   }
@@ -232,19 +352,19 @@ public class RemoteCommandController {
   private func handleLikeCommandDefault(event _: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
-    MPRemoteCommandHandlerStatus.success
+    return MPRemoteCommandHandlerStatus.success
   }
 
   private func handleDislikeCommandDefault(event _: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
-    MPRemoteCommandHandlerStatus.success
+    return MPRemoteCommandHandlerStatus.success
   }
 
   private func handleBookmarkCommandDefault(event _: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
-    MPRemoteCommandHandlerStatus.success
+    return MPRemoteCommandHandlerStatus.success
   }
 
   private func getRemoteCommandHandlerStatus(forError error: Error)
