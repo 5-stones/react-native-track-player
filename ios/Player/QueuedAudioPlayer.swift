@@ -216,8 +216,8 @@ public class QueuedAudioPlayer: AudioPlayer {
         guard currentItem != nil && items.count > 0 else { return nil }
 
         if items.count == 1 {
-            if wrap {
-                handleSkippedToSameItem()
+            if wrap && playWhenReady {
+                replay()
             }
             return currentItem
         }
@@ -279,7 +279,9 @@ public class QueuedAudioPlayer: AudioPlayer {
         try throwIfIndexInvalid(index: index)
 
         if index == currentIndex {
-            handleSkippedToSameItem()
+            if playWhenReady {
+                replay()
+            }
         } else {
             currentIndex = index
             handleCurrentItemChanged()
@@ -368,8 +370,6 @@ public class QueuedAudioPlayer: AudioPlayer {
         }
     }
 
-    // MARK: - Queue Event Handlers
-
     func handleCurrentItemChanged() {
         let lastPosition = currentTime;
         let shouldContinuePlayback = playWhenReady
@@ -391,11 +391,5 @@ public class QueuedAudioPlayer: AudioPlayer {
         )
         lastItem = currentItem
         lastIndex = currentIndex
-    }
-
-    func handleSkippedToSameItem() {
-        if (playWhenReady) {
-            replay()
-        }
     }
 }
