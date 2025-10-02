@@ -11,14 +11,13 @@ import MediaPlayer
 /**
  An audio player that can keep track of a queue of AudioItems.
  */
-public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
-    let queue: QueueManager = QueueManager<AudioItem>()
+public class QueuedAudioPlayer: AudioPlayer {
+    lazy var queue: QueueManager<AudioItem> = QueueManager<AudioItem>(player: self)
     fileprivate var lastIndex: Int = -1
     fileprivate var lastItem: AudioItem? = nil
 
     public override init(nowPlayingInfoController: NowPlayingInfoControllerProtocol = NowPlayingInfoController(), remoteCommandController: RemoteCommandController = RemoteCommandController()) {
         super.init(nowPlayingInfoController: nowPlayingInfoController, remoteCommandController: remoteCommandController)
-        queue.delegate = self
     }
 
     /// The repeat mode for the queue player.
@@ -210,9 +209,9 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
         }
     }
 
-    // MARK: - QueueManagerDelegate
+    // MARK: - QueueManager Callbacks
 
-    func onCurrentItemChanged() {
+    func handleCurrentItemChanged() {
         let lastPosition = currentTime;
         let shouldContinuePlayback = playWhenReady
         if let currentItem = currentItem {
@@ -235,13 +234,13 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
         lastIndex = currentIndex
     }
 
-    func onSkippedToSameCurrentItem() {
+    func handleSkippedToSameItem() {
         if (playWhenReady) {
             replay()
         }
     }
 
-    func onReceivedFirstItem() {
+    func handleReceivedFirstItem() {
         try! queue.jump(to: 0)
     }
 }

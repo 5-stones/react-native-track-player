@@ -7,15 +7,13 @@
 
 import Foundation
 
-protocol QueueManagerDelegate: AnyObject {
-    func onReceivedFirstItem()
-    func onCurrentItemChanged()
-    func onSkippedToSameCurrentItem()
-}
-
 class QueueManager<T> {
 
-    weak var delegate: QueueManagerDelegate? = nil
+    private weak var player: AudioPlayer?
+
+    init(player: AudioPlayer) {
+        self.player = player
+    }
 
     private func assertMainThread() {
         assert(Thread.isMainThread, "QueueManager must be accessed from the main thread")
@@ -83,7 +81,7 @@ class QueueManager<T> {
         let wasEmpty = items.isEmpty
         items.append(item)
         if wasEmpty {
-            delegate?.onReceivedFirstItem()
+            player?.handleReceivedFirstItem()
         }
     }
 
@@ -98,7 +96,7 @@ class QueueManager<T> {
         let wasEmpty = self.items.isEmpty
         self.items.append(contentsOf: items)
         if wasEmpty {
-            delegate?.onReceivedFirstItem()
+            player?.handleReceivedFirstItem()
         }
     }
 
@@ -121,7 +119,7 @@ class QueueManager<T> {
         }
         self.items.insert(contentsOf: items, at: index)
         if wasEmpty {
-            delegate?.onReceivedFirstItem()
+            player?.handleReceivedFirstItem()
         }
     }
 
@@ -136,7 +134,7 @@ class QueueManager<T> {
 
         if items.count == 1 {
             if wrap {
-                delegate?.onSkippedToSameCurrentItem()
+                player?.handleSkippedToSameItem()
             }
             return current
         }
@@ -148,7 +146,7 @@ class QueueManager<T> {
         let oldIndex = currentIndex
         currentIndex = max(0, min(items.count - 1, index))
         if oldIndex != currentIndex {
-            delegate?.onCurrentItemChanged()
+            player?.handleCurrentItemChanged()
         }
         return current
     }
@@ -189,10 +187,10 @@ class QueueManager<T> {
         try throwIfIndexInvalid(index: index)
 
         if index == currentIndex {
-            delegate?.onSkippedToSameCurrentItem()
+            player?.handleSkippedToSameItem()
         } else {
             currentIndex = index
-            delegate?.onCurrentItemChanged()
+            player?.handleCurrentItemChanged()
         }
         return current!
     }
@@ -214,7 +212,7 @@ class QueueManager<T> {
         items.insert(item, at: min(items.count, toIndex))
         if fromIndex == currentIndex {
             currentIndex = toIndex
-            delegate?.onCurrentItemChanged()
+            player?.handleCurrentItemChanged()
         }
     }
 
@@ -232,7 +230,7 @@ class QueueManager<T> {
         let result = items.remove(at: index)
         if index == currentIndex {
             currentIndex = items.count > 0 ? currentIndex % items.count : -1
-            delegate?.onCurrentItemChanged()
+            player?.handleCurrentItemChanged()
         } else if index < currentIndex {
             currentIndex -= 1
         }
@@ -249,10 +247,10 @@ class QueueManager<T> {
         if currentIndex == -1  {
             items.append(item)
             currentIndex = items.count - 1
-            delegate?.onReceivedFirstItem()
+            player?.handleReceivedFirstItem()
         } else {
             items[currentIndex] = item
-            delegate?.onCurrentItemChanged()
+            player?.handleCurrentItemChanged()
         }
     }
 
@@ -266,7 +264,7 @@ class QueueManager<T> {
         guard currentIndex > 0 else { return }
         items.removeSubrange(0..<currentIndex)
         currentIndex = 0
-        delegate?.onCurrentItemChanged()
+        player?.handleCurrentItemChanged()
     }
 
     /**
@@ -290,7 +288,7 @@ class QueueManager<T> {
         currentIndex = -1
         items.removeAll()
         if !itemWasNil {
-            delegate?.onCurrentItemChanged()
+            player?.handleCurrentItemChanged()
         }
     }
 
