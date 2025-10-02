@@ -37,7 +37,7 @@ public class NowPlayingInfoController {
     infoQueue.async(flags: .barrier) { [weak self] in
       guard let self else { return }
       for keyValue in keyValues {
-        _info[keyValue.getKey()] = keyValue.getValue()
+        _info[keyValue.key] = keyValue.value
       }
       performUpdate()
     }
@@ -49,7 +49,7 @@ public class NowPlayingInfoController {
     infoQueue.async(flags: .barrier) { [weak self] in
       guard let self else { return }
       for keyValue in keyValues {
-        _info[keyValue.getKey()] = keyValue.getValue()
+        _info[keyValue.key] = keyValue.value
       }
     }
   }
@@ -58,7 +58,7 @@ public class NowPlayingInfoController {
   public func set(keyValue: NowPlayingInfoKeyValue) {
     infoQueue.async(flags: .barrier) { [weak self] in
       guard let self else { return }
-      _info[keyValue.getKey()] = keyValue.getValue()
+      _info[keyValue.key] = keyValue.value
       performUpdate()
     }
   }

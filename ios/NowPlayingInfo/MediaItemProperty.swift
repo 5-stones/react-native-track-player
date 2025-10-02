@@ -45,7 +45,7 @@ public enum MediaItemProperty: NowPlayingInfoKeyValue {
    */
   case artwork(MPMediaItemArtwork?)
 
-  public func getKey() -> String {
+  public var key: String {
     switch self {
     case .artist:
       return MPMediaItemPropertyArtist
@@ -64,7 +64,7 @@ public enum MediaItemProperty: NowPlayingInfoKeyValue {
     }
   }
 
-  public func getValue() -> Any? {
+  public var value: Any? {
     switch self {
     case let .artist(artist):
       return artist

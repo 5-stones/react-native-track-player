@@ -115,7 +115,7 @@ public enum NowPlayingInfoProperty: NowPlayingInfoKeyValue {
    */
   case serviceIdentifier(String?)
 
-  public func getKey() -> String {
+  public var key: String {
     switch self {
     case .collectionIdentifier:
       return MPNowPlayingInfoCollectionIdentifier
@@ -170,7 +170,7 @@ public enum NowPlayingInfoProperty: NowPlayingInfoKeyValue {
     }
   }
 
-  public func getValue() -> Any? {
+  public var value: Any? {
     switch self {
     case let .collectionIdentifier(identifier):
       return identifier

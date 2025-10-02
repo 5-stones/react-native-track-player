@@ -8,6 +8,6 @@
 import Foundation
 
 public protocol NowPlayingInfoKeyValue {
-  func getKey() -> String
-  func getValue() -> Any?
+  var key: String { get }
+  var value: Any? { get }
 }
