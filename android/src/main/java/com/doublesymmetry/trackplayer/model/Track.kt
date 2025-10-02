@@ -39,6 +39,9 @@ private constructor(
   val duration: Double?,
   val rating: Rating?,
   val mediaId: String?,
+
+  // Preserve original bridge data to maintain custom fields
+  private val originalItem: Bundle,
 ) {
   fun toMediaItem(): MediaItem {
     val extras =
@@ -66,31 +69,8 @@ private constructor(
   }
 
   fun toBridge(): WritableMap {
-    val map = Arguments.createMap()
-
-    url?.let { map.putString("url", it) }
-    type.name.lowercase().let { map.putString("type", it) }
-    contentType?.let { map.putString("contentType", it) }
-    userAgent?.let { map.putString("userAgent", it) }
-
-    headers?.let { headerMap ->
-      val headerWritableMap = Arguments.createMap()
-      headerMap.forEach { (key, value) -> headerWritableMap.putString(key, value) }
-      map.putMap("headers", headerWritableMap)
-    }
-
-    title?.let { map.putString("title", it) }
-    artist?.let { map.putString("artist", it) }
-    album?.let { map.putString("album", it) }
-    artwork?.let { map.putString("artwork", it) }
-    date?.let { map.putString("date", it) }
-    genre?.let { map.putString("genre", it) }
-    duration?.let { map.putDouble("duration", it) }
-    mediaId?.let { map.putString("mediaId", it) }
-
-    rating?.let { ratingValue -> BundleUtils.setRating(map, "rating", ratingValue) }
-
-    return map
+    // Return the original item to preserve custom fields
+    return Arguments.fromBundle(originalItem) ?: Arguments.createMap()
   }
 
   fun updateMetadata(
@@ -104,6 +84,18 @@ private constructor(
     rating: Rating? = this.rating,
     mediaId: String? = this.mediaId,
   ): Track {
+    // Merge updates into the originalItem to preserve custom fields
+    val updatedBundle = Bundle(originalItem)
+    title?.let { updatedBundle.putString("title", it) }
+    artist?.let { updatedBundle.putString("artist", it) }
+    album?.let { updatedBundle.putString("album", it) }
+    artwork?.let { updatedBundle.putString("artwork", it) }
+    date?.let { updatedBundle.putString("date", it) }
+    genre?.let { updatedBundle.putString("genre", it) }
+    duration?.let { updatedBundle.putDouble("duration", it) }
+    mediaId?.let { updatedBundle.putString("mediaId", it) }
+    // Note: Rating is not stored in bundle as it's handled by BundleUtils
+
     return Track(
       url = url,
       uri = uri,
@@ -121,6 +113,7 @@ private constructor(
       duration = duration,
       rating = rating,
       mediaId = mediaId,
+      originalItem = updatedBundle,
     )
   }
 
@@ -130,6 +123,9 @@ private constructor(
     }
 
     fun fromBridge(context: Context, map: ReadableMap, ratingType: Int): Track {
+      // Store original map as Bundle to preserve custom fields
+      val originalBundle = readableMapToBundle(map)
+
       val resourceId = BundleUtils.getRawResourceId(context, map, "url")
       val uri =
         if (resourceId == 0) {
@@ -179,7 +175,48 @@ private constructor(
         duration = if (map.hasKey("duration")) map.getDouble("duration") else null,
         rating = BundleUtils.getRating(map, "rating", ratingType),
         mediaId = map.getString("mediaId"),
+        originalItem = originalBundle,
       )
+    }
+
+    private fun readableMapToBundle(map: ReadableMap): Bundle {
+      val bundle = Bundle()
+      val iterator = map.keySetIterator()
+      while (iterator.hasNextKey()) {
+        val key = iterator.nextKey()
+        when (map.getType(key)) {
+          ReadableType.Null -> {}
+          ReadableType.Boolean -> bundle.putBoolean(key, map.getBoolean(key))
+          ReadableType.Number -> {
+            val value = map.getDouble(key)
+            if (value == value.toInt().toDouble()) {
+              bundle.putInt(key, value.toInt())
+            } else {
+              bundle.putDouble(key, value)
+            }
+          }
+          ReadableType.String -> bundle.putString(key, map.getString(key))
+          ReadableType.Map -> map.getMap(key)?.let { bundle.putBundle(key, readableMapToBundle(it)) }
+          ReadableType.Array -> {
+            // Store array as an ArrayList to preserve it in the bundle
+            map.getArray(key)?.let { array ->
+              val list = ArrayList<Any?>()
+              for (i in 0 until array.size()) {
+                when (array.getType(i)) {
+                  ReadableType.Null -> list.add(null)
+                  ReadableType.Boolean -> list.add(array.getBoolean(i))
+                  ReadableType.Number -> list.add(array.getDouble(i))
+                  ReadableType.String -> list.add(array.getString(i))
+                  ReadableType.Map -> array.getMap(i)?.let { list.add(readableMapToBundle(it)) }
+                  ReadableType.Array -> {} // Skip nested arrays for simplicity
+                }
+              }
+              bundle.putSerializable(key, list)
+            }
+          }
+        }
+      }
+      return bundle
     }
   }
 }

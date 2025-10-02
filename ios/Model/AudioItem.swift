@@ -49,6 +49,11 @@ public class AudioItem {
   internal var userAgent: String?
   internal var isLiveStream: Bool?
 
+  // MARK: - Internal State
+
+  /// Stores the original bridge dictionary to preserve custom fields
+  private var originalObject: [String: Any] = [:]
+
   // MARK: - Initialization
 
   /// Internal initializer - use `fromBridge()` to create items from React Native
@@ -123,10 +128,12 @@ public class AudioItem {
   }
 
   /// Serializes the AudioItem back to a React Native bridge dictionary
-  /// Rebuilds the dictionary from current property values (matches Android behavior)
+  /// Preserves custom fields from the original bridge dictionary
   public func toBridge() -> [String: Any] {
-    var map: [String: Any] = [:]
+    // Start with the original object to preserve custom fields
+    var map = originalObject
 
+    // Override with current property values
     // URL is required
     if let url = url {
       map["url"] = url.value.absoluteString
@@ -197,6 +204,13 @@ public class AudioItem {
 
   /// Updates metadata from a React Native bridge dictionary
   public func updateMetadata(dictionary: [String: Any]) {
+    // TODO: Clarify nil value behavior - should nil values clear fields or preserve existing values?
+    // Currently, nil values preserve the old value from originalObject in toBridge()
+    // This may cause unexpected behavior when trying to explicitly clear a field
+
+    // Merge the update into originalObject to preserve custom fields
+    originalObject = originalObject.merging(dictionary) { _, new in new }
+
     title = (dictionary["title"] as? String) ?? title
     artist = (dictionary["artist"] as? String) ?? artist
     date = dictionary["date"] as? String
