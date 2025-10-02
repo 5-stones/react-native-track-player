@@ -9,7 +9,7 @@
 import Foundation
 
 public enum RepeatMode: String {
-    case off = "off"
-    case track = "track"
-    case queue = "queue"
+  case off
+  case track
+  case queue
 }

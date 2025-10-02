@@ -9,55 +9,66 @@
 import Foundation
 
 enum Capability: String {
-    case play = "play"
-    case pause = "pause"
-    case togglePlayPause = "toggle-play-pause"
-    case stop = "stop"
-    case next = "skip-to-next"
-    case previous = "skip-to-previous"
-    case jumpForward = "jump-forward"
-    case jumpBackward = "jump-backward"
-    case seek = "seek-to"
-    case like = "like"
-    case dislike = "dislike"
-    case bookmark = "bookmark"
+  case play
+  case pause
+  case togglePlayPause = "toggle-play-pause"
+  case stop
+  case next = "skip-to-next"
+  case previous = "skip-to-previous"
+  case jumpForward = "jump-forward"
+  case jumpBackward = "jump-backward"
+  case seek = "seek-to"
+  case like
+  case dislike
+  case bookmark
 
-    func mapToPlayerCommand(forwardJumpInterval: NSNumber?,
-                            backwardJumpInterval: NSNumber?,
-                            likeOptions: [String: Any]?,
-                            dislikeOptions: [String: Any]?,
-                            bookmarkOptions: [String: Any]?) -> RemoteCommand {
-        switch self {
-        case .stop:
-            return .stop
-        case .play:
-            return .play
-        case .pause:
-            return .pause
-        case .togglePlayPause:
-            return .togglePlayPause
-        case .next:
-            return .next
-        case .previous:
-            return .previous
-        case .seek:
-            return .changePlaybackPosition
-        case .jumpForward:
-            return .skipForward(preferredIntervals: [(forwardJumpInterval ?? backwardJumpInterval) ?? 15])
-        case .jumpBackward:
-            return .skipBackward(preferredIntervals: [(backwardJumpInterval ?? forwardJumpInterval) ?? 15])
-        case .like:
-            return .like(isActive: likeOptions?["isActive"] as? Bool ?? false,
-                         localizedTitle: likeOptions?["title"] as? String ?? "Like",
-                         localizedShortTitle: likeOptions?["title"] as? String ?? "Like")
-        case .dislike:
-            return .dislike(isActive: dislikeOptions?["isActive"] as? Bool ?? false,
-                            localizedTitle: dislikeOptions?["title"] as? String ?? "Dislike",
-                            localizedShortTitle: dislikeOptions?["title"] as? String ?? "Dislike")
-        case .bookmark:
-            return .bookmark(isActive: bookmarkOptions?["isActive"] as? Bool ?? false,
-                             localizedTitle: bookmarkOptions?["title"] as? String ?? "Bookmark",
-                             localizedShortTitle: bookmarkOptions?["title"] as? String ?? "Bookmark")
-        }
+  func mapToPlayerCommand(
+    forwardJumpInterval: NSNumber?,
+    backwardJumpInterval: NSNumber?,
+    likeOptions: [String: Any]?,
+    dislikeOptions: [String: Any]?,
+    bookmarkOptions: [String: Any]?
+  ) -> RemoteCommand {
+    switch self {
+    case .stop:
+      return .stop
+    case .play:
+      return .play
+    case .pause:
+      return .pause
+    case .togglePlayPause:
+      return .togglePlayPause
+    case .next:
+      return .next
+    case .previous:
+      return .previous
+    case .seek:
+      return .changePlaybackPosition
+    case .jumpForward:
+      return .skipForward(preferredIntervals: [(forwardJumpInterval ?? backwardJumpInterval) ?? 15])
+    case .jumpBackward:
+      return .skipBackward(preferredIntervals: [
+        (backwardJumpInterval ?? forwardJumpInterval) ??
+          15,
+      ])
+    case .like:
+      return .like(
+        isActive: likeOptions?["isActive"] as? Bool ?? false,
+        localizedTitle: likeOptions?["title"] as? String ?? "Like",
+        localizedShortTitle: likeOptions?["title"] as? String ?? "Like"
+      )
+    case .dislike:
+      return .dislike(
+        isActive: dislikeOptions?["isActive"] as? Bool ?? false,
+        localizedTitle: dislikeOptions?["title"] as? String ?? "Dislike",
+        localizedShortTitle: dislikeOptions?["title"] as? String ?? "Dislike"
+      )
+    case .bookmark:
+      return .bookmark(
+        isActive: bookmarkOptions?["isActive"] as? Bool ?? false,
+        localizedTitle: bookmarkOptions?["title"] as? String ?? "Bookmark",
+        localizedShortTitle: bookmarkOptions?["title"] as? String ?? "Bookmark"
+      )
     }
+  }
 }

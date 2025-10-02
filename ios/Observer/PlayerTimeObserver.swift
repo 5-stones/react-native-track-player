@@ -6,103 +6,106 @@
 //  Copyright © 2018 Jørgen Henrichsen. All rights reserved.
 //
 
-import Foundation
 import AVFoundation
+import Foundation
 
 /**
  Observes time-based player events and calls AudioPlayer methods directly.
  */
 class PlayerTimeObserver {
+  /// The time to use as start boundary time. Cannot be zero.
+  private static let startBoundaryTime: CMTime = .init(value: 1, timescale: 1000)
 
-    /// The time to use as start boundary time. Cannot be zero.
-    private static let startBoundaryTime: CMTime = CMTime(value: 1, timescale: 1000)
+  var boundaryTimeStartObserverToken: Any?
+  var periodicTimeObserverToken: Any?
 
-    var boundaryTimeStartObserverToken: Any?
-    var periodicTimeObserverToken: Any?
+  weak var avPlayer: AVPlayer? {
+    willSet {
+      unregisterForBoundaryTimeEvents()
+      unregisterForPeriodicEvents()
+    }
+  }
 
-    weak var avPlayer: AVPlayer? {
-        willSet {
-            unregisterForBoundaryTimeEvents()
-            unregisterForPeriodicEvents()
-        }
+  /// The frequency to receive periodic time events.
+  /// Setting this to a new value will trigger a re-registering to the periodic events of the
+  /// player.
+  var periodicObserverTimeInterval: CMTime {
+    didSet {
+      if oldValue != periodicObserverTimeInterval {
+        registerForPeriodicTimeEvents()
+      }
     }
+  }
 
-    /// The frequency to receive periodic time events.
-    /// Setting this to a new value will trigger a re-registering to the periodic events of the player.
-    var periodicObserverTimeInterval: CMTime {
-        didSet {
-            if oldValue != periodicObserverTimeInterval {
-                registerForPeriodicTimeEvents()
-            }
-        }
-    }
+  weak var player: AudioPlayer?
 
-    weak var player: AudioPlayer?
+  init(player: AudioPlayer, periodicObserverTimeInterval: CMTime) {
+    self.player = player
+    self.periodicObserverTimeInterval = periodicObserverTimeInterval
+  }
 
-    init(player: AudioPlayer, periodicObserverTimeInterval: CMTime) {
-        self.player = player
-        self.periodicObserverTimeInterval = periodicObserverTimeInterval
-    }
-    
-    deinit {
-        unregisterForPeriodicEvents()
-        unregisterForBoundaryTimeEvents()
-    }
-    
-    /**
-     Will register for the AVPlayer BoundaryTimeEvents, to trigger start and complete events.
-     */
-    func registerForBoundaryTimeEvents() {
-        guard let avPlayer = avPlayer else {
-            return
-        }
-        unregisterForBoundaryTimeEvents()
-        boundaryTimeStartObserverToken = avPlayer.addBoundaryTimeObserver(
-            forTimes: [PlayerTimeObserver.startBoundaryTime].map({
-                NSValue(time: $0)
-            }),
-            queue: nil,
-            using: { [weak self] in
-                self?.player?.audioDidStart()
-            }
-        )
-    }
-    
-    /**
-     Unregister from the boundary events of the player.
-     */
-    func unregisterForBoundaryTimeEvents() {
-        guard
-            let avPlayer = avPlayer,
-            let boundaryTimeStartObserverToken = boundaryTimeStartObserverToken
-        else { return }
-        avPlayer.removeTimeObserver(boundaryTimeStartObserverToken)
-        self.boundaryTimeStartObserverToken = nil
-    }
-    
-    /**
-     Start observing periodic time events.
-     Will trigger unregisterForPeriodicEvents() first to avoid multiple subscriptions.
-     */
-    func registerForPeriodicTimeEvents() {
-        guard let avPlayer = avPlayer else {
-            return
-        }
-        unregisterForPeriodicEvents()
-        periodicTimeObserverToken = avPlayer.addPeriodicTimeObserver(forInterval: periodicObserverTimeInterval, queue: nil, using: { [weak self] (time) in
-            self?.player?.handleSecondElapsed(time.seconds)
-        })
-    }
+  deinit {
+    unregisterForPeriodicEvents()
+    unregisterForBoundaryTimeEvents()
+  }
 
-    /**
-     Unregister for periodic events.
-     */
-    func unregisterForPeriodicEvents() {
-        guard let avPlayer = avPlayer, let periodicTimeObserverToken = periodicTimeObserverToken else {
-            return
-        }
-        avPlayer.removeTimeObserver(periodicTimeObserverToken)
-        self.periodicTimeObserverToken = nil
+  /**
+   Will register for the AVPlayer BoundaryTimeEvents, to trigger start and complete events.
+   */
+  func registerForBoundaryTimeEvents() {
+    guard let avPlayer else {
+      return
     }
-    
+    unregisterForBoundaryTimeEvents()
+    boundaryTimeStartObserverToken = avPlayer.addBoundaryTimeObserver(
+      forTimes: [PlayerTimeObserver.startBoundaryTime].map({
+        NSValue(time: $0)
+      }),
+      queue: nil,
+      using: { [weak self] in
+        self?.player?.audioDidStart()
+      }
+    )
+  }
+
+  /**
+   Unregister from the boundary events of the player.
+   */
+  func unregisterForBoundaryTimeEvents() {
+    guard
+      let avPlayer,
+      let boundaryTimeStartObserverToken
+    else { return }
+    avPlayer.removeTimeObserver(boundaryTimeStartObserverToken)
+    self.boundaryTimeStartObserverToken = nil
+  }
+
+  /**
+   Start observing periodic time events.
+   Will trigger unregisterForPeriodicEvents() first to avoid multiple subscriptions.
+   */
+  func registerForPeriodicTimeEvents() {
+    guard let avPlayer else {
+      return
+    }
+    unregisterForPeriodicEvents()
+    periodicTimeObserverToken = avPlayer.addPeriodicTimeObserver(
+      forInterval: periodicObserverTimeInterval,
+      queue: nil,
+      using: { [weak self] time in
+        self?.player?.handleSecondElapsed(time.seconds)
+      }
+    )
+  }
+
+  /**
+   Unregister for periodic events.
+   */
+  func unregisterForPeriodicEvents() {
+    guard let avPlayer, let periodicTimeObserverToken else {
+      return
+    }
+    avPlayer.removeTimeObserver(periodicTimeObserverToken)
+    self.periodicTimeObserverToken = nil
+  }
 }
