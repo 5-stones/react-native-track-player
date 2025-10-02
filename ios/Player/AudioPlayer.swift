@@ -547,7 +547,7 @@ public class AudioPlayer {
 
   private func setTimePitchingAlgorithmForCurrentItem() {
     if let algorithm = currentItem?.pitchAlgorithm {
-      currentAVPlayerItem?.audioTimePitchAlgorithm = algorithm
+      currentAVPlayerItem?.audioTimePitchAlgorithm = algorithm.avAlgorithm
     } else {
       currentAVPlayerItem?.audioTimePitchAlgorithm = audioTimePitchAlgorithm
     }
