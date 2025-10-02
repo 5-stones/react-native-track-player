@@ -9,11 +9,6 @@ import Foundation
 import AVFoundation
 import UIKit
 
-public enum SourceType {
-    case stream
-    case file
-}
-
 public protocol AudioItem {
     
     func getSourceUrl() -> String

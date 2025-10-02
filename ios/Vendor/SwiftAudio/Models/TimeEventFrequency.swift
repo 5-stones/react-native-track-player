@@ -8,13 +8,12 @@
 import Foundation
 import AVFoundation
 
-
 public enum TimeEventFrequency {
     case everySecond
     case everyHalfSecond
     case everyQuarterSecond
     case custom(time: CMTime)
-    
+
     func getTime() -> CMTime {
         switch self {
         case .everySecond: return CMTime(value: 1, timescale: 1)
