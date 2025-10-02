@@ -436,10 +436,14 @@ extension AVPlayerWrapper: AVPlayerObserverDelegate {
             if self.asset == nil && state != .stopped {
                 self.state = .idle
             } else if (state != .failed && state != .stopped) {
-                // Playback may have become paused externally for example due to a bluetooth device disconnecting:
+                // Distinguish between external pauses (bluetooth disconnect, interruption) and natural track completion:
                 if (self.playWhenReady) {
-                    // Only if we are not on the boundaries of the track, otherwise itemDidPlayToEndTime will handle it instead.
-                    if (self.currentTime > 0 && self.currentTime < self.duration) {
+                    // If playback pauses unexpectedly, this is likely an external interruption (bluetooth
+                    // disconnect, system interruption, etc). Set playWhenReady to false to acknowledge the pause.
+                    // However, if we're near the end of the track (within 0.5s of duration), this is likely
+                    // a natural pause from track completion. Let itemDidPlayToEndTime handle this case to
+                    // preserve auto-advance behavior between tracks in a queue/playlist.
+                    if (self.currentTime < self.duration - 0.5) {
                         self.playWhenReady = false;
                     }
                 } else {
