@@ -62,6 +62,13 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     }
 
     /**
+     Whether there are more items after the current item in the queue.
+     */
+    private var hasNextItem: Bool {
+        currentIndex < items.count - 1
+    }
+
+    /**
      Will replace the current item with a new one and load it into the player.
 
      - parameter item: The AudioItem to replace the current item.
@@ -180,8 +187,11 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     }
 
     func replay() {
-        seek(to: 0);
-        play()
+        seek(to: 0) { [weak self] succeeded in
+            if succeeded {
+                self?.play()
+            }
+        }
     }
 
     // MARK: - AVPlayerWrapperDelegate
@@ -191,14 +201,9 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
             guard let self = self else { return }
             self.event.playbackEnd.emit(data: .playedUntilEnd)
             if (self.repeatMode == .track) {
-                self.pause()
-
-                // quick workaround for race condition - schedule a call after 2 frames
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.016 * 2) { [weak self] in self?.replay() }
-            } else if (self.repeatMode == .queue) {
-                _ = self.queue.next(wrap: true)
-            } else if (self.currentIndex != self.items.count - 1) {
-                _ = self.queue.next(wrap: false)
+                self.replay()
+            } else if (self.repeatMode == .queue || self.hasNextItem) {
+                self.next()
             } else {
                 self.wrapper.state = .ended
             }
@@ -209,8 +214,11 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
 
     func onCurrentItemChanged() {
         let lastPosition = currentTime;
+        let shouldContinuePlayback = wrapper.playWhenReady
         if let currentItem = currentItem {
-            super.load(item: currentItem)
+            // Ensure playWhenReady is set before loading to preserve playback state
+            wrapper.playWhenReady = shouldContinuePlayback
+            super.load(item: currentItem, playWhenReady: nil)
         } else {
             super.clear()
         }
@@ -228,7 +236,7 @@ public class QueuedAudioPlayer: AudioPlayer, QueueManagerDelegate {
     }
 
     func onSkippedToSameCurrentItem() {
-        if (wrapper.playbackActive) {
+        if (wrapper.playWhenReady) {
             replay()
         }
     }

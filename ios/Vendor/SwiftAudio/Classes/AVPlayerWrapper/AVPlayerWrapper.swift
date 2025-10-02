@@ -22,13 +22,31 @@ public enum PlaybackEndedReason: String {
 
 class AVPlayerWrapper: AVPlayerWrapperProtocol {
     // MARK: - Properties
-    
+
+    /// Represents a seek operation that's pending while an item loads
+    private struct PendingSeek {
+        let time: TimeInterval
+        let completion: ((Bool) -> Void)?
+
+        func execute(on player: AVPlayer, delegate: AVPlayerWrapperDelegate?) {
+            let cmTime = CMTimeMakeWithSeconds(time, preferredTimescale: 1000)
+            player.seek(to: cmTime, toleranceBefore: CMTime.zero, toleranceAfter: CMTime.zero) { finished in
+                delegate?.AVWrapper(seekTo: Double(self.time), didFinish: finished)
+                self.completion?(finished)
+            }
+        }
+
+        func cancel() {
+            completion?(false)
+        }
+    }
+
     fileprivate var avPlayer = AVPlayer()
     private let playerObserver = AVPlayerObserver()
     internal let playerTimeObserver: AVPlayerTimeObserver
     private let playerItemNotificationObserver = AVPlayerItemNotificationObserver()
     private let playerItemObserver = AVPlayerItemObserver()
-    fileprivate var timeToSeekToAfterLoading: TimeInterval?
+    private var pendingSeek: PendingSeek?
     fileprivate var asset: AVAsset? = nil
     fileprivate var item: AVPlayerItem? = nil
     fileprivate var url: URL? = nil
@@ -193,32 +211,49 @@ class AVPlayerWrapper: AVPlayerWrapperProtocol {
     }
     
     func seek(to seconds: TimeInterval) {
-       // if the player is loading then we need to defer seeking until it's ready.
-        if (avPlayer.currentItem == nil) {
-         timeToSeekToAfterLoading = seconds
-       } else {
-           let time = CMTimeMakeWithSeconds(seconds, preferredTimescale: 1000)
-           avPlayer.seek(to: time, toleranceBefore: CMTime.zero, toleranceAfter: CMTime.zero) { (finished) in
-             self.delegate?.AVWrapper(seekTo: Double(seconds), didFinish: finished)
-         }
-       }
-     }
+        seek(to: seconds, completion: { _ in })
+    }
 
-    func seek(by seconds: TimeInterval) {
-        if let currentItem = avPlayer.currentItem {
-            let time = currentItem.currentTime().seconds + seconds
-            avPlayer.seek(
-                to: CMTimeMakeWithSeconds(time, preferredTimescale: 1000)
-            ) { (finished) in
-                  self.delegate?.AVWrapper(seekTo: Double(time), didFinish: finished)
+    /**
+     Seek to a specific time in the item with a completion handler.
+
+     - parameter seconds: The time to seek to.
+     - parameter completion: Called when the seek operation completes. The Bool parameter indicates whether the seek finished successfully (true) or was interrupted/deferred (false).
+     */
+    func seek(to seconds: TimeInterval, completion: @escaping (Bool) -> Void) {
+        // If an item is currently being loaded asynchronously, defer the seek until it's ready.
+        if state == .loading {
+            // Cancel any previous pending seek before creating a new one
+            pendingSeek?.cancel()
+            pendingSeek = PendingSeek(time: seconds, completion: completion)
+        } else if avPlayer.currentItem != nil {
+            let time = CMTimeMakeWithSeconds(seconds, preferredTimescale: 1000)
+            avPlayer.seek(to: time, toleranceBefore: CMTime.zero, toleranceAfter: CMTime.zero) { (finished) in
+                self.delegate?.AVWrapper(seekTo: Double(seconds), didFinish: finished)
+                completion(finished)
             }
         } else {
-            if let timeToSeekToAfterLoading = timeToSeekToAfterLoading {
-                self.timeToSeekToAfterLoading = timeToSeekToAfterLoading + seconds
-            } else {
-                timeToSeekToAfterLoading = seconds
-            }
+            // No item loaded and not loading - seek fails immediately
+            completion(false)
         }
+    }
+
+    func seek(by seconds: TimeInterval) {
+        // Calculate the target time based on current state
+        let targetTime: TimeInterval
+        if state == .loading {
+            // If loading, offset from pending seek (or 0 if no pending seek)
+            targetTime = (pendingSeek?.time ?? 0) + seconds
+        } else if let currentItem = avPlayer.currentItem {
+            // If playing, offset from current position
+            targetTime = currentItem.currentTime().seconds + seconds
+        } else {
+            // No item and not loading - nothing to seek in
+            return
+        }
+
+        // Delegate to absolute seek
+        seek(to: targetTime)
     }
     
     private func playbackFailed(error: AudioPlayerError.PlaybackError) {
@@ -300,10 +335,11 @@ class AVPlayerWrapper: AVPlayerWrapperProtocol {
                     self.avPlayer.replaceCurrentItem(with: item)
                     self.startObservingAVPlayer(item: item)
                     self.applyAVPlayerRate()
-                    
-                    if let initialTime = self.timeToSeekToAfterLoading {
-                        self.timeToSeekToAfterLoading = nil
-                        self.seek(to: initialTime)
+
+                    // Execute any pending seek operation
+                    if let pending = self.pendingSeek {
+                        self.pendingSeek = nil
+                        pending.execute(on: self.avPlayer, delegate: self.delegate)
                     }
                 }
             })
@@ -375,10 +411,16 @@ class AVPlayerWrapper: AVPlayerWrapperProtocol {
     private func clearCurrentItem() {
         guard let asset = asset else { return }
         stopObservingAVPlayerItem()
-        
+
         asset.cancelLoading()
         self.asset = nil
-        
+
+        // Clear any pending seek to prevent it from being applied to the next item that loads.
+        // Without this, a seek called before any item was loaded could incorrectly apply to
+        // an unrelated track that loads later.
+        pendingSeek?.cancel()
+        pendingSeek = nil
+
         avPlayer.replaceCurrentItem(with: nil)
     }
     

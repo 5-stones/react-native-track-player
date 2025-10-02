@@ -270,6 +270,16 @@ public class AudioPlayer: AVPlayerWrapperDelegate {
     }
 
     /**
+     Seek to a specific time in the item with a completion handler.
+
+     - parameter seconds: The time to seek to.
+     - parameter completion: Called when the seek operation completes. The Bool parameter indicates whether the seek finished successfully (true) or was interrupted/deferred (false).
+     */
+    public func seek(to seconds: TimeInterval, completion: @escaping (Bool) -> Void) {
+        wrapper.seek(to: seconds, completion: completion)
+    }
+
+    /**
      Seek by relative a time offset in the item.
      */
     public func seek(by offset: TimeInterval) {
