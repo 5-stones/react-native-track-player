@@ -4,7 +4,7 @@ import MediaPlayer
 import React
 
 @objc(NativeTrackPlayerImpl)
-public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
+public class NativeTrackPlayerImpl: NSObject {
     // Add property for the Objective-C bridge
     @objc public weak var delegate: NativeTrackPlayerImplDelegate? = nil
 
@@ -17,7 +17,8 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
 
     private var hasInitialized = false
     private let player = QueuedAudioPlayer()
-    private let audioSessionController = AudioSessionController.shared
+    private let audioSession = AVAudioSession.sharedInstance()
+    private var audioSessionIsActive = false
     private var shouldEmitProgressEvent: Bool = false
     private var shouldResumePlaybackAfterInterruptionEnds: Bool = false
     private var forwardJumpInterval: NSNumber? = nil;
@@ -31,7 +32,15 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
 
     public override init() {
         super.init()
-        audioSessionController.delegate = self
+
+        // Observe audio session interruptions
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleAudioSessionInterruption),
+            name: AVAudioSession.interruptionNotification,
+            object: nil
+        )
+
         player.playWhenReady = false;
         player.event.receiveChapterMetadata.addListener(self, handleAudioPlayerChapterMetadataReceived)
         player.event.receiveTimedMetadata.addListener(self, handleAudioPlayerTimedMetadataReceived)
@@ -44,6 +53,11 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
     }
 
     deinit {
+        NotificationCenter.default.removeObserver(
+            self,
+            name: AVAudioSession.interruptionNotification,
+            object: nil
+        )
         reset()
     }
 
@@ -108,16 +122,30 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
         }
     }
 
-    // MARK: - AudioSessionControllerDelegate
+    // MARK: - Audio Session Interruption Handling
 
-    public func handleInterruption(type: InterruptionType) {
+    @objc private func handleAudioSessionInterruption(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+
         switch type {
         case .began:
             break
-        case let .ended(shouldResume):
+        case .ended:
+            guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else {
+                return
+            }
+            let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+            let shouldResume = options.contains(.shouldResume)
+
             if shouldResume && shouldResumePlaybackAfterInterruptionEnds {
                 player.play()
             }
+        @unknown default:
+            break
         }
     }
 
@@ -280,14 +308,16 @@ public class NativeTrackPlayerImpl: NSObject, AudioSessionControllerDelegate {
         ensureMainThread {
             // deactivate the session when there is no current item to be played
             if (self.player.currentItem == nil) {
-                try? self.audioSessionController.deactivateSession()
+                try? self.audioSession.setActive(false, options: [])
+                self.audioSessionIsActive = false
                 return
             }
 
             // activate the audio session when there is an item to be played
             // and the player has been configured to start when it is ready loading:
             if (self.player.playWhenReady) {
-                try? self.audioSessionController.activateSession()
+                try? self.audioSession.setActive(true, options: [])
+                self.audioSessionIsActive = true
                 if #available(iOS 11.0, *) {
                     try? AVAudioSession.sharedInstance().setCategory(self.sessionCategory, mode: self.sessionCategoryMode, policy: self.sessionCategoryPolicy, options: self.sessionCategoryOptions)
                 } else {
