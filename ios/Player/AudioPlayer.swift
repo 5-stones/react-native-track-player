@@ -9,7 +9,7 @@ import Foundation
 import MediaPlayer
 
 public class AudioPlayer {
-  public let nowPlayingInfoController: NowPlayingInfoControllerProtocol
+  public let nowPlayingInfoController: NowPlayingInfoController
   public let remoteCommandController: RemoteCommandController
   public let event = EventHolder()
 
@@ -298,7 +298,7 @@ public class AudioPlayer {
    - parameter infoCenter: The InfoCenter to update. Default is `MPNowPlayingInfoCenter.default()`.
    */
   public init(
-    nowPlayingInfoController: NowPlayingInfoControllerProtocol = NowPlayingInfoController(),
+    nowPlayingInfoController: NowPlayingInfoController = NowPlayingInfoController(),
     remoteCommandController: RemoteCommandController = RemoteCommandController()
   ) {
     self.nowPlayingInfoController = nowPlayingInfoController

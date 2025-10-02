@@ -723,7 +723,7 @@ public class NativeTrackPlayerImpl: NSObject {
       track.updateMetadata(dictionary: metadata)
 
       if self.player.currentIndex == trackIndex {
-        updateNowPlayingInfo(with: metadata)
+        self.updateNowPlayingInfo(with: metadata)
       }
     }
   }
@@ -732,7 +732,7 @@ public class NativeTrackPlayerImpl: NSObject {
   public func updateNowPlayingMetadata(metadata: [String: Any]) {
     ensureMainThread {
       guard self.hasInitialized else { return }
-      updateNowPlayingInfo(with: metadata)
+      self.updateNowPlayingInfo(with: metadata)
     }
   }
 

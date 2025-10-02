@@ -16,7 +16,7 @@ public class QueuedAudioPlayer: AudioPlayer {
   fileprivate var lastItem: AudioItem?
 
   override public init(
-    nowPlayingInfoController: NowPlayingInfoControllerProtocol = NowPlayingInfoController(),
+    nowPlayingInfoController: NowPlayingInfoController = NowPlayingInfoController(),
     remoteCommandController: RemoteCommandController = RemoteCommandController()
   ) {
     super.init(

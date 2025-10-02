@@ -8,7 +8,7 @@
 import Foundation
 import MediaPlayer
 
-public class NowPlayingInfoController: NowPlayingInfoControllerProtocol {
+public class NowPlayingInfoController {
   private var infoQueue = DispatchQueue(
     label: "NowPlayingInfoController.infoQueue",
     attributes: .concurrent
@@ -19,6 +19,10 @@ public class NowPlayingInfoController: NowPlayingInfoControllerProtocol {
 
   public required init() {
     infoCenter = MPNowPlayingInfoCenter.default()
+  }
+
+  public required init(infoCenter: NowPlayingInfoCenter) {
+    self.infoCenter = infoCenter
   }
 
   public func set(keyValues: [NowPlayingInfoKeyValue]) {
