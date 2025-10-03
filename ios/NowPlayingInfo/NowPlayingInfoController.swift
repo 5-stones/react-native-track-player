@@ -1,10 +1,3 @@
-//
-//  NowPlayingInfoController.swift
-//  SwiftAudio
-//
-//  Created by Jørgen Henrichsen on 15/03/2018.
-//
-
 import Foundation
 import MediaPlayer
 

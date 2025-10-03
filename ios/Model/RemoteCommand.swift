@@ -1,10 +1,3 @@
-//
-//  RemoteCommand.swift
-//  SwiftAudio
-//
-//  Created by Jørgen Henrichsen on 20/03/2018.
-//
-
 import Foundation
 
 public enum RemoteCommand: CustomStringConvertible, Equatable {

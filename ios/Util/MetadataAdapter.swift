@@ -1,11 +1,3 @@
-//
-//  MetadataAdapter.swift
-//  react-native-track-player
-//
-//  Created by David Chavez on 01.08.23.
-//  Copyright © 2023 Double Symmetry. All rights reserved.
-//
-
 import AVFoundation
 import Foundation
 

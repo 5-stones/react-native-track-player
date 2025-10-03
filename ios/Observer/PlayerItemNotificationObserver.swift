@@ -1,10 +1,3 @@
-//
-//  PlayerItemNotificationObserver.swift
-//  SwiftAudio
-//
-//  Created by Jørgen Henrichsen on 12/03/2018.
-//
-
 import AVFoundation
 import Foundation
 

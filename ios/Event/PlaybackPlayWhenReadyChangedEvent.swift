@@ -1,11 +1,3 @@
-//
-//  PlaybackPlayWhenReadyChangedEvent.swift
-//  SwiftAudio
-//
-//  Created by Jørgen Henrichsen on 10/03/2018.
-//  Copyright © 2018 Jørgen Henrichsen. All rights reserved.
-//
-
 import Foundation
 
 /**

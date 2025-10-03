@@ -1,11 +1,3 @@
-//
-//  SessionCategories.swift
-//  RNTrackPlayer
-//
-//  Created by Thomas Hessler on 3/12/19.
-//  Copyright © 2019 David Chavez. All rights reserved.
-//
-
 import AVFoundation
 import Foundation
 import MediaPlayer

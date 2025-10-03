@@ -1,10 +1,3 @@
-//
-//  Track.swift
-//  SwiftAudio
-//
-//  Created by Jørgen Henrichsen on 18/03/2018.
-//
-
 import AVFoundation
 import Foundation
 import MediaPlayer

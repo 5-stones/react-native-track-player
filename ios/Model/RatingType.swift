@@ -1,8 +1,3 @@
-//
-//  RatingType.swift
-//  RNTrackPlayer
-//
-
 import Foundation
 
 public enum RatingType: String {

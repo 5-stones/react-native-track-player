@@ -1,11 +1,3 @@
-//
-//  PlayerStateObserver.swift
-//  SwiftAudio
-//
-//  Created by Jørgen Henrichsen on 09/03/2018.
-//  Copyright © 2018 Jørgen Henrichsen. All rights reserved.
-//
-
 import AVFoundation
 import Foundation
 

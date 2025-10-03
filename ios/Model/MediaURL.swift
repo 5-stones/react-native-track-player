@@ -1,11 +1,3 @@
-//
-//  MediaURL.swift
-//  RNTrackPlayer
-//
-//  Created by David Chavez on 12.08.17.
-//  Copyright © 2017 David Chavez. All rights reserved.
-//
-
 import Foundation
 import React
 
