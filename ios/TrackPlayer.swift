@@ -90,29 +90,54 @@ public class TrackPlayer {
   private var avPlayer = AVPlayer()
 
   private lazy var playerObserver: PlayerStateObserver = {
-    let observer = PlayerStateObserver()
-    observer.player = self
-    return observer
+    PlayerStateObserver(
+      onStatusChange: { [weak self] status in
+        self?.avPlayerStatusDidChange(status)
+      },
+      onTimeControlStatusChange: { [weak self] status in
+        self?.avPlayerDidChangeTimeControlStatus(status)
+      }
+    )
   }()
 
   private lazy var playerTimeObserver: PlayerTimeObserver = {
-    let observer = PlayerTimeObserver(
-      periodicObserverTimeInterval: _timeEventFrequency.getTime()
+    PlayerTimeObserver(
+      periodicObserverTimeInterval: _timeEventFrequency.getTime(),
+      onAudioDidStart: { [weak self] in
+        self?.audioDidStart()
+      },
+      onSecondElapsed: { [weak self] time in
+        self?.handleSecondElapsed(time)
+      }
     )
-    observer.player = self
-    return observer
   }()
 
   private lazy var playerItemNotificationObserver: PlayerItemNotificationObserver = {
-    let observer = PlayerItemNotificationObserver()
-    observer.player = self
-    return observer
+    PlayerItemNotificationObserver(
+      onDidPlayToEndTime: { [weak self] in
+        self?.handleTrackDidPlayToEndTime()
+      },
+      onFailedToPlayToEndTime: { [weak self] in
+        self?.handleTrackFailedToPlayToEndTime()
+      },
+      onPlaybackStalled: { [weak self] in
+        self?.handleTrackPlaybackStalled()
+      }
+    )
   }()
 
   private lazy var playerItemObserver: PlayerItemPropertyObserver = {
-    let observer = PlayerItemPropertyObserver()
-    observer.player = self
-    return observer
+    PlayerItemPropertyObserver(
+      onDurationUpdate: { [weak self] duration in
+        self?.handleDurationUpdate(duration)
+      },
+      onPlaybackLikelyToKeepUpUpdate: { [weak self] isLikely in
+        self?.avItemDidUpdatePlaybackLikelyToKeepUp(isLikely)
+      },
+      onTimedMetadataReceived: { [weak self] groups in
+        self?.handleTimedMetadataReceived(groups)
+      }
+    )
   }()
   private var pendingSeek: PendingSeek?
   private var asset: AVAsset?

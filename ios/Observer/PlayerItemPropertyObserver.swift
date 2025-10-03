@@ -9,7 +9,7 @@ import AVFoundation
 import Foundation
 
 /**
- Observes player item property changes and calls TrackPlayer methods directly.
+ Observes player item property changes and invokes callbacks passed at initialization.
  */
 class PlayerItemPropertyObserver: NSObject {
   private static var context = 0
@@ -22,9 +22,21 @@ class PlayerItemPropertyObserver: NSObject {
   }
 
   private(set) var isObserving: Bool = false
-
   private(set) weak var observingAVItem: AVPlayerItem?
-  weak var player: TrackPlayer?
+
+  private let onDurationUpdate: (Double) -> Void
+  private let onPlaybackLikelyToKeepUpUpdate: (Bool) -> Void
+  private let onTimedMetadataReceived: ([AVTimedMetadataGroup]) -> Void
+
+  init(
+    onDurationUpdate: @escaping (Double) -> Void,
+    onPlaybackLikelyToKeepUpUpdate: @escaping (Bool) -> Void,
+    onTimedMetadataReceived: @escaping ([AVTimedMetadataGroup]) -> Void
+  ) {
+    self.onDurationUpdate = onDurationUpdate
+    self.onPlaybackLikelyToKeepUpUpdate = onPlaybackLikelyToKeepUpUpdate
+    self.onTimedMetadataReceived = onTimedMetadataReceived
+  }
 
   deinit {
     stopObservingCurrentItem()
@@ -109,19 +121,19 @@ class PlayerItemPropertyObserver: NSObject {
     switch observedKeyPath {
     case AVPlayerItemKeyPath.duration:
       if let duration = change?[.newKey] as? CMTime {
-        player?.handleDurationUpdate(duration.seconds)
+        onDurationUpdate(duration.seconds)
       }
 
     case AVPlayerItemKeyPath.loadedTimeRanges:
       if let ranges = change?[.newKey] as? [NSValue],
          let duration = ranges.first?.timeRangeValue.duration
       {
-        player?.handleDurationUpdate(duration.seconds)
+        onDurationUpdate(duration.seconds)
       }
 
     case AVPlayerItemKeyPath.playbackLikelyToKeepUp:
       if let playbackLikelyToKeepUp = change?[.newKey] as? Bool {
-        player?.avItemDidUpdatePlaybackLikelyToKeepUp(playbackLikelyToKeepUp)
+        onPlaybackLikelyToKeepUpUpdate(playbackLikelyToKeepUp)
       }
 
     default: break
@@ -136,7 +148,7 @@ extension PlayerItemPropertyObserver: AVPlayerItemMetadataOutputPushDelegate {
     from _: AVPlayerItemTrack?
   ) {
     if output == currentMetadataOutput {
-      player?.handleTimedMetadataReceived(groups)
+      onTimedMetadataReceived(groups)
     }
   }
 }

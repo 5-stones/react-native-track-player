@@ -10,7 +10,7 @@ import AVFoundation
 import Foundation
 
 /**
- Observes player state changes and calls TrackPlayer methods directly.
+ Observes player state changes and invokes callbacks passed at initialization.
  */
 class PlayerStateObserver: NSObject {
   private static var context = 0
@@ -25,11 +25,21 @@ class PlayerStateObserver: NSObject {
   private let timeControlStatusChangeOptions: NSKeyValueObservingOptions = [.new]
   private(set) var isObserving: Bool = false
 
-  weak var player: TrackPlayer?
   weak var avPlayer: AVPlayer? {
     willSet {
       stopObserving()
     }
+  }
+
+  private let onStatusChange: (AVPlayer.Status) -> Void
+  private let onTimeControlStatusChange: (AVPlayer.TimeControlStatus) -> Void
+
+  init(
+    onStatusChange: @escaping (AVPlayer.Status) -> Void,
+    onTimeControlStatusChange: @escaping (AVPlayer.TimeControlStatus) -> Void
+  ) {
+    self.onStatusChange = onStatusChange
+    self.onTimeControlStatusChange = onTimeControlStatusChange
   }
 
   deinit {
@@ -105,14 +115,14 @@ class PlayerStateObserver: NSObject {
     } else {
       .unknown
     }
-    player?.avPlayerStatusDidChange(status)
+    onStatusChange(status)
   }
 
   private func handleTimeControlStatusChange(_ change: [NSKeyValueChangeKey: Any]?) {
     let status: AVPlayer.TimeControlStatus
     if let statusNumber = change?[.newKey] as? NSNumber {
       status = AVPlayer.TimeControlStatus(rawValue: statusNumber.intValue)!
-      player?.avPlayerDidChangeTimeControlStatus(status)
+      onTimeControlStatusChange(status)
     }
   }
 }

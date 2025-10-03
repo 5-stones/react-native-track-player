@@ -12,36 +12,50 @@ graph TB
 JS[React Native Layer<br/>JavaScript]
 TPM[TrackPlayerModule<br/>RN Bridge]
 TP[TrackPlayer<br/>Core Player]
-EVT[Event System<br/>Output Layer]
-OBS[Observer Classes<br/>Input Layer]
-RCC[RemoteCommandController]
-AVP[AVPlayer<br/>Apple Platform]
+EVT[Event System<br/>event.stateChange, fail, etc]
+AVP[AVPlayer<br/>Apple AVFoundation]
+
+subgraph Observers[Observer Layer - Closure-Based]
+  PSO[PlayerStateObserver]
+  PTO[PlayerTimeObserver]
+  PINO[PlayerItemNotificationObserver]
+  PIPO[PlayerItemPropertyObserver]
+end
+
+subgraph Controllers[Controller Layer]
+  RCC[RemoteCommandController]
+  NPIC[NowPlayingInfoController]
+end
 
 JS -->|Commands| TPM
 TPM -->|Player Commands| TP
-TPM -.->|Customizes| RCC
-TPM -.->|Listens to Events| EVT
+TPM -->|Listen to Events| EVT
 
-TP -->|Emits| EVT
+TP -->|Owns & Initializes<br/>with Closures| Observers
+TP -->|Emits Events| EVT
 TP -->|Controls| AVP
-RCC -.->|Weak ref| TP
+TP -->|Owns| Controllers
 
-OBS -->|KVO Observes| AVP
-OBS -->|Calls Methods| TP
+Observers -->|Observe via KVO<br/>& Notifications| AVP
+Observers -->|Invoke Closures| TP
 
-EVT -.->|event.stateChange<br/>event.fail<br/>event.updateDuration| TPM
+RCC -->|Weak ref| TP
+RCC -->|System Events| TP
 
+EVT -->|Bridges Events| TPM
 TPM -->|Events| JS
 
 classDef bridge fill:#e1f5ff,stroke:#333,stroke-width:2px
 classDef core fill:#ffe1e1,stroke:#333,stroke-width:2px
-classDef io fill:#e1ffe1,stroke:#333,stroke-width:2px
+classDef observer fill:#e1ffe1,stroke:#333,stroke-width:2px
+classDef controller fill:#fff3e1,stroke:#333,stroke-width:2px
 classDef platform fill:#f0f0f0,stroke:#333,stroke-width:2px
 
 class TPM bridge
-class TP,RCC core
-class EVT,OBS io
-class AVP,JS platform
+class TP core
+class PSO,PTO,PINO,PIPO observer
+class RCC,NPIC controller
+class AVP,JS,EVT platform
 ```
 
 ## Project Structure

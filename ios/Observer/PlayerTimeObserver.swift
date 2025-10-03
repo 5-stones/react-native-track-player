@@ -10,7 +10,7 @@ import AVFoundation
 import Foundation
 
 /**
- Observes time-based player events and calls TrackPlayer methods directly.
+ Observes time-based player events and invokes callbacks passed at initialization.
  */
 class PlayerTimeObserver {
   /// The time to use as start boundary time. Cannot be zero.
@@ -37,10 +37,17 @@ class PlayerTimeObserver {
     }
   }
 
-  weak var player: TrackPlayer?
+  private let onAudioDidStart: () -> Void
+  private let onSecondElapsed: (Double) -> Void
 
-  init(periodicObserverTimeInterval: CMTime) {
+  init(
+    periodicObserverTimeInterval: CMTime,
+    onAudioDidStart: @escaping () -> Void,
+    onSecondElapsed: @escaping (Double) -> Void
+  ) {
     self.periodicObserverTimeInterval = periodicObserverTimeInterval
+    self.onAudioDidStart = onAudioDidStart
+    self.onSecondElapsed = onSecondElapsed
   }
 
   deinit {
@@ -62,7 +69,7 @@ class PlayerTimeObserver {
       }),
       queue: nil,
       using: { [weak self] in
-        self?.player?.audioDidStart()
+        self?.onAudioDidStart()
       }
     )
   }
@@ -92,7 +99,7 @@ class PlayerTimeObserver {
       forInterval: periodicObserverTimeInterval,
       queue: nil,
       using: { [weak self] time in
-        self?.player?.handleSecondElapsed(time.seconds)
+        self?.onSecondElapsed(time.seconds)
       }
     )
   }

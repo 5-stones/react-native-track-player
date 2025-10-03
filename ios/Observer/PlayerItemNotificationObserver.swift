@@ -9,15 +9,27 @@ import AVFoundation
 import Foundation
 
 /**
- Observes player item notifications and calls TrackPlayer methods directly.
+ Observes player item notifications and invokes callbacks passed at initialization.
  */
 class PlayerItemNotificationObserver {
   private let notificationCenter: NotificationCenter = .default
 
   private(set) weak var observingAVItem: AVPlayerItem?
-  weak var player: TrackPlayer?
-
   private(set) var isObserving: Bool = false
+
+  private let onDidPlayToEndTime: () -> Void
+  private let onFailedToPlayToEndTime: () -> Void
+  private let onPlaybackStalled: () -> Void
+
+  init(
+    onDidPlayToEndTime: @escaping () -> Void,
+    onFailedToPlayToEndTime: @escaping () -> Void,
+    onPlaybackStalled: @escaping () -> Void
+  ) {
+    self.onDidPlayToEndTime = onDidPlayToEndTime
+    self.onFailedToPlayToEndTime = onFailedToPlayToEndTime
+    self.onPlaybackStalled = onPlaybackStalled
+  }
 
   deinit {
     stopObservingCurrentItem()
@@ -80,14 +92,14 @@ class PlayerItemNotificationObserver {
   }
 
   @objc private func avItemDidPlayToEndTime() {
-    player?.handleTrackDidPlayToEndTime()
+    onDidPlayToEndTime()
   }
 
   @objc private func avItemFailedToPlayToEndTime() {
-    player?.handleTrackFailedToPlayToEndTime()
+    onFailedToPlayToEndTime()
   }
 
   @objc private func avItemPlaybackStalled() {
-    player?.handleTrackPlaybackStalled()
+    onPlaybackStalled()
   }
 }
