@@ -10,10 +10,16 @@ import MediaPlayer
 
 public typealias RemoteCommandHandler = (MPRemoteCommandEvent) -> MPRemoteCommandHandlerStatus
 
+/**
+ Manages MPRemoteCommandCenter integration for media control (lock screen, control center, CarPlay, etc.).
+
+ This controller enables/disables remote commands and routes them to handlers. It provides default handlers
+ that call TrackPlayer methods, but allows customization by setting the lazy handler properties.
+ */
 public class RemoteCommandController {
   private let center: MPRemoteCommandCenter
 
-  weak var player: AudioPlayer?
+  weak var player: TrackPlayer?
 
   var commandTargetPointers: [String: Any] = [:]
   private var enabledCommands: [RemoteCommand] = []

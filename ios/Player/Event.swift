@@ -8,7 +8,14 @@
 import Foundation
 import MediaPlayer
 
-public extension AudioPlayer {
+/**
+ Event system for TrackPlayer.
+
+ Provides type-safe events that listeners can subscribe to for playback state changes,
+ metadata updates, and player lifecycle events. TrackPlayerModule uses these events to
+ bridge player state to React Native.
+ */
+public extension TrackPlayer {
   typealias PlayWhenReadyChangeData = Bool
   typealias StateChangeEventData = AudioPlayerState
   typealias PlaybackEndEventData = PlaybackEndedReason
@@ -29,66 +36,66 @@ public extension AudioPlayer {
 
   struct EventHolder {
     /**
-     Emitted when the `AudioPlayer`s state is changed
+     Emitted when the `TrackPlayer`s state is changed
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
-    public let stateChange: AudioPlayer.Event<StateChangeEventData> = AudioPlayer.Event()
+    public let stateChange: TrackPlayer.Event<StateChangeEventData> = TrackPlayer.Event()
 
     /**
-     Emitted when the `AudioPlayer#playWhenReady` has changed
+     Emitted when the `TrackPlayer#playWhenReady` has changed
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
-    public let playWhenReadyChange: AudioPlayer.Event<PlayWhenReadyChangeData> = AudioPlayer.Event()
+    public let playWhenReadyChange: TrackPlayer.Event<PlayWhenReadyChangeData> = TrackPlayer.Event()
 
     /**
      Emitted when the playback of the player, for some reason, has stopped.
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
-    public let playbackEnd: AudioPlayer.Event<PlaybackEndEventData> = AudioPlayer.Event()
+    public let playbackEnd: TrackPlayer.Event<PlaybackEndEventData> = TrackPlayer.Event()
 
     /**
-     Emitted when a second is elapsed in the `AudioPlayer`.
+     Emitted when a second is elapsed in the `TrackPlayer`.
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
-    public let secondElapse: AudioPlayer.Event<SecondElapseEventData> = AudioPlayer.Event()
+    public let secondElapse: TrackPlayer.Event<SecondElapseEventData> = TrackPlayer.Event()
 
     /**
      Emitted when the player encounters an error. This will ultimately result in the AVPlayer instance to be recreated.
      If this event is emitted, it means you will need to load a new item in some way. Calling play() will not resume playback.
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
-    public let fail: AudioPlayer.Event<FailEventData> = AudioPlayer.Event()
+    public let fail: TrackPlayer.Event<FailEventData> = TrackPlayer.Event()
 
     /**
      Emitted when the player is done attempting to seek.
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
-    public let seek: AudioPlayer.Event<SeekEventData> = AudioPlayer.Event()
+    public let seek: TrackPlayer.Event<SeekEventData> = TrackPlayer.Event()
 
     /**
      Emitted when the player updates its duration.
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
-    public let updateDuration: AudioPlayer.Event<UpdateDurationEventData> = AudioPlayer.Event()
+    public let updateDuration: TrackPlayer.Event<UpdateDurationEventData> = TrackPlayer.Event()
 
     /**
      Emitted when the player receives common metadata.
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
-    public let receiveCommonMetadata: AudioPlayer.Event<MetadataCommonEventData> = AudioPlayer
+    public let receiveCommonMetadata: TrackPlayer.Event<MetadataCommonEventData> = TrackPlayer
       .Event()
 
     /**
      Emitted when the player receives timed metadata.
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
-    public let receiveTimedMetadata: AudioPlayer.Event<MetadataTimedEventData> = AudioPlayer.Event()
+    public let receiveTimedMetadata: TrackPlayer.Event<MetadataTimedEventData> = TrackPlayer.Event()
 
     /**
      Emitted when the player receives chapter metadata.
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
-    public let receiveChapterMetadata: AudioPlayer.Event<MetadataTimedEventData> = AudioPlayer
+    public let receiveChapterMetadata: TrackPlayer.Event<MetadataTimedEventData> = TrackPlayer
       .Event()
 
     /**
@@ -96,14 +103,13 @@ public extension AudioPlayer {
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      - Note: It can be necessary to set the AVAudioSession's category again when this event is emitted.
      */
-    public let didRecreateAVPlayer: AudioPlayer.Event<Void> = AudioPlayer.Event()
+    public let didRecreateAVPlayer: TrackPlayer.Event<Void> = TrackPlayer.Event()
 
     /**
      Emitted when the current track has changed.
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
-     - Note: It is only fired for instances of a QueuedAudioPlayer.
      */
-    public let currentItem: AudioPlayer.Event<CurrentItemEventData> = AudioPlayer.Event()
+    public let currentItem: TrackPlayer.Event<CurrentItemEventData> = TrackPlayer.Event()
   }
 
   typealias EventClosure<EventData> = (EventData) -> Void

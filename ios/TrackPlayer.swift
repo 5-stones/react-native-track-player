@@ -1,1024 +1,1233 @@
-// TrackPlayer.swift
+//
+//  TrackPlayer.swift
+//  SwiftAudio
+//
+//  Created by Jørgen Henrichsen on 15/03/2018.
+//
+
 import Foundation
 import MediaPlayer
-import React
 
-@objc(NativeTrackPlayerImpl)
-public class NativeTrackPlayerImpl: NSObject {
-  // Add property for the Objective-C bridge
-  @objc public weak var delegate: NativeTrackPlayerImplDelegate?
+public class TrackPlayer {
+  public let nowPlayingInfoController: NowPlayingInfoController
+  public let remoteCommandController: RemoteCommandController
+  public let event = EventHolder()
 
-  // @objc
-  // func constantsToExport() -> [String: Any]! {
-  //   return ["someKey": "someValue"]
-  // }
+  fileprivate var lastIndex: Int = -1
+  fileprivate var lastItem: AudioItem?
 
-  // MARK: - Attributes
+  /// The repeat mode for the queue player.
+  public var repeatMode: RepeatMode = .off
 
-  private var hasInitialized = false
-  private let player = QueuedAudioPlayer()
-  private let audioSession = AVAudioSession.sharedInstance()
-  private var audioSessionIsActive = false
-  private var shouldEmitProgressEvent: Bool = false
-  private var shouldResumePlaybackAfterInterruptionEnds: Bool = false
-  private var forwardJumpInterval: NSNumber?
-  private var backwardJumpInterval: NSNumber?
-  private var sessionCategory: AVAudioSession.Category = .playback
-  private var sessionCategoryMode: AVAudioSession.Mode = .default
-  private var sessionCategoryPolicy: AVAudioSession.RouteSharingPolicy = .default
-  private var sessionCategoryOptions: AVAudioSession.CategoryOptions = []
-  private var currentImageTask: URLSessionDataTask?
+  // MARK: - Queue Properties
 
-  // MARK: - Lifecycle Methods
-
-  override public init() {
-    super.init()
-
-    // Observe audio session interruptions
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(handleAudioSessionInterruption),
-      name: AVAudioSession.interruptionNotification,
-      object: nil
-    )
-
-    player.playWhenReady = false
-    player.event.receiveChapterMetadata.addListener(self, handleAudioPlayerChapterMetadataReceived)
-    player.event.receiveTimedMetadata.addListener(self, handleAudioPlayerTimedMetadataReceived)
-    player.event.receiveCommonMetadata.addListener(self, handleAudioPlayerCommonMetadataReceived)
-    player.event.stateChange.addListener(self, handleAudioPlayerStateChange)
-    player.event.fail.addListener(self, handleAudioPlayerFailed)
-    player.event.currentItem.addListener(self, handleAudioPlayerCurrentItemChange)
-    player.event.secondElapse.addListener(self, handleAudioPlayerSecondElapse)
-    player.event.playWhenReadyChange.addListener(self, handlePlayWhenReadyChange)
+  private func assertMainThread() {
+    assert(Thread.isMainThread, "TrackPlayer queue must be accessed from the main thread")
   }
 
-  deinit {
-    NotificationCenter.default.removeObserver(
-      self,
-      name: AVAudioSession.interruptionNotification,
-      object: nil
-    )
-    reset()
+  /**
+   The index of the current item. `-1` when there is no current item
+   */
+  private(set) public var currentIndex: Int = -1
+
+  /**
+   All items held by the queue.
+   */
+  private(set) public var items: [AudioItem] = []
+
+  public var currentItem: AudioItem? {
+    assertMainThread()
+    guard currentIndex >= 0, currentIndex < items.count else { return nil }
+    return items[currentIndex]
   }
 
-  // MARK: - Event Emission
+  /**
+   The upcoming items in the queue.
+   */
+  public var nextItems: [AudioItem] {
+    assertMainThread()
+    guard currentIndex >= 0, currentIndex < items.count - 1 else { return [] }
+    return Array(items[currentIndex + 1 ..< items.count])
+  }
 
-  private func emit(event: EventType, body: Any? = nil) {
-    let bodyDict = body as? [String: Any] ?? [:]
+  /**
+   The previous items held by the queue.
+   */
+  public var previousItems: [AudioItem] {
+    assertMainThread()
+    guard currentIndex > 0 else { return [] }
+    return Array(items[0 ..< currentIndex])
+  }
 
-    switch event {
-    case .PlaybackState:
-      delegate?.emitPlaybackState(bodyDict)
-    case .PlaybackActiveTrackChanged:
-      delegate?.emitPlaybackActiveTrackChanged(bodyDict)
-    case .PlaybackProgressUpdated:
-      delegate?.emitPlaybackProgressUpdated(bodyDict)
-    case .PlaybackPlayWhenReadyChanged:
-      delegate?.emitPlaybackPlayWhenReadyChanged(bodyDict)
-    case .PlaybackQueueEnded:
-      delegate?.emitPlaybackQueueEnded(bodyDict)
-    case .PlaybackError:
-      delegate?.emitPlaybackError(bodyDict)
-    case .PlaybackMetadata:
-      delegate?.emitPlaybackMetadata(bodyDict)
-    case .RemotePlay:
-      delegate?.emitRemotePlay(bodyDict)
-    case .RemotePause:
-      delegate?.emitRemotePause(bodyDict)
-    case .RemoteNext:
-      delegate?.emitRemoteNext(bodyDict)
-    case .RemotePrevious:
-      delegate?.emitRemotePrevious(bodyDict)
-    case .RemoteSeek:
-      delegate?.emitRemoteSeek(bodyDict)
-    case .RemoteJumpForward:
-      delegate?.emitRemoteJumpForward(bodyDict)
-    case .RemoteJumpBackward:
-      delegate?.emitRemoteJumpBackward(bodyDict)
-    case .RemoteStop:
-      delegate?.emitRemoteStop(bodyDict)
-    case .RemoteSetRating:
-      delegate?.emitRemoteSetRating(bodyDict)
-    case .RemotePlayId:
-      delegate?.emitRemotePlayId(bodyDict)
-    case .RemotePlaySearch:
-      delegate?.emitRemotePlaySearch(bodyDict)
-    case .RemoteSkip:
-      delegate?.emitRemoteSkip(bodyDict)
-    case .RemoteLike:
-      delegate?.emitRemoteLike(bodyDict)
-    case .RemoteDislike:
-      delegate?.emitRemoteDislike(bodyDict)
-    case .RemoteBookmark:
-      delegate?.emitRemoteBookmark(bodyDict)
-    case .MetadataChapterReceived:
-      delegate?.emitMetadataChapterReceived(bodyDict)
-    case .MetadataTimedReceived:
-      delegate?.emitMetadataTimedReceived(bodyDict)
-    case .MetadataCommonReceived:
-      delegate?.emitMetadataCommonReceived(bodyDict)
-    default:
-      // Log unmapped events - these should be added to the switch statement
-      print("[TrackPlayer] Unmapped event: \(event.rawValue)")
+  /**
+   Whether there are more items after the current item in the queue.
+   */
+  private var hasNextItem: Bool {
+    currentIndex < items.count - 1
+  }
+
+  // MARK: - AVPlayer Properties (from AVPlayerWrapper)
+
+  /// Represents a seek operation that's pending while an item loads
+  private struct PendingSeek {
+    let time: TimeInterval
+    let completion: ((Bool) -> Void)?
+
+    func execute(on player: AVPlayer, delegate: TrackPlayer?) {
+      let cmTime = CMTimeMakeWithSeconds(time, preferredTimescale: 1000)
+      player
+        .seek(to: cmTime, toleranceBefore: CMTime.zero, toleranceAfter: CMTime.zero) { finished in
+          delegate?.handleSeekCompleted(to: Double(time), didFinish: finished)
+          completion?(finished)
+        }
+    }
+
+    func cancel() {
+      completion?(false)
     }
   }
 
-  // MARK: - Audio Session Interruption Handling
+  private var avPlayer = AVPlayer()
 
-  @objc private func handleAudioSessionInterruption(notification: Notification) {
-    guard let userInfo = notification.userInfo,
-          let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
-          let type = AVAudioSession.InterruptionType(rawValue: typeValue)
-    else {
+  private lazy var playerObserver: PlayerStateObserver = {
+    let observer = PlayerStateObserver()
+    observer.player = self
+    return observer
+  }()
+
+  private lazy var playerTimeObserver: PlayerTimeObserver = {
+    let observer = PlayerTimeObserver(
+      periodicObserverTimeInterval: _timeEventFrequency.getTime()
+    )
+    observer.player = self
+    return observer
+  }()
+
+  private lazy var playerItemNotificationObserver: PlayerItemNotificationObserver = {
+    let observer = PlayerItemNotificationObserver()
+    observer.player = self
+    return observer
+  }()
+
+  private lazy var playerItemObserver: PlayerItemPropertyObserver = {
+    let observer = PlayerItemPropertyObserver()
+    observer.player = self
+    return observer
+  }()
+  private var pendingSeek: PendingSeek?
+  private var asset: AVAsset?
+  private var item: AVPlayerItem?
+  private var url: URL?
+  private var urlOptions: [String: Any]?
+  private let stateQueue = DispatchQueue(
+    label: "TrackPlayer.stateQueue",
+    attributes: .concurrent
+  )
+  private(set) var playbackError: AudioPlayerError.PlaybackError?
+  var _state: AudioPlayerState = .idle
+  private(set) var lastPlayerTimeControlStatus: AVPlayer.TimeControlStatus = .paused
+  private var _rate: Float = 1.0
+  var _playWhenReady: Bool = false
+  var _bufferDuration: TimeInterval = 0
+  var _timeEventFrequency: TimeEventFrequency = .everySecond
+
+  /**
+   Set this to false to disable automatic updating of now playing info for control center and lock screen.
+   */
+  public var automaticallyUpdateNowPlayingInfo: Bool = true
+
+  /**
+   Controls the time pitch algorithm applied to each item loaded into the player.
+   If the loaded `AudioItem` conforms to `TimePitcher`-protocol this will be overriden.
+   */
+  public var audioTimePitchAlgorithm: AVAudioTimePitchAlgorithm = .timeDomain
+
+  /**
+   Default remote commands to use for each playing item
+   */
+  public var remoteCommands: [RemoteCommand] = [] {
+    didSet {
+      if let item = currentItem {
+        enableRemoteCommands(forItem: item)
+      }
+    }
+  }
+
+  /**
+    Handles the `playWhenReady` setting while executing a given action.
+
+    This method takes an optional `Bool` value and a closure representing an action to execute.
+    If the `Bool` value is not `nil`, `self.playWhenReady` is set accordingly either before or
+    after executing the action.
+
+    - Parameters:
+      - playWhenReady: Optional `Bool` to set `self.playWhenReady`.
+                       - If `true`, `self.playWhenReady` will be set after executing the action.
+                       - If `false`, `self.playWhenReady` will be set before executing the action.
+                       - If `nil`, `self.playWhenReady` will not be changed.
+      - action: A closure representing the action to execute. This closure can throw an error.
+
+    - Throws: This function will propagate any errors thrown by the `action` closure.
+   */
+  func handlePlayWhenReady(_ playWhenReady: Bool?, action: () throws -> Void) rethrows {
+    if playWhenReady == false {
+      self.playWhenReady = false
+    }
+
+    try action()
+
+    if playWhenReady == true {
+      self.playWhenReady = true
+    }
+  }
+
+  // MARK: - AVPlayer State and Computed Properties
+
+  var state: AudioPlayerState {
+    get {
+      var state: AudioPlayerState!
+      stateQueue.sync {
+        state = _state
+      }
+      return state
+    }
+    set {
+      stateQueue.async(flags: .barrier) { [weak self] in
+        guard let self else { return }
+        let currentState = _state
+        if currentState != newValue {
+          _state = newValue
+          handleStateChange(newValue)
+        }
+      }
+    }
+  }
+
+  var currentAVPlayerItem: AVPlayerItem? {
+    avPlayer.currentItem
+  }
+
+  var playbackActive: Bool {
+    switch state {
+    case .idle, .stopped, .ended, .failed:
+      return false
+    default: return true
+    }
+  }
+
+  var reasonForWaitingToPlay: AVPlayer.WaitingReason? {
+    avPlayer.reasonForWaitingToPlay
+  }
+
+  // MARK: - Getters from AVPlayerWrapper
+
+  /**
+   The elapsed playback time of the current item.
+   */
+  public var currentTime: Double {
+    let seconds = avPlayer.currentTime().seconds
+    return seconds.isNaN ? 0 : seconds
+  }
+
+  /**
+   The duration of the current AudioItem.
+   */
+  public var duration: Double {
+    if let seconds = currentAVPlayerItem?.asset.duration.seconds, !seconds.isNaN {
+      return seconds
+    } else if let seconds = currentAVPlayerItem?.duration.seconds, !seconds.isNaN {
+      return seconds
+    } else if let seconds = currentAVPlayerItem?.seekableTimeRanges.last?.timeRangeValue.duration
+      .seconds,
+      !seconds.isNaN
+    {
+      return seconds
+    }
+    return 0.0
+  }
+
+  /**
+   The bufferedPosition of the current AudioItem.
+   */
+  public var bufferedPosition: Double {
+    currentAVPlayerItem?.loadedTimeRanges.last?.timeRangeValue.end.seconds ?? 0
+  }
+
+  /**
+   The current state of the underlying `TrackPlayer`.
+   */
+  public var playerState: AudioPlayerState {
+    state
+  }
+
+  // MARK: - Setters for AVPlayerWrapper
+
+  /**
+   Whether the player should start playing automatically when the item is ready.
+   */
+  public var playWhenReady: Bool {
+    get { _playWhenReady }
+    set {
+      let oldValue = _playWhenReady
+      _playWhenReady = newValue
+      if newValue == true, state == .failed || state == .stopped {
+        reload(startFromCurrentTime: state == .failed)
+      }
+      applyAVPlayerRate()
+
+      if oldValue != newValue {
+        handlePlayWhenReadyChange(newValue)
+      }
+    }
+  }
+
+  /**
+   The amount of seconds to be buffered by the player. Default value is 0 seconds, this means the AVPlayer will choose an appropriate level of buffering. Setting `bufferDuration` to larger than zero automatically disables `automaticallyWaitsToMinimizeStalling`. Setting it back to zero automatically enables `automaticallyWaitsToMinimizeStalling`.
+
+   [Read more from Apple Documentation](https://developer.apple.com/documentation/avfoundation/avplayeritem/1643630-preferredforwardbufferduration)
+   */
+  public var bufferDuration: TimeInterval {
+    get { _bufferDuration }
+    set {
+      _bufferDuration = newValue
+      avPlayer.automaticallyWaitsToMinimizeStalling = _bufferDuration == 0
+    }
+  }
+
+  /**
+   Indicates whether the player should automatically delay playback in order to minimize stalling. Setting this to true will also set `bufferDuration` back to `0`.
+
+   [Read more from Apple Documentation](https://developer.apple.com/documentation/avfoundation/avplayer/1643482-automaticallywaitstominimizestal)
+   */
+  public var automaticallyWaitsToMinimizeStalling: Bool {
+    get { avPlayer.automaticallyWaitsToMinimizeStalling }
+    set {
+      if newValue {
+        _bufferDuration = 0
+      }
+      avPlayer.automaticallyWaitsToMinimizeStalling = newValue
+    }
+  }
+
+  /**
+   Set this to decide how often the player should call the delegate with time progress events.
+   */
+  public var timeEventFrequency: TimeEventFrequency {
+    get { _timeEventFrequency }
+    set {
+      _timeEventFrequency = newValue
+      playerTimeObserver.periodicObserverTimeInterval = newValue.getTime()
+    }
+  }
+
+  public var volume: Float {
+    get { avPlayer.volume }
+    set { avPlayer.volume = newValue }
+  }
+
+  public var isMuted: Bool {
+    get { avPlayer.isMuted }
+    set { avPlayer.isMuted = newValue }
+  }
+
+  public var rate: Float {
+    get { _rate }
+    set {
+      _rate = newValue
+      applyAVPlayerRate()
+      if automaticallyUpdateNowPlayingInfo {
+        updateNowPlayingPlaybackValues()
+      }
+    }
+  }
+
+  // MARK: - Init
+
+  public init(
+    nowPlayingInfoController: NowPlayingInfoController = NowPlayingInfoController(),
+    remoteCommandController: RemoteCommandController = RemoteCommandController()
+  ) {
+    self.nowPlayingInfoController = nowPlayingInfoController
+    self.remoteCommandController = remoteCommandController
+    self.remoteCommandController.player = self
+
+    setupAVPlayer()
+  }
+
+  // MARK: - Player Actions
+
+  /**
+   Will replace the current item with a new one and load it into the player.
+
+   - parameter item: The AudioItem to replace the current item.
+   - parameter playWhenReady: Optional, whether to start playback when the item is ready.
+   */
+  public func load(item: AudioItem, playWhenReady: Bool? = nil) {
+    handlePlayWhenReady(playWhenReady) {
+      replaceCurrentItem(with: item)
+    }
+  }
+
+  /**
+   Internal load method that loads an item directly without queue management.
+   Used by queue operations after updating the queue state.
+   */
+  private func loadItem(_ item: AudioItem) {
+    if automaticallyUpdateNowPlayingInfo {
+      // Reset playback values without updating, because that will happen in
+      // the loadNowPlayingMetaValues call straight after:
+      nowPlayingInfoController.setWithoutUpdate(keyValues: [
+        MediaItemProperty.duration(nil),
+        NowPlayingInfoProperty.playbackRate(nil),
+        NowPlayingInfoProperty.elapsedPlaybackTime(nil),
+      ])
+      loadNowPlayingMetaValues()
+    }
+
+    enableRemoteCommands(forItem: item)
+
+    loadFromString(
+      from: item.audioUrl,
+      type: item.sourceType,
+      playWhenReady: self.playWhenReady,
+      initialTime: item.initialTime,
+      options: item.assetOptions
+    )
+  }
+
+  /**
+   Toggle playback status.
+   */
+  public func togglePlaying() {
+    switch avPlayer.timeControlStatus {
+    case .playing, .waitingToPlayAtSpecifiedRate:
+      pause()
+    case .paused:
+      play()
+    @unknown default:
+      fatalError("Unknown AVPlayer.timeControlStatus")
+    }
+  }
+
+  /**
+   Start playback
+   */
+  public func play() {
+    playWhenReady = true
+  }
+
+  /**
+   Pause playback
+   */
+  public func pause() {
+    playWhenReady = false
+  }
+
+  /**
+   Stop playback
+   */
+  public func stop() {
+    let wasActive = playbackActive
+    state = .stopped
+    clearCurrentItem()
+    playWhenReady = false
+    if wasActive {
+      event.playbackEnd.emit(data: .playerStopped)
+    }
+  }
+
+  /**
+   Reload the current item.
+   */
+  public func reload(startFromCurrentTime: Bool) {
+    var time: Double? = nil
+    if startFromCurrentTime {
+      if let currentItem = currentAVPlayerItem {
+        if !currentItem.duration.isIndefinite {
+          time = currentItem.currentTime().seconds
+        }
+      }
+    }
+    loadAVPlayer()
+    if let time {
+      seek(to: time)
+    }
+  }
+
+  /**
+   Seek to a specific time in the item.
+   */
+  public func seek(to seconds: TimeInterval) {
+    seek(to: seconds, completion: { _ in })
+  }
+
+  /**
+   Seek to a specific time in the item with a completion handler.
+
+   - parameter seconds: The time to seek to.
+   - parameter completion: Called when the seek operation completes. The Bool parameter indicates whether the seek finished successfully (true) or was interrupted/deferred (false).
+   */
+  public func seek(to seconds: TimeInterval, completion: @escaping (Bool) -> Void) {
+    // If an item is currently being loaded asynchronously, defer the seek until it's ready.
+    if state == .loading {
+      // Cancel any previous pending seek before creating a new one
+      pendingSeek?.cancel()
+      pendingSeek = PendingSeek(time: seconds, completion: completion)
+    } else if avPlayer.currentItem != nil {
+      let time = CMTimeMakeWithSeconds(seconds, preferredTimescale: 1000)
+      avPlayer
+        .seek(to: time, toleranceBefore: CMTime.zero, toleranceAfter: CMTime.zero) { finished in
+          self.handleSeekCompleted(to: Double(seconds), didFinish: finished)
+          completion(finished)
+        }
+    } else {
+      // No item loaded and not loading - seek fails immediately
+      completion(false)
+    }
+  }
+
+  /**
+   Seek by relative a time offset in the item.
+   */
+  public func seek(by offset: TimeInterval) {
+    // Calculate the target time based on current state
+    let targetTime: TimeInterval
+    if state == .loading {
+      // If loading, offset from pending seek (or 0 if no pending seek)
+      targetTime = (pendingSeek?.time ?? 0) + offset
+    } else if let currentItem = avPlayer.currentItem {
+      // If playing, offset from current position
+      targetTime = currentItem.currentTime().seconds + offset
+    } else {
+      // No item and not loading - nothing to seek in
       return
     }
 
-    switch type {
-    case .began:
-      break
-    case .ended:
-      guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else {
-        return
-      }
-      let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-      let shouldResume = options.contains(.shouldResume)
+    // Delegate to absolute seek
+    seek(to: targetTime)
+  }
 
-      if shouldResume, shouldResumePlaybackAfterInterruptionEnds {
-        player.play()
+  // MARK: - Remote Command Center
+
+  func enableRemoteCommands(_ commands: [RemoteCommand]) {
+    remoteCommandController.enable(commands: commands)
+  }
+
+  func enableRemoteCommands(forItem item: AudioItem) {
+    if let commands = item.remoteCommands {
+      enableRemoteCommands(commands)
+    } else {
+      enableRemoteCommands(remoteCommands)
+    }
+  }
+
+  /**
+   Syncs the current remoteCommands with the iOS command center.
+   Can be used to update item states - e.g. like, dislike and bookmark.
+   */
+  @available(*, deprecated, message: "Directly set .remoteCommands instead")
+  public func syncRemoteCommandsWithCommandCenter() {
+    enableRemoteCommands(remoteCommands)
+  }
+
+  // MARK: - NowPlayingInfo
+
+  /**
+   Loads NowPlayingInfo-meta values with the values found in the current `AudioItem`. Use this if a change to the `AudioItem` is made and you want to update the `NowPlayingInfoController`s values.
+
+   Reloads:
+   - Artist
+   - Title
+   - Album title
+   - Album artwork
+   */
+  public func loadNowPlayingMetaValues() {
+    guard let item = currentItem else { return }
+
+    nowPlayingInfoController.set(keyValues: [
+      MediaItemProperty.artist(item.artist),
+      MediaItemProperty.title(item.title),
+      MediaItemProperty.albumTitle(item.album),
+    ])
+    loadArtwork(forItem: item)
+  }
+
+  /**
+   Resyncs the playbackvalues of the currently playing `AudioItem`.
+
+   Will resync:
+   - Current time
+   - Duration
+   - Playback rate
+   */
+  func updateNowPlayingPlaybackValues() {
+    nowPlayingInfoController.set(keyValues: [
+      MediaItemProperty.duration(duration),
+      NowPlayingInfoProperty.playbackRate(playWhenReady ? Double(rate) : 0),
+      NowPlayingInfoProperty.elapsedPlaybackTime(currentTime),
+    ])
+  }
+
+  public func clear() {
+    clearQueue()
+    let playbackWasActive = playbackActive
+    unloadAVPlayer()
+    nowPlayingInfoController.clear()
+    if playbackWasActive {
+      event.playbackEnd.emit(data: .cleared)
+    }
+  }
+
+  // MARK: - Private
+
+  private func setNowPlayingCurrentTime(seconds: Double) {
+    nowPlayingInfoController.set(
+      keyValue: NowPlayingInfoProperty.elapsedPlaybackTime(seconds)
+    )
+  }
+
+  private func loadArtwork(forItem item: AudioItem) {
+    item.loadArtwork { image in
+      if let image {
+        let artwork = MPMediaItemArtwork(boundsSize: image.size, requestHandler: { _ in image })
+        self.nowPlayingInfoController.set(keyValue: MediaItemProperty.artwork(artwork))
+      } else {
+        self.nowPlayingInfoController.set(keyValue: MediaItemProperty.artwork(nil))
       }
+    }
+  }
+
+  private func setTimePitchingAlgorithmForCurrentItem() {
+    if let algorithm = currentItem?.pitchAlgorithm {
+      currentAVPlayerItem?.audioTimePitchAlgorithm = algorithm.avAlgorithm
+    } else {
+      currentAVPlayerItem?.audioTimePitchAlgorithm = audioTimePitchAlgorithm
+    }
+  }
+
+  // MARK: - AVPlayer Management Methods (from AVPlayerWrapper)
+
+  private func applyAVPlayerRate() {
+    avPlayer.rate = _playWhenReady ? _rate : 0
+  }
+
+  private func clearCurrentItem() {
+    guard let asset else { return }
+    stopObservingAVPlayerItem()
+
+    asset.cancelLoading()
+    self.asset = nil
+
+    // Clear any pending seek to prevent it from being applied to the next item that loads.
+    // Without this, a seek called before any item was loaded could incorrectly apply to
+    // an unrelated track that loads later.
+    pendingSeek?.cancel()
+    pendingSeek = nil
+
+    avPlayer.replaceCurrentItem(with: nil)
+  }
+
+  private func startObservingAVPlayer(item: AVPlayerItem) {
+    playerItemObserver.startObserving(item: item)
+    playerItemNotificationObserver.startObserving(item: item)
+  }
+
+  private func stopObservingAVPlayerItem() {
+    playerItemObserver.stopObservingCurrentItem()
+    playerItemNotificationObserver.stopObservingCurrentItem()
+  }
+
+  private func recreateAVPlayer() {
+    playbackError = nil
+    playerTimeObserver.unregisterForBoundaryTimeEvents()
+    playerTimeObserver.unregisterForPeriodicEvents()
+    playerObserver.stopObserving()
+    stopObservingAVPlayerItem()
+    clearCurrentItem()
+
+    avPlayer = AVPlayer()
+    setupAVPlayer()
+
+    handleAVPlayerRecreated()
+  }
+
+  private func setupAVPlayer() {
+    // disabled since we're not making use of video playback
+    avPlayer.allowsExternalPlayback = false
+
+    playerObserver.avPlayer = avPlayer
+    playerObserver.startObserving()
+
+    playerTimeObserver.avPlayer = avPlayer
+    playerTimeObserver.registerForBoundaryTimeEvents()
+    playerTimeObserver.registerForPeriodicTimeEvents()
+
+    applyAVPlayerRate()
+  }
+
+  private func playbackFailed(error: AudioPlayerError.PlaybackError) {
+    state = .failed
+    playbackError = error
+    handlePlaybackError(error)
+  }
+
+  func loadAVPlayer() {
+    if state == .failed {
+      recreateAVPlayer()
+    } else {
+      clearCurrentItem()
+    }
+    if let url {
+      let pendingAsset = AVURLAsset(url: url, options: urlOptions)
+      asset = pendingAsset
+      state = .loading
+
+      // Load metadata keys asynchronously and separate from playable, to allow that to execute as
+      // quickly as it can
+      let metdataKeys = ["commonMetadata", "availableChapterLocales", "availableMetadataFormats"]
+      pendingAsset.loadValuesAsynchronously(
+        forKeys: metdataKeys,
+        completionHandler: { [weak self] in
+          guard let self else { return }
+          if pendingAsset != asset { return }
+
+          let commonData = pendingAsset.commonMetadata
+          if !commonData.isEmpty {
+            handleCommonMetadataReceived(commonData)
+          }
+
+          if !pendingAsset.availableChapterLocales.isEmpty {
+            for locale in pendingAsset.availableChapterLocales {
+              let chapters = pendingAsset.chapterMetadataGroups(
+                withTitleLocale: locale,
+                containingItemsWithCommonKeys: nil
+              )
+              handleChapterMetadataReceived(chapters)
+            }
+          } else {
+            for format in pendingAsset.availableMetadataFormats {
+              let timeRange = CMTimeRange(
+                start: CMTime(seconds: 0, preferredTimescale: 1000),
+                end: pendingAsset.duration
+              )
+              let group = AVTimedMetadataGroup(
+                items: pendingAsset.metadata(forFormat: format),
+                timeRange: timeRange
+              )
+              handleTimedMetadataReceived([group])
+            }
+          }
+        }
+      )
+
+      // Load playable portion of the track and commence when ready
+      let playableKeys = ["playable"]
+      pendingAsset.loadValuesAsynchronously(
+        forKeys: playableKeys,
+        completionHandler: { [weak self] in
+          guard let self else { return }
+
+          DispatchQueue.main.async {
+            if pendingAsset != self.asset { return }
+
+            for key in playableKeys {
+              var error: NSError?
+              let keyStatus = pendingAsset.statusOfValue(forKey: key, error: &error)
+              switch keyStatus {
+              case .failed:
+                self.playbackFailed(error: AudioPlayerError.PlaybackError.failedToLoadKeyValue)
+                return
+              case .cancelled, .loading, .unknown:
+                return
+              case .loaded:
+                break
+              default: break
+              }
+            }
+
+            if !pendingAsset.isPlayable {
+              self.playbackFailed(error: AudioPlayerError.PlaybackError.itemWasUnplayable)
+              return
+            }
+
+            let item = AVPlayerItem(
+              asset: pendingAsset,
+              automaticallyLoadedAssetKeys: playableKeys
+            )
+            self.item = item
+            item.preferredForwardBufferDuration = self._bufferDuration
+            self.avPlayer.replaceCurrentItem(with: item)
+            self.startObservingAVPlayer(item: item)
+            self.applyAVPlayerRate()
+
+            // Execute any pending seek operation
+            if let pending = self.pendingSeek {
+              self.pendingSeek = nil
+              pending.execute(on: self.avPlayer, delegate: self)
+            }
+          }
+        }
+      )
+    }
+  }
+
+  func loadFromURL(
+    from url: URL,
+    playWhenReady: Bool,
+    initialTime: TimeInterval? = nil,
+    options: [String: Any]? = nil
+  ) {
+    self.playWhenReady = playWhenReady
+    self.url = url
+    urlOptions = options
+    loadAVPlayer()
+    if let initialTime {
+      seek(to: initialTime)
+    }
+  }
+
+  func loadFromString(
+    from url: String,
+    type: SourceType = .stream,
+    playWhenReady: Bool = false,
+    initialTime: TimeInterval? = nil,
+    options: [String: Any]? = nil
+  ) {
+    if let itemUrl = type == .file
+      ? URL(fileURLWithPath: url)
+      : URL(string: url)
+    {
+      loadFromURL(
+        from: itemUrl,
+        playWhenReady: playWhenReady,
+        initialTime: initialTime,
+        options: options
+      )
+    } else {
+      clearCurrentItem()
+      playbackFailed(error: AudioPlayerError.PlaybackError.invalidSourceUrl(url))
+    }
+  }
+
+  func unloadAVPlayer() {
+    clearCurrentItem()
+    state = .idle
+  }
+
+  // MARK: - Internal Event Handlers
+
+  private func handleStateChange(_ state: AudioPlayerState) {
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      switch state {
+      case .ready, .loading:
+        setTimePitchingAlgorithmForCurrentItem()
+      default: break
+      }
+
+      switch state {
+      case .ready, .loading, .playing, .paused:
+        if automaticallyUpdateNowPlayingInfo {
+          updateNowPlayingPlaybackValues()
+        }
+      default: break
+      }
+      event.stateChange.emit(data: state)
+    }
+  }
+
+  func handleSecondElapsed(_ seconds: Double) {
+    event.secondElapse.emit(data: seconds)
+  }
+
+  private func handlePlaybackError(_ error: Error?) {
+    event.fail.emit(data: error)
+    event.playbackEnd.emit(data: .failed)
+  }
+
+  private func handleSeekCompleted(to seconds: Double, didFinish: Bool) {
+    if automaticallyUpdateNowPlayingInfo {
+      setNowPlayingCurrentTime(seconds: Double(seconds))
+    }
+    event.seek.emit(data: (seconds, didFinish))
+  }
+
+  func handleDurationUpdate(_ duration: Double) {
+    event.updateDuration.emit(data: duration)
+  }
+
+  private func handleCommonMetadataReceived(_ metadata: [AVMetadataItem]) {
+    event.receiveCommonMetadata.emit(data: metadata)
+  }
+
+  private func handleChapterMetadataReceived(_ metadata: [AVTimedMetadataGroup]) {
+    event.receiveChapterMetadata.emit(data: metadata)
+  }
+
+  func handleTimedMetadataReceived(_ metadata: [AVTimedMetadataGroup]) {
+    event.receiveTimedMetadata.emit(data: metadata)
+  }
+
+  private func handlePlayWhenReadyChange(_ playWhenReady: Bool) {
+    event.playWhenReadyChange.emit(data: playWhenReady)
+  }
+
+  func handleItemDidPlayToEndTime() {
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      event.playbackEnd.emit(data: .playedUntilEnd)
+      if repeatMode == .track {
+        replay()
+      } else if repeatMode == .queue || hasNextItem {
+        next()
+      } else {
+        state = .ended
+      }
+    }
+  }
+
+  func handleItemFailedToPlayToEndTime() {
+    handlePlaybackError(AudioPlayerError.PlaybackError.playbackFailed)
+  }
+
+  func handleItemPlaybackStalled() {}
+
+  private func handleAVPlayerRecreated() {
+    event.didRecreateAVPlayer.emit(data: ())
+  }
+
+  // MARK: - Observer Callbacks
+
+  func playerDidChangeTimeControlStatus(_ status: AVPlayer.TimeControlStatus) {
+    switch status {
+    case .paused:
+      let currentState = state
+      if asset == nil, currentState != .stopped {
+        state = .idle
+      } else if currentState != .failed, currentState != .stopped {
+        // Distinguish between external pauses (bluetooth disconnect, interruption) and natural
+        // track completion:
+        if playWhenReady {
+          // If playback pauses unexpectedly, this is likely an external interruption (bluetooth
+          // disconnect, system interruption, etc). Set playWhenReady to false to acknowledge the
+          // pause.
+          // However, if we're near the end of the track (within 0.5s of duration), this is likely
+          // a natural pause from track completion. Let itemDidPlayToEndTime handle this case to
+          // preserve auto-advance behavior between tracks in a queue/playlist.
+          if currentTime < duration - 0.5 {
+            playWhenReady = false
+          }
+        } else {
+          state = .paused
+        }
+      }
+    case .waitingToPlayAtSpecifiedRate:
+      if asset != nil {
+        state = .buffering
+      }
+    case .playing:
+      state = .playing
     @unknown default:
       break
     }
   }
 
-  // MARK: - Bridged Methods
+  func playerStatusDidChange(_ status: AVPlayer.Status) {
+    if status == .failed {
+      let error = item!.error as NSError?
+      playbackFailed(error: error?.code == URLError.notConnectedToInternet.rawValue
+        ? AudioPlayerError.PlaybackError.notConnectedToInternet
+        : AudioPlayerError.PlaybackError.playbackFailed
+      )
+    }
+  }
 
-  private func ensureMainThread(_ block: @escaping () -> Void) {
-    if Thread.isMainThread {
-      block()
+  func audioDidStart() {
+    state = .playing
+  }
+
+  func itemFailedToPlayToEndTime() {
+    playbackFailed(error: AudioPlayerError.PlaybackError.playbackFailed)
+    handleItemFailedToPlayToEndTime()
+  }
+
+  func itemDidUpdatePlaybackLikelyToKeepUp(_ playbackLikelyToKeepUp: Bool) {
+    if playbackLikelyToKeepUp, state != .playing {
+      state = .ready
+    }
+  }
+
+  // MARK: - Queue Validation
+
+  private func throwIfQueueEmpty() throws {
+    if items.isEmpty {
+      throw AudioPlayerError.QueueError.empty
+    }
+  }
+
+  private func throwIfIndexInvalid(
+    index: Int,
+    name: String = "index",
+    min: Int? = nil,
+    max: Int? = nil
+  ) throws {
+    guard index >= (min ?? 0), (max ?? items.count) > index else {
+      throw AudioPlayerError.QueueError.invalidIndex(
+        index: index,
+        message: "\(name) must be non-negative and less than \(items.count)"
+      )
+    }
+  }
+
+  // MARK: - Queue Methods
+
+  /**
+   Replace the current item with a new one. If there is no current item, it is equivalent to calling `add(item:)`, `jump(to: itemIndex)`.
+
+   - parameter item: The item to set as the new current item.
+   */
+  private func replaceCurrentItem(with item: AudioItem) {
+    assertMainThread()
+    if currentIndex == -1 {
+      items.append(item)
+      currentIndex = 0
+      handleCurrentItemChanged()
     } else {
-      DispatchQueue.main.async(execute: block)
+      items[currentIndex] = item
+      handleCurrentItemChanged()
     }
   }
 
-  private func onMainThread<T>(_ block: () -> T) -> T {
-    if Thread.isMainThread {
-      return block()
-    } else {
-      return DispatchQueue.main.sync(execute: block)
+  /**
+   Add items to the queue.
+
+   - parameter items: The items to add to the queue.
+   - parameter playWhenReady: Optional, whether to start playback when the item is ready.
+   */
+  public func add(items: [AudioItem], playWhenReady: Bool? = nil) {
+    handlePlayWhenReady(playWhenReady) {
+      addItems(items)
     }
   }
 
-  private func rejectWhenNotInitialized(reject: RCTPromiseRejectBlock) -> Bool {
-    let rejected = !hasInitialized
-    if rejected {
-      reject(
-        "player_not_initialized",
-        "The player is not initialized. Call setupPlayer first.",
-        nil
+  private func addItems(_ newItems: [AudioItem]) {
+    assertMainThread()
+    guard !newItems.isEmpty else { return }
+    let wasEmpty = items.isEmpty
+    items.append(contentsOf: newItems)
+    if wasEmpty {
+      currentIndex = 0
+      handleCurrentItemChanged()
+    }
+  }
+
+  public func add(items: [AudioItem], at index: Int) throws {
+    assertMainThread()
+    guard !items.isEmpty else { return }
+    guard index >= 0, self.items.count >= index else {
+      throw AudioPlayerError.QueueError.invalidIndex(
+        index: index,
+        message: "Index to insert at has to be non-negative and equal to or smaller than the number of items: (\(self.items.count))"
       )
     }
-    return rejected
+    let wasEmpty = self.items.isEmpty
+    // Correct index when items were inserted in front of it:
+    if self.items.count > 1, currentIndex >= index {
+      currentIndex += items.count
+    }
+    self.items.insert(contentsOf: items, at: index)
+    if wasEmpty {
+      currentIndex = 0
+      handleCurrentItemChanged()
+    }
   }
 
-  @objc(setupPlayer:resolver:rejecter:)
-  public func setupPlayer(
-    config: [String: Any],
-    resolve: @escaping RCTPromiseResolveBlock,
-    reject: @escaping RCTPromiseRejectBlock
-  ) {
-    ensureMainThread {
-      if self.hasInitialized {
-        reject(
-          "player_already_initialized",
-          "The player has already been initialized via setupPlayer.",
-          nil
-        )
-        return
+  /**
+   Step to the next item in the queue.
+   */
+  public func next() {
+    let lastIndex = currentIndex
+    let playbackWasActive = playbackActive
+    _ = skip(by: 1, wrap: repeatMode == .queue)
+    if playbackWasActive && lastIndex != currentIndex || repeatMode == .queue {
+      event.playbackEnd.emit(data: .skippedToNext)
+    }
+  }
+
+  /**
+   Step to the previous item in the queue.
+   */
+  public func previous() {
+    let lastIndex = currentIndex
+    let playbackWasActive = playbackActive
+    _ = skip(by: -1, wrap: repeatMode == .queue)
+    if playbackWasActive && lastIndex != currentIndex || repeatMode == .queue {
+      event.playbackEnd.emit(data: .skippedToPrevious)
+    }
+  }
+
+  private func skip(by delta: Int, wrap: Bool) -> AudioItem? {
+    assertMainThread()
+    guard currentItem != nil, !items.isEmpty else { return nil }
+
+    if items.count == 1 {
+      if wrap, playWhenReady {
+        replay()
       }
-      // configure buffer size
-      if let bufferDuration = config["minBuffer"] as? TimeInterval {
-        self.player.bufferDuration = bufferDuration
-      }
+      return currentItem
+    }
 
-      if let autoHandleInterruptions = config["autoHandleInterruptions"] as? Bool {
-        self.shouldResumePlaybackAfterInterruptionEnds = autoHandleInterruptions
-      }
+    var index = currentIndex + delta
+    if wrap {
+      index = (index + items.count) % items.count
+    }
+    let newIndex = max(0, min(items.count - 1, index))
 
-      // configure wether control center metdata should auto update
-      self.player.automaticallyUpdateNowPlayingInfo = config["autoUpdateMetadata"] as? Bool ?? true
+    if newIndex != currentIndex {
+      currentIndex = newIndex
+      handleCurrentItemChanged()
+    }
+    return currentItem
+  }
 
-      // configure audio session - category, options & mode
-      if
-        let sessionCategoryStr = config["iosCategory"] as? String,
-        let mappedCategory = SessionCategory(rawValue: sessionCategoryStr)
-      {
-        self.sessionCategory = mappedCategory.mapConfigToAVAudioSessionCategory()
-      }
+  /**
+   Remove an item from the queue.
 
-      if
-        let sessionCategoryModeStr = config["iosCategoryMode"] as? String,
-        let mappedCategoryMode = SessionCategoryMode(rawValue: sessionCategoryModeStr)
-      {
-        self.sessionCategoryMode = mappedCategoryMode.mapConfigToAVAudioSessionCategoryMode()
-      }
-
-      if
-        let sessionCategoryPolicyStr = config["iosCategoryPolicy"] as? String,
-        let mappedCategoryPolicy = SessionCategoryPolicy(rawValue: sessionCategoryPolicyStr)
-      {
-        self.sessionCategoryPolicy = mappedCategoryPolicy.mapConfigToAVAudioSessionCategoryPolicy()
-      }
-
-      let sessionCategoryOptsStr = config["iosCategoryOptions"] as? [String]
-      let mappedCategoryOpts = sessionCategoryOptsStr?
-        .compactMap {
-          SessionCategoryOptions(rawValue: $0)?.mapConfigToAVAudioSessionCategoryOptions()
-        } ?? []
-      self.sessionCategoryOptions = AVAudioSession.CategoryOptions(mappedCategoryOpts)
-
-      self.configureAudioSession()
-
-      // setup event listeners
-      self.player.remoteCommandController
-        .handleChangePlaybackPositionCommand = { [weak self] event in
-          if let event = event as? MPChangePlaybackPositionCommandEvent {
-            self?.emit(event: EventType.RemoteSeek, body: ["position": event.positionTime])
-            return MPRemoteCommandHandlerStatus.success
-          }
-
-          return MPRemoteCommandHandlerStatus.commandFailed
-        }
-
-      self.player.remoteCommandController.handleNextTrackCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemoteNext)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handlePauseCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemotePause)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handlePlayCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemotePlay)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handlePreviousTrackCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemotePrevious)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handleSkipBackwardCommand = { [weak self] event in
-        if let command = event.command as? MPSkipIntervalCommand,
-           let interval = command.preferredIntervals.first
-        {
-          self?.emit(event: EventType.RemoteJumpBackward, body: ["interval": interval])
-          return MPRemoteCommandHandlerStatus.success
-        }
-
-        return MPRemoteCommandHandlerStatus.commandFailed
-      }
-
-      self.player.remoteCommandController.handleSkipForwardCommand = { [weak self] event in
-        if let command = event.command as? MPSkipIntervalCommand,
-           let interval = command.preferredIntervals.first
-        {
-          self?.emit(event: EventType.RemoteJumpForward, body: ["interval": interval])
-          return MPRemoteCommandHandlerStatus.success
-        }
-
-        return MPRemoteCommandHandlerStatus.commandFailed
-      }
-
-      self.player.remoteCommandController.handleStopCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemoteStop)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handleTogglePlayPauseCommand = { [weak self] _ in
-        self?.emit(event: self?.player.playerState == .paused
-          ? EventType.RemotePlay
-          : EventType.RemotePause
-        )
-
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handleLikeCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemoteLike)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handleDislikeCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemoteDislike)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handleBookmarkCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemoteBookmark)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.hasInitialized = true
-      resolve(NSNull())
+   - parameter index: The index of the item to remove.
+   - throws: `AudioPlayerError.QueueError`
+   */
+  public func removeItem(at index: Int) throws {
+    assertMainThread()
+    try throwIfQueueEmpty()
+    try throwIfIndexInvalid(index: index)
+    let result = items.remove(at: index)
+    if index == currentIndex {
+      currentIndex = items.count > 0 ? currentIndex % items.count : -1
+      handleCurrentItemChanged()
+    } else if index < currentIndex {
+      currentIndex -= 1
     }
   }
 
-  private func configureAudioSession() {
-    ensureMainThread {
-      // deactivate the session when there is no current item to be played
-      if self.player.currentItem == nil {
-        try? self.audioSession.setActive(false, options: [])
-        self.audioSessionIsActive = false
-        return
-      }
-
-      // activate the audio session when there is an item to be played
-      // and the player has been configured to start when it is ready loading:
-      if self.player.playWhenReady {
-        try? self.audioSession.setActive(true, options: [])
-        self.audioSessionIsActive = true
-        if #available(iOS 11.0, *) {
-          try? AVAudioSession.sharedInstance().setCategory(
-            self.sessionCategory,
-            mode: self.sessionCategoryMode,
-            policy: self.sessionCategoryPolicy,
-            options: self.sessionCategoryOptions
-          )
-        } else {
-          try? AVAudioSession.sharedInstance().setCategory(
-            self.sessionCategory,
-            mode: self.sessionCategoryMode,
-            options: self.sessionCategoryOptions
-          )
-        }
-      }
-    }
-  }
-
-  @objc(isServiceRunning:rejecter:)
-  public func isServiceRunning(resolve: RCTPromiseResolveBlock, reject _: RCTPromiseRejectBlock) {
-    // TODO: That is probably always true
-    resolve(player != nil)
-  }
-
-  @objc
-  public func updateOptions(options: [String: Any]) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      var capabilitiesStr = options["capabilities"] as? [String] ?? []
-      if capabilitiesStr.contains("play"), capabilitiesStr.contains("pause") {
-        capabilitiesStr.append("toggle-play-pause")
-      }
-
-      self.forwardJumpInterval = options["forwardJumpInterval"] as? NSNumber ?? self
-        .forwardJumpInterval
-      self.backwardJumpInterval = options["backwardJumpInterval"] as? NSNumber ?? self
-        .backwardJumpInterval
-
-      self.player.remoteCommands = capabilitiesStr
-        .compactMap { Capability(rawValue: $0) }
-        .map { capability in
-          capability.mapToPlayerCommand(
-            forwardJumpInterval: self.forwardJumpInterval,
-            backwardJumpInterval: self.backwardJumpInterval,
-            likeOptions: options["likeOptions"] as? [String: Any],
-            dislikeOptions: options["dislikeOptions"] as? [String: Any],
-            bookmarkOptions: options["bookmarkOptions"] as? [String: Any]
-          )
-        }
-
-      self.configureProgressUpdateEvent(
-        interval: ((options["progressUpdateEventInterval"] as? NSNumber) ?? 0).doubleValue
-      )
-    }
-  }
-
-  private func configureProgressUpdateEvent(interval: Double) {
-    shouldEmitProgressEvent = interval > 0
-    player.timeEventFrequency = shouldEmitProgressEvent
-      ? .custom(time: CMTime(seconds: interval, preferredTimescale: 1000))
-      : .everySecond
-  }
-
-  @objc
-  public func add(trackDicts: [[String: Any]], before trackIndex: NSNumber) -> Int {
-    return onMainThread {
-      guard self.hasInitialized else { return -1 }
-      // -1 means no index was passed and therefore should be inserted at the end.
-      let index = trackIndex.intValue == -1 ? player.items.count : trackIndex.intValue
-      guard index >= 0, index <= player.items.count else { return -1 }
-
-      var tracks = [AudioItem]()
-      for trackDict in trackDicts {
-        guard let track = AudioItem.fromBridge(dictionary: trackDict) else { return -1 }
-        tracks.append(track)
-      }
-
-      try? player.add(items: tracks, at: index)
-      return index
-    }
-  }
-
-  @objc
-  public func load(trackDict: [String: Any]) {
-    guard let track = AudioItem.fromBridge(dictionary: trackDict) else { return }
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.load(item: track)
-    }
-  }
-
-  @objc
-  public func remove(tracks indexes: [Int]) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      // Validate all indexes first
-      for index in indexes {
-        guard index >= 0, index < self.player.items.count else { return }
-      }
-
-      // Sort the indexes in descending order so we can safely remove them one by one
-      // without having the next index possibly newly pointing to another item than intended:
-      for index in indexes.sorted().reversed() {
-        try? self.player.removeItem(at: index)
-      }
-    }
-  }
-
-  @objc
-  public func move(fromIndex: Int, toIndex: Int) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      guard fromIndex >= 0, fromIndex < self.player.items.count else { return }
-      guard toIndex >= 0 else { return }
-      try? self.player.moveItem(fromIndex: fromIndex, toIndex: toIndex)
-    }
-  }
-
-  @objc
-  public func removeUpcomingTracks() {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.removeUpcomingItems()
-    }
-  }
-
-  @objc
-  public func skip(to trackIndex: Int, initialTime: Double) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      guard trackIndex >= 0, trackIndex < self.player.items.count else { return }
-
-      print("Skipping to track:", trackIndex)
-      try? self.player.jumpToItem(
-        atIndex: trackIndex,
-        playWhenReady: self.player.playerState == .playing
-      )
-
-      // if an initialTime is passed then seek to it
-      if initialTime >= 0 {
-        self.seekTo(time: initialTime)
-      }
-    }
-  }
-
-  @objc
-  public func skipToNext(initialTime: Double) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.next()
-
-      // if an initialTime is passed then seek to it
-      if initialTime >= 0 {
-        self.seekTo(time: initialTime)
-      }
-    }
-  }
-
-  @objc
-  public func skipToPrevious(initialTime: Double) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.previous()
-
-      // if an initialTime is passed then seek to it
-      if initialTime >= 0 {
-        self.seekTo(time: initialTime)
-      }
-    }
-  }
-
-  @objc
-  public func reset() {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.stop()
-      self.player.clear()
-    }
-  }
-
-  @objc
-  public func play() {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.play()
-    }
-  }
-
-  @objc
-  public func pause() {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.pause()
-    }
-  }
-
-  @objc
-  public func setPlayWhenReady(playWhenReady: Bool) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.playWhenReady = playWhenReady
-    }
-  }
-
-  @objc
-  public func getPlayWhenReady() -> Bool {
-    return onMainThread {
-      guard self.hasInitialized else { return false }
-      return player.playWhenReady
-    }
-  }
-
-  @objc
-  public func stop() {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.stop()
-    }
-  }
-
-  @objc
-  public func seekTo(time: Double) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.seek(to: time)
-    }
-  }
-
-  @objc
-  public func seekBy(offset: Double) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.seek(by: offset)
-    }
-  }
-
-  @objc
-  public func retry() {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.reload(startFromCurrentTime: true)
-    }
-  }
-
-  @objc
-  public func setRepeatMode(repeatMode: NSString) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.repeatMode = RepeatMode(rawValue: repeatMode as String) ?? .off
-    }
-  }
-
-  @objc
-  public func getRepeatMode() -> String {
-    return onMainThread {
-      guard self.hasInitialized else { return "off" }
-      return player.repeatMode.rawValue
-    }
-  }
-
-  @objc
-  public func setVolume(level: Float) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.volume = level
-    }
-  }
-
-  @objc
-  public func getVolume() -> Float {
-    return onMainThread {
-      guard self.hasInitialized else { return 1.0 }
-      return player.volume
-    }
-  }
-
-  @objc
-  public func setRate(rate: Float) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.player.rate = rate
-    }
-  }
-
-  @objc
-  public func getRate() -> Float {
-    return onMainThread {
-      guard self.hasInitialized else { return 1.0 }
-      return player.rate
-    }
-  }
-
-  @objc
-  public func getTrack(index: Double) -> [String: Any]? {
-    return onMainThread {
-      guard self.hasInitialized else { return nil }
-      let indexInt = Int(index)
-      if indexInt >= 0, indexInt < player.items.count {
-        let track = player.items[indexInt]
-        return track.toBridge()
-      }
-      return nil
-    }
-  }
-
-  @objc
-  public func getQueue() -> [[String: Any]] {
-    return onMainThread {
-      guard self.hasInitialized else { return [] }
-      return player.items.map { $0.toBridge() }
-    }
-  }
-
-  @objc
-  public func setQueue(trackDicts: [[String: Any]]) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      var tracks = [AudioItem]()
-      for trackDict in trackDicts {
-        guard let track = AudioItem.fromBridge(dictionary: trackDict) else { return }
-        tracks.append(track)
-      }
-      self.player.clear()
-      try? self.player.add(items: tracks)
-    }
-  }
-
-  @objc
-  public func getActiveTrack() -> [String: Any]? {
-    return onMainThread {
-      guard self.hasInitialized else { return nil }
-      let index = player.currentIndex
-      if index >= 0, index < player.items.count {
-        let track = player.items[index]
-        return track.toBridge()
-      }
-      return nil
-    }
-  }
-
-  @objc
-  public func getActiveTrackIndex() -> NSNumber? {
-    return onMainThread {
-      guard self.hasInitialized else { return nil }
-      let index = player.currentIndex
-      if index < 0 || index >= player.items.count {
-        return nil
-      }
-      return NSNumber(value: index)
-    }
-  }
-
-  @objc
-  public func getProgress() -> [String: Any] {
-    return onMainThread {
-      guard self.hasInitialized else { return [:] }
-      return [
-        "position": player.currentTime,
-        "duration": player.duration,
-        "buffered": player.bufferedPosition,
-      ]
-    }
-  }
-
-  @objc
-  public func getPlaybackState() -> [String: Any] {
-    return onMainThread {
-      guard self.hasInitialized else { return [:] }
-      return getPlaybackStateBodyKeyValues(state: player.playerState)
-    }
-  }
-
-  @objc
-  public func updateMetadata(for trackIndex: Int, metadata: [String: Any]) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      guard trackIndex >= 0, trackIndex < self.player.items.count else { return }
-      let track = self.player.items[trackIndex]
-
-      track.updateMetadata(dictionary: metadata)
-
-      if self.player.currentIndex == trackIndex {
-        self.updateNowPlayingInfo(with: metadata)
-      }
-    }
-  }
-
-  @objc
-  public func updateNowPlayingMetadata(metadata: [String: Any]) {
-    ensureMainThread {
-      guard self.hasInitialized else { return }
-      self.updateNowPlayingInfo(with: metadata)
-    }
-  }
-
-  private func updateNowPlayingInfo(with metadata: [String: Any]) {
-    currentImageTask?.cancel()
-    var ret: [NowPlayingInfoKeyValue] = []
-
-    if let title = metadata["title"] as? String {
-      ret.append(MediaItemProperty.title(title))
-    }
-
-    if let artist = metadata["artist"] as? String {
-      ret.append(MediaItemProperty.artist(artist))
-    }
-
-    if let album = metadata["album"] as? String {
-      ret.append(MediaItemProperty.albumTitle(album))
-    }
-
-    if let duration = metadata["duration"] as? Double {
-      ret.append(MediaItemProperty.duration(duration))
-    }
-
-    if let elapsedTime = metadata["elapsedTime"] as? Double {
-      ret.append(NowPlayingInfoProperty.elapsedPlaybackTime(elapsedTime))
-    }
-
-    if let isLiveStream = metadata["isLiveStream"] as? Bool {
-      ret.append(NowPlayingInfoProperty.isLiveStream(isLiveStream))
-    }
-
-    player.nowPlayingInfoController.set(keyValues: ret)
-
-    if let artworkURL = MediaURL(object: metadata["artwork"]) {
-      currentImageTask = URLSession.shared.dataTask(
-        with: artworkURL.value,
-        completionHandler: { [weak self] data, _, error in
-          if let data, let image = UIImage(data: data), error == nil {
-            let artwork = MPMediaItemArtwork(
-              boundsSize: image.size,
-              requestHandler: { _ -> UIImage in
-                return image
-              }
-            )
-            self?.player.nowPlayingInfoController.set(keyValue: MediaItemProperty.artwork(artwork))
-          }
-        }
-      )
-
-      currentImageTask?.resume()
-    } else {
-      player.nowPlayingInfoController.set(keyValue: MediaItemProperty.artwork(nil))
-    }
-  }
-
-  private func getPlaybackStateErrorKeyValues() -> [String: Any] {
-    switch player.playbackError {
-    case .failedToLoadKeyValue: return [
-        "message": "Failed to load resource",
-        "code": "ios_failed_to_load_resource",
-      ]
-    case .invalidSourceUrl: return [
-        "message": "The source url was invalid",
-        "code": "ios_invalid_source_url",
-      ]
-    case .notConnectedToInternet: return [
-        "message": "A network resource was requested, but an internet connection has not been established and can’t be established automatically.",
-        "code": "ios_not_connected_to_internet",
-      ]
-    case .playbackFailed: return [
-        "message": "Playback of the track failed",
-        "code": "ios_playback_failed",
-      ]
-    case .itemWasUnplayable: return [
-        "message": "The track could not be played",
-        "code": "ios_track_unplayable",
-      ]
-    default: return [
-        "message": "A playback error occurred",
-        "code": "ios_playback_error",
-      ]
-    }
-  }
-
-  private func getPlaybackStateBodyKeyValues(state: AudioPlayerState) -> [String: Any] {
-    var body: [String: Any] = ["state": State.fromPlayerState(state: state).rawValue]
-    if state == AudioPlayerState.failed {
-      body["error"] = getPlaybackStateErrorKeyValues()
-    }
-    return body
-  }
-
-  // MARK: - QueuedAudioPlayer Event Handlers
-
-  func handleAudioPlayerStateChange(state: AudioPlayerState) {
-    ensureMainThread {
-      self.emit(
-        event: EventType.PlaybackState,
-        body: self.getPlaybackStateBodyKeyValues(state: state)
-      )
-      if state == .ended {
-        self.emit(event: EventType.PlaybackQueueEnded, body: [
-          "track": self.player.currentIndex,
-          "position": self.player.currentTime,
-        ] as [String: Any])
-      }
-    }
-  }
-
-  func handleAudioPlayerCommonMetadataReceived(metadata: [AVMetadataItem]) {
-    let commonMetadata = MetadataAdapter.convertToCommonMetadata(metadata: metadata, skipRaw: true)
-    emit(event: EventType.MetadataCommonReceived, body: ["metadata": commonMetadata])
-  }
-
-  func handleAudioPlayerChapterMetadataReceived(metadata: [AVTimedMetadataGroup]) {
-    let metadataItems = MetadataAdapter.convertToGroupedMetadata(metadataGroups: metadata)
-    emit(event: EventType.MetadataChapterReceived, body: ["metadata": metadataItems])
-  }
-
-  func handleAudioPlayerTimedMetadataReceived(metadata: [AVTimedMetadataGroup]) {
-    let metadataItems = MetadataAdapter.convertToGroupedMetadata(metadataGroups: metadata)
-    emit(event: EventType.MetadataTimedReceived, body: ["metadata": metadataItems])
-  }
-
-  func handleAudioPlayerFailed(error: Error?) {
-    emit(event: EventType.PlaybackError, body: ["error": error?.localizedDescription])
-  }
-
-  func handleAudioPlayerCurrentItemChange(
-    item: AudioItem?,
-    index: Int?,
-    lastItem: AudioItem?,
-    lastIndex: Int?,
-    lastPosition: Double?
-  ) {
-    ensureMainThread {
-      if let item {
-        UIApplication.shared.beginReceivingRemoteControlEvents()
-        // Update now playing controller with isLiveStream option from track
-        if self.player.automaticallyUpdateNowPlayingInfo {
-          let isTrackLiveStream = item.isLiveStream ?? false
-          self.player.nowPlayingInfoController
-            .set(keyValue: NowPlayingInfoProperty.isLiveStream(isTrackLiveStream))
-        }
+  /**
+   Jump to a certain item in the queue.
+
+   - parameter index: The index of the item to jump to.
+   - parameter playWhenReady: Optional, whether to start playback when the item is ready.
+   - throws: `AudioPlayerError`
+   */
+  public func jumpToItem(atIndex index: Int, playWhenReady: Bool? = nil) throws {
+    try handlePlayWhenReady(playWhenReady) {
+      if index == currentIndex {
+        seek(to: 0)
       } else {
-        UIApplication.shared.endReceivingRemoteControlEvents()
+        _ = try jump(to: index)
       }
-
-      if (item != nil && lastItem == nil) || item == nil {
-        self.configureAudioSession()
-      }
-
-      var a: [String: Any] = ["lastPosition": lastPosition ?? 0]
-      if let lastIndex {
-        a["lastIndex"] = lastIndex
-      }
-
-      if let lastItem {
-        a["lastTrack"] = lastItem.toBridge()
-      }
-
-      if let index {
-        a["index"] = index
-      }
-
-      if let item {
-        a["track"] = item.toBridge()
-      }
-      self.emit(event: EventType.PlaybackActiveTrackChanged, body: a)
+      event.playbackEnd.emit(data: .jumpedToIndex)
     }
   }
 
-  func handleAudioPlayerSecondElapse(seconds _: Double) {
-    // because you cannot prevent the `event.secondElapse` from firing
-    // do not emit an event if `progressUpdateEventInterval` is nil
-    // additionally, there are certain instances in which this event is emitted
-    // _after_ a manipulation to the queu causing no currentItem to exist (see reset)
-    // in which case we shouldn't emit anything or we'll get an exception.
-    guard shouldEmitProgressEvent else { return }
-    ensureMainThread {
-      guard self.player.currentItem != nil else { return }
-      self.emit(
-        event: EventType.PlaybackProgressUpdated,
-        body: [
-          "position": self.player.currentTime,
-          "duration": self.player.duration,
-          "buffered": self.player.bufferedPosition,
-          "track": self.player.currentIndex,
-        ]
+  private func jump(to index: Int) throws -> AudioItem {
+    assertMainThread()
+    try throwIfQueueEmpty()
+    try throwIfIndexInvalid(index: index)
+
+    if index == currentIndex {
+      if playWhenReady {
+        replay()
+      }
+    } else {
+      currentIndex = index
+      handleCurrentItemChanged()
+    }
+
+    guard let item = currentItem else {
+      throw AudioPlayerError.QueueError.invalidIndex(
+        index: index,
+        message: "Failed to get current item after jumping to index \(index)"
       )
     }
+    return item
   }
 
-  func handlePlayWhenReadyChange(playWhenReady: Bool) {
-    configureAudioSession()
-    emit(
-      event: EventType.PlaybackPlayWhenReadyChanged,
-      body: [
-        "playWhenReady": playWhenReady,
-      ]
+  /**
+   Move an item in the queue from one position to another.
+
+   - parameter fromIndex: The index of the item to move.
+   - parameter toIndex: The index to move the item to.
+   - throws: `AudioPlayerError.QueueError`
+   */
+  public func moveItem(fromIndex: Int, toIndex: Int) throws {
+    assertMainThread()
+    try throwIfQueueEmpty()
+    try throwIfIndexInvalid(index: fromIndex, name: "fromIndex")
+    try throwIfIndexInvalid(index: toIndex, name: "toIndex", max: Int.max)
+
+    let item = items.remove(at: fromIndex)
+    items.insert(item, at: min(items.count, toIndex))
+    if fromIndex == currentIndex {
+      currentIndex = toIndex
+      handleCurrentItemChanged()
+    }
+  }
+
+  /**
+   Remove all upcoming items, those returned by `next()`
+   */
+  public func removeUpcomingItems() {
+    assertMainThread()
+    guard !items.isEmpty else { return }
+    let nextIndex = currentIndex + 1
+    guard nextIndex < items.count else { return }
+    items.removeSubrange(nextIndex ..< items.count)
+  }
+
+  /**
+   Removes all items from queue
+   */
+  private func clearQueue() {
+    assertMainThread()
+    let itemWasNil = currentIndex == -1
+    currentIndex = -1
+    items.removeAll()
+    if !itemWasNil {
+      handleCurrentItemChanged()
+    }
+  }
+
+  func replay() {
+    seek(to: 0) { [weak self] succeeded in
+      if succeeded {
+        self?.play()
+      }
+    }
+  }
+
+  func handleCurrentItemChanged() {
+    let lastPosition = currentTime
+    let shouldContinuePlayback = playWhenReady
+    if let currentItem {
+      // Ensure playWhenReady is set before loading to preserve playback state
+      playWhenReady = shouldContinuePlayback
+      loadItem(currentItem)
+    } else {
+      let playbackWasActive = playbackActive
+      unloadAVPlayer()
+      nowPlayingInfoController.clear()
+      if playbackWasActive {
+        event.playbackEnd.emit(data: .cleared)
+      }
+    }
+    event.currentItem.emit(
+      data: (
+        item: currentItem,
+        index: currentIndex == -1 ? nil : currentIndex,
+        lastItem: lastItem,
+        lastIndex: lastIndex == -1 ? nil : lastIndex,
+        lastPosition: lastPosition
+      )
     )
-  }
-}
-
-@objc public protocol NativeTrackPlayerImplDelegate {
-  func emitPlaybackState(_ body: [String: Any])
-  func emitPlaybackActiveTrackChanged(_ body: [String: Any])
-  func emitPlaybackProgressUpdated(_ body: [String: Any])
-  func emitPlaybackPlayWhenReadyChanged(_ body: [String: Any])
-  func emitPlaybackQueueEnded(_ body: [String: Any])
-  func emitPlaybackError(_ body: [String: Any])
-  func emitRemotePlay(_ body: [String: Any])
-  func emitRemotePause(_ body: [String: Any])
-  func emitRemoteNext(_ body: [String: Any])
-  func emitRemotePrevious(_ body: [String: Any])
-  func emitRemoteSeek(_ body: [String: Any])
-  func emitRemoteJumpForward(_ body: [String: Any])
-  func emitRemoteJumpBackward(_ body: [String: Any])
-  func emitRemoteStop(_ body: [String: Any])
-  func emitRemoteSetRating(_ body: [String: Any])
-  func emitRemotePlayId(_ body: [String: Any])
-  func emitRemotePlaySearch(_ body: [String: Any])
-  func emitRemoteSkip(_ body: [String: Any])
-  func emitRemoteLike(_ body: [String: Any])
-  func emitRemoteDislike(_ body: [String: Any])
-  func emitRemoteBookmark(_ body: [String: Any])
-  func emitMetadataTimedReceived(_ body: [String: Any])
-  func emitMetadataCommonReceived(_ body: [String: Any])
-  func emitMetadataChapterReceived(_ body: [String: Any])
-  func emitPlaybackMetadata(_ body: [String: Any])
-}
-
-public extension NativeTrackPlayerImpl {
-  @objc(constantsToExport)
-  static var constantsToExport: [AnyHashable: Any] {
-    return [
-      "STATE_NONE": State.none.rawValue,
-      "STATE_READY": State.ready.rawValue,
-      "STATE_PLAYING": State.playing.rawValue,
-      "STATE_PAUSED": State.paused.rawValue,
-      "STATE_STOPPED": State.stopped.rawValue,
-      "STATE_BUFFERING": State.buffering.rawValue,
-      "STATE_LOADING": State.loading.rawValue,
-      "STATE_ERROR": State.error.rawValue,
-
-      "TRACK_PLAYBACK_ENDED_REASON_END": PlaybackEndedReason.playedUntilEnd.rawValue,
-      "TRACK_PLAYBACK_ENDED_REASON_JUMPED": PlaybackEndedReason.jumpedToIndex.rawValue,
-      "TRACK_PLAYBACK_ENDED_REASON_NEXT": PlaybackEndedReason.skippedToNext.rawValue,
-      "TRACK_PLAYBACK_ENDED_REASON_PREVIOUS": PlaybackEndedReason.skippedToPrevious.rawValue,
-      "TRACK_PLAYBACK_ENDED_REASON_STOPPED": PlaybackEndedReason.playerStopped.rawValue,
-
-      "PITCH_ALGORITHM_LINEAR": PitchAlgorithm.linear.rawValue,
-      "PITCH_ALGORITHM_MUSIC": PitchAlgorithm.music.rawValue,
-      "PITCH_ALGORITHM_VOICE": PitchAlgorithm.voice.rawValue,
-
-      "CAPABILITY_PLAY": Capability.play.rawValue,
-      "CAPABILITY_PLAY_FROM_ID": "NOOP",
-      "CAPABILITY_PLAY_FROM_SEARCH": "NOOP",
-      "CAPABILITY_PAUSE": Capability.pause.rawValue,
-      "CAPABILITY_STOP": Capability.stop.rawValue,
-      "CAPABILITY_SEEK_TO": Capability.seek.rawValue,
-      "CAPABILITY_SKIP": "NOOP",
-      "CAPABILITY_SKIP_TO_NEXT": Capability.next.rawValue,
-      "CAPABILITY_SKIP_TO_PREVIOUS": Capability.previous.rawValue,
-      "CAPABILITY_SET_RATING": "NOOP",
-      "CAPABILITY_JUMP_FORWARD": Capability.jumpForward.rawValue,
-      "CAPABILITY_JUMP_BACKWARD": Capability.jumpBackward.rawValue,
-      "CAPABILITY_LIKE": Capability.like.rawValue,
-      "CAPABILITY_DISLIKE": Capability.dislike.rawValue,
-      "CAPABILITY_BOOKMARK": Capability.bookmark.rawValue,
-
-      "REPEAT_OFF": RepeatMode.off.rawValue,
-      "REPEAT_TRACK": RepeatMode.track.rawValue,
-      "REPEAT_QUEUE": RepeatMode.queue.rawValue,
-
-      "RATING_HEART": RatingType.heart.rawValue,
-      "RATING_THUMBS_UP_DOWN": RatingType.thumbsUpDown.rawValue,
-      "RATING_3_STARS": RatingType.threeStars.rawValue,
-      "RATING_4_STARS": RatingType.fourStars.rawValue,
-      "RATING_5_STARS": RatingType.fiveStars.rawValue,
-      "RATING_PERCENTAGE": RatingType.percentage.rawValue,
-    ]
-  }
-
-  @objc(supportedEvents)
-  static var supportedEvents: [String] {
-    return EventType.allRawValues()
+    lastItem = currentItem
+    lastIndex = currentIndex
   }
 }

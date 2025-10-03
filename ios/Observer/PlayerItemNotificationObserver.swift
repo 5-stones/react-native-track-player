@@ -9,13 +9,13 @@ import AVFoundation
 import Foundation
 
 /**
- Observes player item notifications and calls AudioPlayer methods directly.
+ Observes player item notifications and calls TrackPlayer methods directly.
  */
 class PlayerItemNotificationObserver {
   private let notificationCenter: NotificationCenter = .default
 
   private(set) weak var observingItem: AVPlayerItem?
-  weak var player: AudioPlayer?
+  weak var player: TrackPlayer?
 
   private(set) var isObserving: Bool = false
 

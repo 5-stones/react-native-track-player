@@ -10,7 +10,7 @@ import AVFoundation
 import Foundation
 
 /**
- Observes time-based player events and calls AudioPlayer methods directly.
+ Observes time-based player events and calls TrackPlayer methods directly.
  */
 class PlayerTimeObserver {
   /// The time to use as start boundary time. Cannot be zero.
@@ -37,7 +37,7 @@ class PlayerTimeObserver {
     }
   }
 
-  weak var player: AudioPlayer?
+  weak var player: TrackPlayer?
 
   init(periodicObserverTimeInterval: CMTime) {
     self.periodicObserverTimeInterval = periodicObserverTimeInterval

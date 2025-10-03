@@ -9,7 +9,7 @@ import AVFoundation
 import Foundation
 
 /**
- Observes player item property changes and calls AudioPlayer methods directly.
+ Observes player item property changes and calls TrackPlayer methods directly.
  */
 class PlayerItemPropertyObserver: NSObject {
   private static var context = 0
@@ -24,7 +24,7 @@ class PlayerItemPropertyObserver: NSObject {
   private(set) var isObserving: Bool = false
 
   private(set) weak var observingItem: AVPlayerItem?
-  weak var player: AudioPlayer?
+  weak var player: TrackPlayer?
 
   deinit {
     stopObservingCurrentItem()

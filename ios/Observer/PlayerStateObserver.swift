@@ -10,7 +10,7 @@ import AVFoundation
 import Foundation
 
 /**
- Observes player state changes and calls AudioPlayer methods directly.
+ Observes player state changes and calls TrackPlayer methods directly.
  */
 class PlayerStateObserver: NSObject {
   private static var context = 0
@@ -25,7 +25,7 @@ class PlayerStateObserver: NSObject {
   private let timeControlStatusChangeOptions: NSKeyValueObservingOptions = [.new]
   private(set) var isObserving: Bool = false
 
-  weak var player: AudioPlayer?
+  weak var player: TrackPlayer?
   weak var avPlayer: AVPlayer? {
     willSet {
       stopObserving()

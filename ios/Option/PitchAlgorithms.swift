@@ -9,13 +9,13 @@
 import AVFoundation
 import Foundation
 
-enum PitchAlgorithm: String {
+public enum PitchAlgorithm: String {
   case linear
   case music
   case voice
 
   /// The corresponding AVAudioTimePitchAlgorithm for use with AVPlayer
-  var avAlgorithm: AVAudioTimePitchAlgorithm {
+  public var avAlgorithm: AVAudioTimePitchAlgorithm {
     switch self {
     case .linear: return .varispeed
     case .music: return .spectral
