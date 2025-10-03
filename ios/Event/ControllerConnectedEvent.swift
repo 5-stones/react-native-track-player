@@ -33,7 +33,7 @@ public struct ControllerConnectedEvent {
       "package": package,
       "isMediaNotificationController": isMediaNotificationController,
       "isAutomotiveController": isAutomotiveController,
-      "isAutoCompanionController": isAutoCompanionController
+      "isAutoCompanionController": isAutoCompanionController,
     ]
   }
 }

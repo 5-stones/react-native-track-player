@@ -28,7 +28,7 @@ public struct PlaybackProgressUpdatedEvent {
       "position": position,
       "duration": duration,
       "buffered": buffered,
-      "track": track
+      "track": track,
     ]
   }
 }

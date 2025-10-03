@@ -14,7 +14,7 @@ public struct PlaybackState {
 
   public func toBridge() -> [String: Any] {
     var body: [String: Any] = ["state": state.bridge]
-    if let error = error {
+    if let error {
       body["error"] = error.toBridge()
     }
     return body

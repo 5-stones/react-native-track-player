@@ -13,7 +13,7 @@ public struct AudioMetadataReceivedEvent {
 
   public func toBridge() -> [String: Any] {
     return [
-      "metadata": metadata.map { $0.toBridge() }
+      "metadata": metadata.map { $0.toBridge() },
     ]
   }
 }
@@ -78,21 +78,21 @@ public struct AudioMetadata {
   public func toBridge() -> [String: Any] {
     var result: [String: Any] = [:]
 
-    if let title = title { result["title"] = title }
-    if let artist = artist { result["artist"] = artist }
-    if let albumTitle = albumTitle { result["albumTitle"] = albumTitle }
-    if let subtitle = subtitle { result["subtitle"] = subtitle }
-    if let description = description { result["description"] = description }
-    if let artworkUri = artworkUri { result["artworkUri"] = artworkUri }
-    if let trackNumber = trackNumber { result["trackNumber"] = trackNumber }
-    if let composer = composer { result["composer"] = composer }
-    if let conductor = conductor { result["conductor"] = conductor }
-    if let genre = genre { result["genre"] = genre }
-    if let compilation = compilation { result["compilation"] = compilation }
-    if let station = station { result["station"] = station }
-    if let mediaType = mediaType { result["mediaType"] = mediaType }
-    if let creationDate = creationDate { result["creationDate"] = creationDate }
-    if let creationYear = creationYear { result["creationYear"] = creationYear }
+    if let title { result["title"] = title }
+    if let artist { result["artist"] = artist }
+    if let albumTitle { result["albumTitle"] = albumTitle }
+    if let subtitle { result["subtitle"] = subtitle }
+    if let description { result["description"] = description }
+    if let artworkUri { result["artworkUri"] = artworkUri }
+    if let trackNumber { result["trackNumber"] = trackNumber }
+    if let composer { result["composer"] = composer }
+    if let conductor { result["conductor"] = conductor }
+    if let genre { result["genre"] = genre }
+    if let compilation { result["compilation"] = compilation }
+    if let station { result["station"] = station }
+    if let mediaType { result["mediaType"] = mediaType }
+    if let creationDate { result["creationDate"] = creationDate }
+    if let creationYear { result["creationYear"] = creationYear }
 
     if !raw.isEmpty {
       result["raw"] = raw.map { $0.toBridge() }
@@ -129,10 +129,10 @@ public struct RawMetadataEntry {
   public func toBridge() -> [String: Any] {
     var result: [String: Any] = ["key": key]
 
-    if let commonKey = commonKey { result["commonKey"] = commonKey }
-    if let keySpace = keySpace { result["keySpace"] = keySpace }
-    if let time = time { result["time"] = time }
-    if let value = value { result["value"] = value }
+    if let commonKey { result["commonKey"] = commonKey }
+    if let keySpace { result["keySpace"] = keySpace }
+    if let time { result["time"] = time }
+    if let value { result["value"] = value }
 
     return result
   }

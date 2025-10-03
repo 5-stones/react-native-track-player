@@ -13,7 +13,7 @@ public struct PlaybackPlayWhenReadyChangedEvent {
 
   public func toBridge() -> [String: Any] {
     return [
-      "playWhenReady": playWhenReady
+      "playWhenReady": playWhenReady,
     ]
   }
 }

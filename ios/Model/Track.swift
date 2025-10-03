@@ -29,18 +29,18 @@ public class Track {
   // MARK: - Internal Bridge Properties
 
   /// The original MediaURL from the bridge (for serialization)
-  internal let url: MediaURL?
+  let url: MediaURL?
 
   /// URL to artwork image (local file or remote URL)
-  internal var artworkURL: MediaURL?
+  var artworkURL: MediaURL?
 
-  internal var date: String?
-  internal var desc: String?
-  internal var genre: String?
-  internal var duration: Double?
-  internal let headers: [String: Any]?
-  internal var userAgent: String?
-  internal var isLiveStream: Bool?
+  var date: String?
+  var desc: String?
+  var genre: String?
+  var duration: Double?
+  let headers: [String: Any]?
+  var userAgent: String?
+  var isLiveStream: Bool?
 
   // MARK: - Internal State
 
@@ -50,7 +50,7 @@ public class Track {
   // MARK: - Initialization
 
   /// Internal initializer - use `Track.fromBridge()` to create tracks from React Native
-  internal init(
+  init(
     audioUrl: String,
     artist: String? = nil,
     title: String? = nil,
@@ -95,13 +95,16 @@ public class Track {
   /// Creates a Track from a React Native bridge dictionary
   public static func fromBridge(dictionary: [String: Any]) -> Track? {
     guard let url = MediaURL(object: dictionary["url"]) else {
-      print("Track.fromBridge: Failed to create track - invalid or missing URL. Dictionary: \(dictionary)")
+      print(
+        "Track.fromBridge: Failed to create track - invalid or missing URL. Dictionary: \(dictionary)"
+      )
       return nil
     }
 
     let headers = dictionary["headers"] as? [String: Any]
     let userAgent = dictionary["userAgent"] as? String
-    let pitchAlgorithm = (dictionary["pitchAlgorithm"] as? String).flatMap { PitchAlgorithm(rawValue: $0) }
+    let pitchAlgorithm = (dictionary["pitchAlgorithm"] as? String)
+      .flatMap { PitchAlgorithm(rawValue: $0) }
 
     let track = Track(
       audioUrl: url.isLocal ? url.value.path : url.value.absoluteString,
@@ -128,7 +131,7 @@ public class Track {
 
     // Override with current property values
     // URL is required
-    if let url = url {
+    if let url {
       map["url"] = url.value.absoluteString
     }
 
@@ -141,30 +144,30 @@ public class Track {
     }
 
     // Headers
-    if let headers = headers {
+    if let headers {
       map["headers"] = headers
     }
 
     // User agent
-    if let userAgent = userAgent {
+    if let userAgent {
       map["userAgent"] = userAgent
     }
 
     // Pitch algorithm
-    if let pitchAlgorithm = pitchAlgorithm {
+    if let pitchAlgorithm {
       map["pitchAlgorithm"] = pitchAlgorithm.rawValue
     }
 
     // Metadata
-    if let title = title {
+    if let title {
       map["title"] = title
     }
 
-    if let artist = artist {
+    if let artist {
       map["artist"] = artist
     }
 
-    if let album = album {
+    if let album {
       map["album"] = album
     }
 
@@ -172,23 +175,23 @@ public class Track {
       map["artwork"] = artwork
     }
 
-    if let date = date {
+    if let date {
       map["date"] = date
     }
 
-    if let genre = genre {
+    if let genre {
       map["genre"] = genre
     }
 
-    if let desc = desc {
+    if let desc {
       map["description"] = desc
     }
 
-    if let duration = duration {
+    if let duration {
       map["duration"] = duration
     }
 
-    if let isLiveStream = isLiveStream {
+    if let isLiveStream {
       map["isLiveStream"] = isLiveStream
     }
 
@@ -251,7 +254,7 @@ public class Track {
         if let data, let artwork = UIImage(data: data), error == nil {
           handler(artwork)
         } else {
-          if let error = error {
+          if let error {
             print("Track.loadArtwork: Failed to load from \(artworkURL) - \(error)")
           }
           handler(nil)

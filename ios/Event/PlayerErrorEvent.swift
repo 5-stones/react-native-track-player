@@ -18,7 +18,7 @@ public struct PlayerErrorEvent {
   public func toBridge() -> [String: Any] {
     return [
       "code": code,
-      "message": message
+      "message": message,
     ]
   }
 }

@@ -35,6 +35,6 @@ public enum State: String {
 
 extension State {
   var bridge: String {
-    return self.rawValue
+    return rawValue
   }
 }

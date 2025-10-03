@@ -36,19 +36,19 @@ public struct PlaybackActiveTrackChangedEvent {
   public func toBridge() -> [String: Any] {
     var result: [String: Any] = ["lastPosition": lastPosition]
 
-    if let lastIndex = lastIndex {
+    if let lastIndex {
       result["lastIndex"] = lastIndex
     }
 
-    if let lastTrack = lastTrack {
+    if let lastTrack {
       result["lastTrack"] = lastTrack.toBridge()
     }
 
-    if let index = index {
+    if let index {
       result["index"] = index
     }
 
-    if let track = track {
+    if let track {
       result["track"] = track.toBridge()
     }
 

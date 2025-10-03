@@ -46,27 +46,27 @@ public struct RemotePlaySearchEvent {
   public func toBridge() -> [String: Any] {
     var result: [String: Any] = ["query": query]
 
-    if let focus = focus {
+    if let focus {
       result["focus"] = focus
     }
 
-    if let title = title {
+    if let title {
       result["title"] = title
     }
 
-    if let artist = artist {
+    if let artist {
       result["artist"] = artist
     }
 
-    if let album = album {
+    if let album {
       result["album"] = album
     }
 
-    if let date = date {
+    if let date {
       result["date"] = date
     }
 
-    if let playlist = playlist {
+    if let playlist {
       result["playlist"] = playlist
     }
 
