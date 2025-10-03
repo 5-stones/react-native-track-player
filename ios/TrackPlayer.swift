@@ -14,7 +14,7 @@ public class TrackPlayer {
   public let event = EventHolder()
 
   fileprivate var lastIndex: Int = -1
-  fileprivate var lastItem: AudioItem?
+  fileprivate var lastTrack: Track?
 
   /// The repeat mode for the queue player.
   public var repeatMode: RepeatMode = .off
@@ -26,49 +26,49 @@ public class TrackPlayer {
   }
 
   /**
-   The index of the current item. `-1` when there is no current item
+   The index of the current track. `-1` when there is no current track
    */
   private(set) public var currentIndex: Int = -1
 
   /**
-   All items held by the queue.
+   All tracks held by the queue.
    */
-  private(set) public var items: [AudioItem] = []
+  private(set) public var tracks: [Track] = []
 
-  public var currentItem: AudioItem? {
+  public var currentTrack: Track? {
     assertMainThread()
-    guard currentIndex >= 0, currentIndex < items.count else { return nil }
-    return items[currentIndex]
+    guard currentIndex >= 0, currentIndex < tracks.count else { return nil }
+    return tracks[currentIndex]
   }
 
   /**
-   The upcoming items in the queue.
+   The upcoming tracks in the queue.
    */
-  public var nextItems: [AudioItem] {
+  public var nextTracks: [Track] {
     assertMainThread()
-    guard currentIndex >= 0, currentIndex < items.count - 1 else { return [] }
-    return Array(items[currentIndex + 1 ..< items.count])
+    guard currentIndex >= 0, currentIndex < tracks.count - 1 else { return [] }
+    return Array(tracks[currentIndex + 1 ..< tracks.count])
   }
 
   /**
-   The previous items held by the queue.
+   The previous tracks held by the queue.
    */
-  public var previousItems: [AudioItem] {
+  public var previousTracks: [Track] {
     assertMainThread()
     guard currentIndex > 0 else { return [] }
-    return Array(items[0 ..< currentIndex])
+    return Array(tracks[0 ..< currentIndex])
   }
 
   /**
-   Whether there are more items after the current item in the queue.
+   Whether there are more tracks after the current track in the queue.
    */
-  private var hasNextItem: Bool {
-    currentIndex < items.count - 1
+  private var hasNextTrack: Bool {
+    currentIndex < tracks.count - 1
   }
 
   // MARK: - AVPlayer Properties (from AVPlayerWrapper)
 
-  /// Represents a seek operation that's pending while an item loads
+  /// Represents a seek operation that's pending while a track loads
   private struct PendingSeek {
     let time: TimeInterval
     let completion: ((Bool) -> Void)?
@@ -116,15 +116,14 @@ public class TrackPlayer {
   }()
   private var pendingSeek: PendingSeek?
   private var asset: AVAsset?
-  private var item: AVPlayerItem?
   private var url: URL?
   private var urlOptions: [String: Any]?
   private let stateQueue = DispatchQueue(
     label: "TrackPlayer.stateQueue",
     attributes: .concurrent
   )
-  private(set) var playbackError: AudioPlayerError.PlaybackError?
-  var _state: AudioPlayerState = .idle
+  private(set) var playbackError: TrackPlayerError.PlaybackError?
+  var _state: PlaybackState = .idle
   private(set) var lastPlayerTimeControlStatus: AVPlayer.TimeControlStatus = .paused
   private var _rate: Float = 1.0
   var _playWhenReady: Bool = false
@@ -137,18 +136,18 @@ public class TrackPlayer {
   public var automaticallyUpdateNowPlayingInfo: Bool = true
 
   /**
-   Controls the time pitch algorithm applied to each item loaded into the player.
+   Controls the time pitch algorithm applied to each track loaded into the player.
    If the loaded `AudioItem` conforms to `TimePitcher`-protocol this will be overriden.
    */
   public var audioTimePitchAlgorithm: AVAudioTimePitchAlgorithm = .timeDomain
 
   /**
-   Default remote commands to use for each playing item
+   Default remote commands to use for each playing track
    */
   public var remoteCommands: [RemoteCommand] = [] {
     didSet {
-      if let item = currentItem {
-        enableRemoteCommands(forItem: item)
+      if let track = currentTrack {
+        enableRemoteCommands(track.remoteCommands ?? remoteCommands)
       }
     }
   }
@@ -183,9 +182,9 @@ public class TrackPlayer {
 
   // MARK: - AVPlayer State and Computed Properties
 
-  var state: AudioPlayerState {
+  var state: PlaybackState {
     get {
-      var state: AudioPlayerState!
+      var state: PlaybackState!
       stateQueue.sync {
         state = _state
       }
@@ -203,10 +202,6 @@ public class TrackPlayer {
     }
   }
 
-  var currentAVPlayerItem: AVPlayerItem? {
-    avPlayer.currentItem
-  }
-
   var playbackActive: Bool {
     switch state {
     case .idle, .stopped, .ended, .failed:
@@ -222,7 +217,7 @@ public class TrackPlayer {
   // MARK: - Getters from AVPlayerWrapper
 
   /**
-   The elapsed playback time of the current item.
+   The elapsed playback time of the current track.
    */
   public var currentTime: Double {
     let seconds = avPlayer.currentTime().seconds
@@ -230,40 +225,43 @@ public class TrackPlayer {
   }
 
   /**
-   The duration of the current AudioItem.
+   The duration of the current track.
    */
   public var duration: Double {
-    if let seconds = currentAVPlayerItem?.asset.duration.seconds, !seconds.isNaN {
-      return seconds
-    } else if let seconds = currentAVPlayerItem?.duration.seconds, !seconds.isNaN {
-      return seconds
-    } else if let seconds = currentAVPlayerItem?.seekableTimeRanges.last?.timeRangeValue.duration
-      .seconds,
-      !seconds.isNaN
+    guard let item = avPlayer.currentItem else { return 0.0 }
+
+    if !item.asset.duration.seconds.isNaN {
+      return item.asset.duration.seconds
+    }
+    if !item.duration.seconds.isNaN {
+      return item.duration.seconds
+    }
+    if let seekable = item.seekableTimeRanges.last?.timeRangeValue.duration.seconds,
+       !seekable.isNaN
     {
-      return seconds
+      return seekable
     }
     return 0.0
   }
 
   /**
-   The bufferedPosition of the current AudioItem.
+   The bufferedPosition of the active track
    */
   public var bufferedPosition: Double {
-    currentAVPlayerItem?.loadedTimeRanges.last?.timeRangeValue.end.seconds ?? 0
+    avPlayer.currentItem?.loadedTimeRanges.last?.timeRangeValue.end.seconds ?? 0
   }
 
   /**
    The current state of the underlying `TrackPlayer`.
    */
-  public var playerState: AudioPlayerState {
+  public var playerState: PlaybackState {
     state
   }
 
   // MARK: - Setters for AVPlayerWrapper
 
   /**
-   Whether the player should start playing automatically when the item is ready.
+   Whether the player should start playing automatically when the track is ready.
    */
   public var playWhenReady: Bool {
     get { _playWhenReady }
@@ -357,22 +355,22 @@ public class TrackPlayer {
   // MARK: - Player Actions
 
   /**
-   Will replace the current item with a new one and load it into the player.
+   Will replace the current track with a new one and load it into the player.
 
-   - parameter item: The AudioItem to replace the current item.
-   - parameter playWhenReady: Optional, whether to start playback when the item is ready.
+   - parameter track: The Track to replace the current track.
+   - parameter playWhenReady: Optional, whether to start playback when the track is ready.
    */
-  public func load(item: AudioItem, playWhenReady: Bool? = nil) {
+  public func load(_ track: Track, playWhenReady: Bool? = nil) {
     handlePlayWhenReady(playWhenReady) {
-      replaceCurrentItem(with: item)
+      replaceCurrentTrackWith(track)
     }
   }
 
   /**
-   Internal load method that loads an item directly without queue management.
+   Internal load method that loads a track directly without queue management.
    Used by queue operations after updating the queue state.
    */
-  private func loadItem(_ item: AudioItem) {
+  private func loadTrack(_ track: Track) {
     if automaticallyUpdateNowPlayingInfo {
       // Reset playback values without updating, because that will happen in
       // the loadNowPlayingMetaValues call straight after:
@@ -384,14 +382,14 @@ public class TrackPlayer {
       loadNowPlayingMetaValues()
     }
 
-    enableRemoteCommands(forItem: item)
+    enableRemoteCommands(track.remoteCommands ?? remoteCommands)
 
     loadFromString(
-      from: item.audioUrl,
-      type: item.sourceType,
+      from: track.audioUrl,
+      type: track.sourceType,
       playWhenReady: self.playWhenReady,
-      initialTime: item.initialTime,
-      options: item.assetOptions
+      initialTime: track.initialTime,
+      options: track.assetOptions
     )
   }
 
@@ -429,7 +427,7 @@ public class TrackPlayer {
   public func stop() {
     let wasActive = playbackActive
     state = .stopped
-    clearCurrentItem()
+    clearCurrentAVItem()
     playWhenReady = false
     if wasActive {
       event.playbackEnd.emit(data: .playerStopped)
@@ -437,12 +435,12 @@ public class TrackPlayer {
   }
 
   /**
-   Reload the current item.
+   Reload the current track.
    */
   public func reload(startFromCurrentTime: Bool) {
     var time: Double? = nil
     if startFromCurrentTime {
-      if let currentItem = currentAVPlayerItem {
+      if let currentItem = avPlayer.currentItem {
         if !currentItem.duration.isIndefinite {
           time = currentItem.currentTime().seconds
         }
@@ -450,25 +448,25 @@ public class TrackPlayer {
     }
     loadAVPlayer()
     if let time {
-      seek(to: time)
+      seekTo(time)
     }
   }
 
   /**
-   Seek to a specific time in the item.
+   Seek to a specific time in the track.
    */
-  public func seek(to seconds: TimeInterval) {
-    seek(to: seconds, completion: { _ in })
+  public func seekTo(_ seconds: TimeInterval) {
+    seekTo(seconds, completion: { _ in })
   }
 
   /**
-   Seek to a specific time in the item with a completion handler.
+   Seek to a specific time in the track with a completion handler.
 
    - parameter seconds: The time to seek to.
    - parameter completion: Called when the seek operation completes. The Bool parameter indicates whether the seek finished successfully (true) or was interrupted/deferred (false).
    */
-  public func seek(to seconds: TimeInterval, completion: @escaping (Bool) -> Void) {
-    // If an item is currently being loaded asynchronously, defer the seek until it's ready.
+  public func seekTo(_ seconds: TimeInterval, completion: @escaping (Bool) -> Void) {
+    // If an track is currently being loaded asynchronously, defer the seek until it's ready.
     if state == .loading {
       // Cancel any previous pending seek before creating a new one
       pendingSeek?.cancel()
@@ -481,15 +479,15 @@ public class TrackPlayer {
           completion(finished)
         }
     } else {
-      // No item loaded and not loading - seek fails immediately
+      // No track loaded and not loading - seek fails immediately
       completion(false)
     }
   }
 
   /**
-   Seek by relative a time offset in the item.
+   Seek by relative a time offset in the track.
    */
-  public func seek(by offset: TimeInterval) {
+  public func seekBy(_ offset: TimeInterval) {
     // Calculate the target time based on current state
     let targetTime: TimeInterval
     if state == .loading {
@@ -499,12 +497,12 @@ public class TrackPlayer {
       // If playing, offset from current position
       targetTime = currentItem.currentTime().seconds + offset
     } else {
-      // No item and not loading - nothing to seek in
+      // No track and not loading - nothing to seek in
       return
     }
 
     // Delegate to absolute seek
-    seek(to: targetTime)
+    seekTo(targetTime)
   }
 
   // MARK: - Remote Command Center
@@ -513,27 +511,10 @@ public class TrackPlayer {
     remoteCommandController.enable(commands: commands)
   }
 
-  func enableRemoteCommands(forItem item: AudioItem) {
-    if let commands = item.remoteCommands {
-      enableRemoteCommands(commands)
-    } else {
-      enableRemoteCommands(remoteCommands)
-    }
-  }
-
-  /**
-   Syncs the current remoteCommands with the iOS command center.
-   Can be used to update item states - e.g. like, dislike and bookmark.
-   */
-  @available(*, deprecated, message: "Directly set .remoteCommands instead")
-  public func syncRemoteCommandsWithCommandCenter() {
-    enableRemoteCommands(remoteCommands)
-  }
-
   // MARK: - NowPlayingInfo
 
   /**
-   Loads NowPlayingInfo-meta values with the values found in the current `AudioItem`. Use this if a change to the `AudioItem` is made and you want to update the `NowPlayingInfoController`s values.
+   Loads NowPlayingInfo-meta values with the values found in the current track. Use this if a change to the track is made and you want to update the `NowPlayingInfoController`s values.
 
    Reloads:
    - Artist
@@ -542,18 +523,18 @@ public class TrackPlayer {
    - Album artwork
    */
   public func loadNowPlayingMetaValues() {
-    guard let item = currentItem else { return }
+    guard let track = currentTrack else { return }
 
     nowPlayingInfoController.set(keyValues: [
-      MediaItemProperty.artist(item.artist),
-      MediaItemProperty.title(item.title),
-      MediaItemProperty.albumTitle(item.album),
+      MediaItemProperty.artist(track.artist),
+      MediaItemProperty.title(track.title),
+      MediaItemProperty.albumTitle(track.album),
     ])
-    loadArtwork(forItem: item)
+    loadArtworkForTrack(track)
   }
 
   /**
-   Resyncs the playbackvalues of the currently playing `AudioItem`.
+   Resyncs the playbackvalues of the currently playing track.
 
    Will resync:
    - Current time
@@ -569,7 +550,7 @@ public class TrackPlayer {
   }
 
   public func clear() {
-    clearQueue()
+    clearTracks()
     let playbackWasActive = playbackActive
     unloadAVPlayer()
     nowPlayingInfoController.clear()
@@ -586,8 +567,8 @@ public class TrackPlayer {
     )
   }
 
-  private func loadArtwork(forItem item: AudioItem) {
-    item.loadArtwork { image in
+  private func loadArtworkForTrack(_ track: Track) {
+    track.loadArtwork { image in
       if let image {
         let artwork = MPMediaItemArtwork(boundsSize: image.size, requestHandler: { _ in image })
         self.nowPlayingInfoController.set(keyValue: MediaItemProperty.artwork(artwork))
@@ -598,10 +579,10 @@ public class TrackPlayer {
   }
 
   private func setTimePitchingAlgorithmForCurrentItem() {
-    if let algorithm = currentItem?.pitchAlgorithm {
-      currentAVPlayerItem?.audioTimePitchAlgorithm = algorithm.avAlgorithm
+    if let algorithm = currentTrack?.pitchAlgorithm {
+      avPlayer.currentItem?.audioTimePitchAlgorithm = algorithm.avAlgorithm
     } else {
-      currentAVPlayerItem?.audioTimePitchAlgorithm = audioTimePitchAlgorithm
+      avPlayer.currentItem?.audioTimePitchAlgorithm = audioTimePitchAlgorithm
     }
   }
 
@@ -611,15 +592,15 @@ public class TrackPlayer {
     avPlayer.rate = _playWhenReady ? _rate : 0
   }
 
-  private func clearCurrentItem() {
+  private func clearCurrentAVItem() {
     guard let asset else { return }
     stopObservingAVPlayerItem()
 
     asset.cancelLoading()
     self.asset = nil
 
-    // Clear any pending seek to prevent it from being applied to the next item that loads.
-    // Without this, a seek called before any item was loaded could incorrectly apply to
+    // Clear any pending seek to prevent it from being applied to the next track that loads.
+    // Without this, a seek called before any track was loaded could incorrectly apply to
     // an unrelated track that loads later.
     pendingSeek?.cancel()
     pendingSeek = nil
@@ -627,9 +608,9 @@ public class TrackPlayer {
     avPlayer.replaceCurrentItem(with: nil)
   }
 
-  private func startObservingAVPlayer(item: AVPlayerItem) {
-    playerItemObserver.startObserving(item: item)
-    playerItemNotificationObserver.startObserving(item: item)
+  private func startObservingAVPlayerItem(_ avItem: AVPlayerItem) {
+    playerItemObserver.startObserving(item: avItem)
+    playerItemNotificationObserver.startObserving(item: avItem)
   }
 
   private func stopObservingAVPlayerItem() {
@@ -643,7 +624,7 @@ public class TrackPlayer {
     playerTimeObserver.unregisterForPeriodicEvents()
     playerObserver.stopObserving()
     stopObservingAVPlayerItem()
-    clearCurrentItem()
+    clearCurrentAVItem()
 
     avPlayer = AVPlayer()
     setupAVPlayer()
@@ -665,7 +646,7 @@ public class TrackPlayer {
     applyAVPlayerRate()
   }
 
-  private func playbackFailed(error: AudioPlayerError.PlaybackError) {
+  private func playbackFailed(error: TrackPlayerError.PlaybackError) {
     state = .failed
     playbackError = error
     handlePlaybackError(error)
@@ -675,7 +656,7 @@ public class TrackPlayer {
     if state == .failed {
       recreateAVPlayer()
     } else {
-      clearCurrentItem()
+      clearCurrentAVItem()
     }
     if let url {
       let pendingAsset = AVURLAsset(url: url, options: urlOptions)
@@ -735,7 +716,7 @@ public class TrackPlayer {
               let keyStatus = pendingAsset.statusOfValue(forKey: key, error: &error)
               switch keyStatus {
               case .failed:
-                self.playbackFailed(error: AudioPlayerError.PlaybackError.failedToLoadKeyValue)
+                self.playbackFailed(error: TrackPlayerError.PlaybackError.failedToLoadKeyValue)
                 return
               case .cancelled, .loading, .unknown:
                 return
@@ -746,18 +727,17 @@ public class TrackPlayer {
             }
 
             if !pendingAsset.isPlayable {
-              self.playbackFailed(error: AudioPlayerError.PlaybackError.itemWasUnplayable)
+              self.playbackFailed(error: TrackPlayerError.PlaybackError.trackWasUnplayable)
               return
             }
 
-            let item = AVPlayerItem(
+            let avItem = AVPlayerItem(
               asset: pendingAsset,
               automaticallyLoadedAssetKeys: playableKeys
             )
-            self.item = item
-            item.preferredForwardBufferDuration = self._bufferDuration
-            self.avPlayer.replaceCurrentItem(with: item)
-            self.startObservingAVPlayer(item: item)
+            avItem.preferredForwardBufferDuration = self._bufferDuration
+            self.avPlayer.replaceCurrentItem(with: avItem)
+            self.startObservingAVPlayerItem(avItem)
             self.applyAVPlayerRate()
 
             // Execute any pending seek operation
@@ -782,7 +762,7 @@ public class TrackPlayer {
     urlOptions = options
     loadAVPlayer()
     if let initialTime {
-      seek(to: initialTime)
+      seekTo(initialTime)
     }
   }
 
@@ -793,30 +773,30 @@ public class TrackPlayer {
     initialTime: TimeInterval? = nil,
     options: [String: Any]? = nil
   ) {
-    if let itemUrl = type == .file
+    if let trackUrl = type == .file
       ? URL(fileURLWithPath: url)
       : URL(string: url)
     {
       loadFromURL(
-        from: itemUrl,
+        from: trackUrl,
         playWhenReady: playWhenReady,
         initialTime: initialTime,
         options: options
       )
     } else {
-      clearCurrentItem()
-      playbackFailed(error: AudioPlayerError.PlaybackError.invalidSourceUrl(url))
+      clearCurrentAVItem()
+      playbackFailed(error: TrackPlayerError.PlaybackError.invalidSourceUrl(url))
     }
   }
 
   func unloadAVPlayer() {
-    clearCurrentItem()
+    clearCurrentAVItem()
     state = .idle
   }
 
   // MARK: - Internal Event Handlers
 
-  private func handleStateChange(_ state: AudioPlayerState) {
+  private func handleStateChange(_ state: PlaybackState) {
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
       switch state {
@@ -872,13 +852,13 @@ public class TrackPlayer {
     event.playWhenReadyChange.emit(data: playWhenReady)
   }
 
-  func handleItemDidPlayToEndTime() {
+  func handleTrackDidPlayToEndTime() {
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
       event.playbackEnd.emit(data: .playedUntilEnd)
       if repeatMode == .track {
         replay()
-      } else if repeatMode == .queue || hasNextItem {
+      } else if repeatMode == .queue || hasNextTrack {
         next()
       } else {
         state = .ended
@@ -886,11 +866,11 @@ public class TrackPlayer {
     }
   }
 
-  func handleItemFailedToPlayToEndTime() {
-    handlePlaybackError(AudioPlayerError.PlaybackError.playbackFailed)
+  func handleTrackFailedToPlayToEndTime() {
+    handlePlaybackError(TrackPlayerError.PlaybackError.playbackFailed)
   }
 
-  func handleItemPlaybackStalled() {}
+  func handleTrackPlaybackStalled() {}
 
   private func handleAVPlayerRecreated() {
     event.didRecreateAVPlayer.emit(data: ())
@@ -898,7 +878,7 @@ public class TrackPlayer {
 
   // MARK: - Observer Callbacks
 
-  func playerDidChangeTimeControlStatus(_ status: AVPlayer.TimeControlStatus) {
+  func avPlayerDidChangeTimeControlStatus(_ status: AVPlayer.TimeControlStatus) {
     switch status {
     case .paused:
       let currentState = state
@@ -912,7 +892,7 @@ public class TrackPlayer {
           // disconnect, system interruption, etc). Set playWhenReady to false to acknowledge the
           // pause.
           // However, if we're near the end of the track (within 0.5s of duration), this is likely
-          // a natural pause from track completion. Let itemDidPlayToEndTime handle this case to
+          // a natural pause from track completion. Let handleTrackDidPlayToEndTime handle this case to
           // preserve auto-advance behavior between tracks in a queue/playlist.
           if currentTime < duration - 0.5 {
             playWhenReady = false
@@ -932,12 +912,12 @@ public class TrackPlayer {
     }
   }
 
-  func playerStatusDidChange(_ status: AVPlayer.Status) {
+  func avPlayerStatusDidChange(_ status: AVPlayer.Status) {
     if status == .failed {
-      let error = item!.error as NSError?
+      let error = avPlayer.currentItem?.error as NSError?
       playbackFailed(error: error?.code == URLError.notConnectedToInternet.rawValue
-        ? AudioPlayerError.PlaybackError.notConnectedToInternet
-        : AudioPlayerError.PlaybackError.playbackFailed
+        ? TrackPlayerError.PlaybackError.notConnectedToInternet
+        : TrackPlayerError.PlaybackError.playbackFailed
       )
     }
   }
@@ -946,12 +926,12 @@ public class TrackPlayer {
     state = .playing
   }
 
-  func itemFailedToPlayToEndTime() {
-    playbackFailed(error: AudioPlayerError.PlaybackError.playbackFailed)
-    handleItemFailedToPlayToEndTime()
+  func avItemFailedToPlayToEndTime() {
+    playbackFailed(error: TrackPlayerError.PlaybackError.playbackFailed)
+    handleTrackFailedToPlayToEndTime()
   }
 
-  func itemDidUpdatePlaybackLikelyToKeepUp(_ playbackLikelyToKeepUp: Bool) {
+  func avItemDidUpdatePlaybackLikelyToKeepUp(_ playbackLikelyToKeepUp: Bool) {
     if playbackLikelyToKeepUp, state != .playing {
       state = .ready
     }
@@ -960,8 +940,8 @@ public class TrackPlayer {
   // MARK: - Queue Validation
 
   private func throwIfQueueEmpty() throws {
-    if items.isEmpty {
-      throw AudioPlayerError.QueueError.empty
+    if tracks.isEmpty {
+      throw TrackPlayerError.QueueError.empty
     }
   }
 
@@ -971,10 +951,10 @@ public class TrackPlayer {
     min: Int? = nil,
     max: Int? = nil
   ) throws {
-    guard index >= (min ?? 0), (max ?? items.count) > index else {
-      throw AudioPlayerError.QueueError.invalidIndex(
+    guard index >= (min ?? 0), (max ?? tracks.count) > index else {
+      throw TrackPlayerError.QueueError.invalidIndex(
         index: index,
-        message: "\(name) must be non-negative and less than \(items.count)"
+        message: "\(name) must be non-negative and less than \(tracks.count)"
       )
     }
   }
@@ -982,152 +962,152 @@ public class TrackPlayer {
   // MARK: - Queue Methods
 
   /**
-   Replace the current item with a new one. If there is no current item, it is equivalent to calling `add(item:)`, `jump(to: itemIndex)`.
+   Replace the current track with a new one. If there is no current track, it is equivalent to calling `add(track:)`, `skipTo(trackIndex)`.
 
-   - parameter item: The item to set as the new current item.
+   - parameter track: The track to set as the new current track.
    */
-  private func replaceCurrentItem(with item: AudioItem) {
+  private func replaceCurrentTrackWith(_ track: Track) {
     assertMainThread()
     if currentIndex == -1 {
-      items.append(item)
+      tracks.append(track)
       currentIndex = 0
-      handleCurrentItemChanged()
+      handleCurrentTrackChanged()
     } else {
-      items[currentIndex] = item
-      handleCurrentItemChanged()
+      tracks[currentIndex] = track
+      handleCurrentTrackChanged()
     }
   }
 
   /**
-   Add items to the queue.
+   Add tracks to the queue.
 
-   - parameter items: The items to add to the queue.
-   - parameter playWhenReady: Optional, whether to start playback when the item is ready.
+   - parameter tracks: The tracks to add to the queue.
+   - parameter playWhenReady: Optional, whether to start playback when the track is ready.
    */
-  public func add(items: [AudioItem], playWhenReady: Bool? = nil) {
+  public func add(_ tracks: [Track], playWhenReady: Bool? = nil) {
     handlePlayWhenReady(playWhenReady) {
-      addItems(items)
+      addTracks(tracks)
     }
   }
 
-  private func addItems(_ newItems: [AudioItem]) {
+  private func addTracks(_ newTracks: [Track]) {
     assertMainThread()
-    guard !newItems.isEmpty else { return }
-    let wasEmpty = items.isEmpty
-    items.append(contentsOf: newItems)
+    guard !newTracks.isEmpty else { return }
+    let wasEmpty = tracks.isEmpty
+    tracks.append(contentsOf: newTracks)
     if wasEmpty {
       currentIndex = 0
-      handleCurrentItemChanged()
+      handleCurrentTrackChanged()
     }
   }
 
-  public func add(items: [AudioItem], at index: Int) throws {
+  public func add(_ tracks: [Track], at index: Int) throws {
     assertMainThread()
-    guard !items.isEmpty else { return }
-    guard index >= 0, self.items.count >= index else {
-      throw AudioPlayerError.QueueError.invalidIndex(
+    guard !tracks.isEmpty else { return }
+    guard index >= 0, self.tracks.count >= index else {
+      throw TrackPlayerError.QueueError.invalidIndex(
         index: index,
-        message: "Index to insert at has to be non-negative and equal to or smaller than the number of items: (\(self.items.count))"
+        message: "Index to insert at has to be non-negative and equal to or smaller than the number of tracks: (\(self.tracks.count))"
       )
     }
-    let wasEmpty = self.items.isEmpty
-    // Correct index when items were inserted in front of it:
-    if self.items.count > 1, currentIndex >= index {
-      currentIndex += items.count
+    let wasEmpty = self.tracks.isEmpty
+    // Correct index when tracks were inserted in front of it:
+    if self.tracks.count > 1, currentIndex >= index {
+      currentIndex += tracks.count
     }
-    self.items.insert(contentsOf: items, at: index)
+    self.tracks.insert(contentsOf: tracks, at: index)
     if wasEmpty {
       currentIndex = 0
-      handleCurrentItemChanged()
+      handleCurrentTrackChanged()
     }
   }
 
   /**
-   Step to the next item in the queue.
+   Step to the next track in the queue.
    */
   public func next() {
     let lastIndex = currentIndex
     let playbackWasActive = playbackActive
-    _ = skip(by: 1, wrap: repeatMode == .queue)
+    _ = skipBy(1, wrap: repeatMode == .queue)
     if playbackWasActive && lastIndex != currentIndex || repeatMode == .queue {
       event.playbackEnd.emit(data: .skippedToNext)
     }
   }
 
   /**
-   Step to the previous item in the queue.
+   Step to the previous track in the queue.
    */
   public func previous() {
     let lastIndex = currentIndex
     let playbackWasActive = playbackActive
-    _ = skip(by: -1, wrap: repeatMode == .queue)
+    _ = skipBy(-1, wrap: repeatMode == .queue)
     if playbackWasActive && lastIndex != currentIndex || repeatMode == .queue {
       event.playbackEnd.emit(data: .skippedToPrevious)
     }
   }
 
-  private func skip(by delta: Int, wrap: Bool) -> AudioItem? {
+  private func skipBy(_ delta: Int, wrap: Bool) -> Track? {
     assertMainThread()
-    guard currentItem != nil, !items.isEmpty else { return nil }
+    guard currentTrack != nil, !tracks.isEmpty else { return nil }
 
-    if items.count == 1 {
+    if tracks.count == 1 {
       if wrap, playWhenReady {
         replay()
       }
-      return currentItem
+      return currentTrack
     }
 
     var index = currentIndex + delta
     if wrap {
-      index = (index + items.count) % items.count
+      index = (index + tracks.count) % tracks.count
     }
-    let newIndex = max(0, min(items.count - 1, index))
+    let newIndex = max(0, min(tracks.count - 1, index))
 
     if newIndex != currentIndex {
       currentIndex = newIndex
-      handleCurrentItemChanged()
+      handleCurrentTrackChanged()
     }
-    return currentItem
+    return currentTrack
   }
 
   /**
-   Remove an item from the queue.
+   Remove a track from the queue.
 
-   - parameter index: The index of the item to remove.
-   - throws: `AudioPlayerError.QueueError`
+   - parameter index: The index of the track to remove.
+   - throws: `TrackPlayerError.QueueError`
    */
-  public func removeItem(at index: Int) throws {
+  public func removeTrack(_ index: Int) throws {
     assertMainThread()
     try throwIfQueueEmpty()
     try throwIfIndexInvalid(index: index)
-    let result = items.remove(at: index)
+    let result = tracks.remove(at: index)
     if index == currentIndex {
-      currentIndex = items.count > 0 ? currentIndex % items.count : -1
-      handleCurrentItemChanged()
+      currentIndex = tracks.count > 0 ? currentIndex % tracks.count : -1
+      handleCurrentTrackChanged()
     } else if index < currentIndex {
       currentIndex -= 1
     }
   }
 
   /**
-   Jump to a certain item in the queue.
+   Skip to a certain track in the queue.
 
-   - parameter index: The index of the item to jump to.
-   - parameter playWhenReady: Optional, whether to start playback when the item is ready.
-   - throws: `AudioPlayerError`
+   - parameter index: The index of the track to skip to.
+   - parameter playWhenReady: Optional, whether to start playback when the track is ready.
+   - throws: `TrackPlayerError`
    */
-  public func jumpToItem(atIndex index: Int, playWhenReady: Bool? = nil) throws {
+  public func skipToTrack(_ index: Int, playWhenReady: Bool? = nil) throws {
     try handlePlayWhenReady(playWhenReady) {
       if index == currentIndex {
-        seek(to: 0)
+        seekTo(0)
       } else {
-        _ = try jump(to: index)
+        _ = try skipTo(index)
       }
       event.playbackEnd.emit(data: .jumpedToIndex)
     }
   }
 
-  private func jump(to index: Int) throws -> AudioItem {
+  private func skipTo(_ index: Int) throws -> Track {
     assertMainThread()
     try throwIfQueueEmpty()
     try throwIfIndexInvalid(index: index)
@@ -1138,78 +1118,76 @@ public class TrackPlayer {
       }
     } else {
       currentIndex = index
-      handleCurrentItemChanged()
+      handleCurrentTrackChanged()
     }
 
-    guard let item = currentItem else {
-      throw AudioPlayerError.QueueError.invalidIndex(
+    guard let track = currentTrack else {
+      throw TrackPlayerError.QueueError.invalidIndex(
         index: index,
-        message: "Failed to get current item after jumping to index \(index)"
+        message: "Failed to get current track after jumping to index \(index)"
       )
     }
-    return item
+    return track
   }
 
   /**
-   Move an item in the queue from one position to another.
+   Move a track in the queue from one position to another.
 
-   - parameter fromIndex: The index of the item to move.
-   - parameter toIndex: The index to move the item to.
-   - throws: `AudioPlayerError.QueueError`
+   - parameter fromIndex: The index of the track to move.
+   - parameter toIndex: The index to move the track to.
+   - throws: `TrackPlayerError.QueueError`
    */
-  public func moveItem(fromIndex: Int, toIndex: Int) throws {
+  public func moveTrack(fromIndex: Int, toIndex: Int) throws {
     assertMainThread()
     try throwIfQueueEmpty()
     try throwIfIndexInvalid(index: fromIndex, name: "fromIndex")
     try throwIfIndexInvalid(index: toIndex, name: "toIndex", max: Int.max)
 
-    let item = items.remove(at: fromIndex)
-    items.insert(item, at: min(items.count, toIndex))
+    let track = tracks.remove(at: fromIndex)
+    tracks.insert(track, at: min(tracks.count, toIndex))
     if fromIndex == currentIndex {
       currentIndex = toIndex
-      handleCurrentItemChanged()
+      handleCurrentTrackChanged()
     }
   }
 
   /**
-   Remove all upcoming items, those returned by `next()`
+   Remove all upcoming tracks, those returned by `next()`
    */
-  public func removeUpcomingItems() {
+  public func removeUpcomingTracks() {
     assertMainThread()
-    guard !items.isEmpty else { return }
+    guard !tracks.isEmpty else { return }
     let nextIndex = currentIndex + 1
-    guard nextIndex < items.count else { return }
-    items.removeSubrange(nextIndex ..< items.count)
+    guard nextIndex < tracks.count else { return }
+    tracks.removeSubrange(nextIndex ..< tracks.count)
   }
 
   /**
-   Removes all items from queue
+   Removes all tracks from queue
    */
-  private func clearQueue() {
+  private func clearTracks() {
     assertMainThread()
-    let itemWasNil = currentIndex == -1
+    guard currentIndex != -1 else { return }
     currentIndex = -1
-    items.removeAll()
-    if !itemWasNil {
-      handleCurrentItemChanged()
-    }
+    tracks.removeAll()
+    handleCurrentTrackChanged()
   }
 
   func replay() {
-    seek(to: 0) { [weak self] succeeded in
+    seekTo(0) { [weak self] succeeded in
       if succeeded {
         self?.play()
       }
     }
   }
 
-  func handleCurrentItemChanged() {
+  func handleCurrentTrackChanged() {
     let lastPosition = currentTime
     let shouldContinuePlayback = playWhenReady
-    if let currentItem {
+    if let currentTrack {
       // Ensure playWhenReady is set before loading to preserve playback state
       playWhenReady = shouldContinuePlayback
-      loadItem(currentItem)
+      loadTrack(currentTrack)
     } else {
       let playbackWasActive = playbackActive
       unloadAVPlayer()
@@ -1218,16 +1196,16 @@ public class TrackPlayer {
         event.playbackEnd.emit(data: .cleared)
       }
     }
-    event.currentItem.emit(
+    event.currentTrack.emit(
       data: (
-        item: currentItem,
+        track: currentTrack,
         index: currentIndex == -1 ? nil : currentIndex,
-        lastItem: lastItem,
+        lastTrack: lastTrack,
         lastIndex: lastIndex == -1 ? nil : lastIndex,
         lastPosition: lastPosition
       )
     )
-    lastItem = currentItem
+    lastTrack = currentTrack
     lastIndex = currentIndex
   }
 }

@@ -1,5 +1,5 @@
 //
-//  AudioPlayerState.swift
+//  PlaybackState.swift
 //  SwiftAudio
 //
 //  Created by Jørgen Henrichsen on 10/03/2018.
@@ -9,16 +9,17 @@
 import Foundation
 
 /**
- The current state of the AudioPlayer.
+ The current playback state of the TrackPlayer.
  */
-public enum AudioPlayerState: String {
+public enum PlaybackState: String {
   /// An asset is being loaded for playback.
   case loading
 
-  /// The current item is loaded, and the player is ready to start playing.
+  /// The current track is loaded, and the player is ready to start playing.
   case ready
 
-  /// The current item is playing, but are currently buffering.
+  /// The current track is currently buffering and will start playing when
+  /// buffering is complete.
   case buffering
 
   /// The player is paused.
@@ -30,7 +31,7 @@ public enum AudioPlayerState: String {
   /// The player is playing.
   case playing
 
-  /// No item loaded, the player is stopped.
+  /// No track loaded, the player is stopped.
   case idle
 
   /// Failed

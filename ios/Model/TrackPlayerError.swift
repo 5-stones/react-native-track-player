@@ -1,5 +1,5 @@
 //
-//  AudioPlayerError.swift
+//  TrackPlayerError.swift
 //  SwiftAudio
 //
 //  Created by Jørgen Henrichsen on 25/03/2018.
@@ -7,13 +7,13 @@
 
 import Foundation
 
-public enum AudioPlayerError: Error {
+public enum TrackPlayerError: Error {
   public enum PlaybackError: Error {
     case failedToLoadKeyValue
     case invalidSourceUrl(String)
     case notConnectedToInternet
     case playbackFailed
-    case itemWasUnplayable
+    case trackWasUnplayable
   }
 
   public enum QueueError: Error {

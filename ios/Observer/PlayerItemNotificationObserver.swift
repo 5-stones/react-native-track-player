@@ -14,7 +14,7 @@ import Foundation
 class PlayerItemNotificationObserver {
   private let notificationCenter: NotificationCenter = .default
 
-  private(set) weak var observingItem: AVPlayerItem?
+  private(set) weak var observingAVItem: AVPlayerItem?
   weak var player: TrackPlayer?
 
   private(set) var isObserving: Bool = false
@@ -24,70 +24,70 @@ class PlayerItemNotificationObserver {
   }
 
   /**
-   Will start observing notifications from an item.
+   Will start observing notifications from an AVPlayerItem.
 
-   - parameter item: The item to observe.
+   - parameter avItem: The AVPlayerItem to observe.
    - important: Cannot observe more than one item at a time.
    */
-  func startObserving(item: AVPlayerItem) {
+  func startObserving(item avItem: AVPlayerItem) {
     stopObservingCurrentItem()
-    observingItem = item
+    observingAVItem = avItem
     isObserving = true
     notificationCenter.addObserver(
       self,
-      selector: #selector(itemDidPlayToEndTime),
+      selector: #selector(avItemDidPlayToEndTime),
       name: NSNotification.Name.AVPlayerItemDidPlayToEndTime,
-      object: item
+      object: avItem
     )
     notificationCenter.addObserver(
       self,
-      selector: #selector(itemFailedToPlayToEndTime),
+      selector: #selector(avItemFailedToPlayToEndTime),
       name: NSNotification.Name.AVPlayerItemFailedToPlayToEndTime,
-      object: item
+      object: avItem
     )
     notificationCenter.addObserver(
       self,
-      selector: #selector(itemPlaybackStalled),
+      selector: #selector(avItemPlaybackStalled),
       name: NSNotification.Name.AVPlayerItemPlaybackStalled,
-      object: item
+      object: avItem
     )
   }
 
   /**
-   Stop receiving notifications for the current item.
+   Stop receiving notifications for the current AVPlayerItem.
    */
   func stopObservingCurrentItem() {
-    guard let observingItem, isObserving else {
+    guard let observingAVItem, isObserving else {
       return
     }
     notificationCenter.removeObserver(
       self,
       name: NSNotification.Name.AVPlayerItemDidPlayToEndTime,
-      object: observingItem
+      object: observingAVItem
     )
     notificationCenter.removeObserver(
       self,
       name: NSNotification.Name.AVPlayerItemFailedToPlayToEndTime,
-      object: observingItem
+      object: observingAVItem
     )
     notificationCenter.removeObserver(
       self,
       name: NSNotification.Name.AVPlayerItemPlaybackStalled,
-      object: observingItem
+      object: observingAVItem
     )
-    self.observingItem = nil
+    self.observingAVItem = nil
     isObserving = false
   }
 
-  @objc private func itemDidPlayToEndTime() {
-    player?.handleItemDidPlayToEndTime()
+  @objc private func avItemDidPlayToEndTime() {
+    player?.handleTrackDidPlayToEndTime()
   }
 
-  @objc private func itemFailedToPlayToEndTime() {
-    player?.itemFailedToPlayToEndTime()
+  @objc private func avItemFailedToPlayToEndTime() {
+    player?.handleTrackFailedToPlayToEndTime()
   }
 
-  @objc private func itemPlaybackStalled() {
-    player?.handleItemPlaybackStalled()
+  @objc private func avItemPlaybackStalled() {
+    player?.handleTrackPlaybackStalled()
   }
 }

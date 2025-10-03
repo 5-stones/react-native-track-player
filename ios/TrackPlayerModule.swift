@@ -48,7 +48,7 @@ public class NativeTrackPlayerImpl: NSObject {
     player.event.receiveCommonMetadata.addListener(self, handleCommonMetadataReceived)
     player.event.stateChange.addListener(self, handleStateChange)
     player.event.fail.addListener(self, handleFailed)
-    player.event.currentItem.addListener(self, handleCurrentItemChange)
+    player.event.currentTrack.addListener(self, handleCurrentTrackChange)
     player.event.secondElapse.addListener(self, handleSecondElapse)
     player.event.playWhenReadyChange.addListener(self, handlePlayWhenReadyChange)
   }
@@ -329,14 +329,14 @@ public class NativeTrackPlayerImpl: NSObject {
 
   private func configureAudioSession() {
     ensureMainThread {
-      // deactivate the session when there is no current item to be played
-      if self.player.currentItem == nil {
+      // deactivate the session when there is no current track to be played
+      if self.player.currentTrack == nil {
         try? self.audioSession.setActive(false, options: [])
         self.audioSessionIsActive = false
         return
       }
 
-      // activate the audio session when there is an item to be played
+      // activate the audio session when there is a track to be played
       // and the player has been configured to start when it is ready loading:
       if self.player.playWhenReady {
         try? self.audioSession.setActive(true, options: [])
@@ -409,26 +409,26 @@ public class NativeTrackPlayerImpl: NSObject {
     return onMainThread {
       guard self.hasInitialized else { return -1 }
       // -1 means no index was passed and therefore should be inserted at the end.
-      let index = trackIndex.intValue == -1 ? player.items.count : trackIndex.intValue
-      guard index >= 0, index <= player.items.count else { return -1 }
+      let index = trackIndex.intValue == -1 ? player.tracks.count : trackIndex.intValue
+      guard index >= 0, index <= player.tracks.count else { return -1 }
 
-      var tracks = [AudioItem]()
+      var tracks = [Track]()
       for trackDict in trackDicts {
-        guard let track = AudioItem.fromBridge(dictionary: trackDict) else { return -1 }
+        guard let track = Track.fromBridge(dictionary: trackDict) else { return -1 }
         tracks.append(track)
       }
 
-      try? player.add(items: tracks, at: index)
+      try? player.add(tracks, at: index)
       return index
     }
   }
 
   @objc
   public func load(trackDict: [String: Any]) {
-    guard let track = AudioItem.fromBridge(dictionary: trackDict) else { return }
+    guard let track = Track.fromBridge(dictionary: trackDict) else { return }
     ensureMainThread {
       guard self.hasInitialized else { return }
-      self.player.load(item: track)
+      self.player.load(track)
     }
   }
 
@@ -438,13 +438,13 @@ public class NativeTrackPlayerImpl: NSObject {
       guard self.hasInitialized else { return }
       // Validate all indexes first
       for index in indexes {
-        guard index >= 0, index < self.player.items.count else { return }
+        guard index >= 0, index < self.player.tracks.count else { return }
       }
 
       // Sort the indexes in descending order so we can safely remove them one by one
-      // without having the next index possibly newly pointing to another item than intended:
+      // without having the next index possibly newly pointing to another track than intended:
       for index in indexes.sorted().reversed() {
-        try? self.player.removeItem(at: index)
+        try? self.player.removeTrack(index)
       }
     }
   }
@@ -453,9 +453,9 @@ public class NativeTrackPlayerImpl: NSObject {
   public func move(fromIndex: Int, toIndex: Int) {
     ensureMainThread {
       guard self.hasInitialized else { return }
-      guard fromIndex >= 0, fromIndex < self.player.items.count else { return }
+      guard fromIndex >= 0, fromIndex < self.player.tracks.count else { return }
       guard toIndex >= 0 else { return }
-      try? self.player.moveItem(fromIndex: fromIndex, toIndex: toIndex)
+      try? self.player.moveTrack(fromIndex: fromIndex, toIndex: toIndex)
     }
   }
 
@@ -463,7 +463,7 @@ public class NativeTrackPlayerImpl: NSObject {
   public func removeUpcomingTracks() {
     ensureMainThread {
       guard self.hasInitialized else { return }
-      self.player.removeUpcomingItems()
+      self.player.removeUpcomingTracks()
     }
   }
 
@@ -471,10 +471,10 @@ public class NativeTrackPlayerImpl: NSObject {
   public func skip(to trackIndex: Int, initialTime: Double) {
     ensureMainThread {
       guard self.hasInitialized else { return }
-      guard trackIndex >= 0, trackIndex < self.player.items.count else { return }
+      guard trackIndex >= 0, trackIndex < self.player.tracks.count else { return }
 
-      try? self.player.jumpToItem(
-        atIndex: trackIndex,
+      try? self.player.skipToTrack(
+        trackIndex,
         playWhenReady: self.player.playerState == .playing
       )
 
@@ -564,7 +564,7 @@ public class NativeTrackPlayerImpl: NSObject {
   public func seekTo(time: Double) {
     ensureMainThread {
       guard self.hasInitialized else { return }
-      self.player.seek(to: time)
+      self.player.seekTo(time)
     }
   }
 
@@ -572,7 +572,7 @@ public class NativeTrackPlayerImpl: NSObject {
   public func seekBy(offset: Double) {
     ensureMainThread {
       guard self.hasInitialized else { return }
-      self.player.seek(by: offset)
+      self.player.seekBy(offset)
     }
   }
 
@@ -637,8 +637,8 @@ public class NativeTrackPlayerImpl: NSObject {
     return onMainThread {
       guard self.hasInitialized else { return nil }
       let indexInt = Int(index)
-      if indexInt >= 0, indexInt < player.items.count {
-        let track = player.items[indexInt]
+      if indexInt >= 0, indexInt < player.tracks.count {
+        let track = player.tracks[indexInt]
         return track.toBridge()
       }
       return nil
@@ -649,7 +649,7 @@ public class NativeTrackPlayerImpl: NSObject {
   public func getQueue() -> [[String: Any]] {
     return onMainThread {
       guard self.hasInitialized else { return [] }
-      return player.items.map { $0.toBridge() }
+      return player.tracks.map { $0.toBridge() }
     }
   }
 
@@ -657,13 +657,13 @@ public class NativeTrackPlayerImpl: NSObject {
   public func setQueue(trackDicts: [[String: Any]]) {
     ensureMainThread {
       guard self.hasInitialized else { return }
-      var tracks = [AudioItem]()
+      var tracks = [Track]()
       for trackDict in trackDicts {
-        guard let track = AudioItem.fromBridge(dictionary: trackDict) else { return }
+        guard let track = Track.fromBridge(dictionary: trackDict) else { return }
         tracks.append(track)
       }
       self.player.clear()
-      try? self.player.add(items: tracks)
+      try? self.player.add(tracks)
     }
   }
 
@@ -672,8 +672,8 @@ public class NativeTrackPlayerImpl: NSObject {
     return onMainThread {
       guard self.hasInitialized else { return nil }
       let index = player.currentIndex
-      if index >= 0, index < player.items.count {
-        let track = player.items[index]
+      if index >= 0, index < player.tracks.count {
+        let track = player.tracks[index]
         return track.toBridge()
       }
       return nil
@@ -685,7 +685,7 @@ public class NativeTrackPlayerImpl: NSObject {
     return onMainThread {
       guard self.hasInitialized else { return nil }
       let index = player.currentIndex
-      if index < 0 || index >= player.items.count {
+      if index < 0 || index >= player.tracks.count {
         return nil
       }
       return NSNumber(value: index)
@@ -716,8 +716,8 @@ public class NativeTrackPlayerImpl: NSObject {
   public func updateMetadata(for trackIndex: Int, metadata: [String: Any]) {
     ensureMainThread {
       guard self.hasInitialized else { return }
-      guard trackIndex >= 0, trackIndex < self.player.items.count else { return }
-      let track = self.player.items[trackIndex]
+      guard trackIndex >= 0, trackIndex < self.player.tracks.count else { return }
+      let track = self.player.tracks[trackIndex]
 
       track.updateMetadata(dictionary: metadata)
 
@@ -805,7 +805,7 @@ public class NativeTrackPlayerImpl: NSObject {
         "message": "Playback of the track failed",
         "code": "ios_playback_failed",
       ]
-    case .itemWasUnplayable: return [
+    case .trackWasUnplayable: return [
         "message": "The track could not be played",
         "code": "ios_track_unplayable",
       ]
@@ -816,9 +816,9 @@ public class NativeTrackPlayerImpl: NSObject {
     }
   }
 
-  private func getPlaybackStateBodyKeyValues(state: AudioPlayerState) -> [String: Any] {
+  private func getPlaybackStateBodyKeyValues(state: PlaybackState) -> [String: Any] {
     var body: [String: Any] = ["state": State.fromPlayerState(state: state).rawValue]
-    if state == AudioPlayerState.failed {
+    if state == PlaybackState.failed {
       body["error"] = getPlaybackStateErrorKeyValues()
     }
     return body
@@ -826,7 +826,7 @@ public class NativeTrackPlayerImpl: NSObject {
 
   // MARK: - Player Event Handlers
 
-  func handleStateChange(state: AudioPlayerState) {
+  func handleStateChange(state: PlaybackState) {
     ensureMainThread {
       self.emit(
         event: EventType.PlaybackState,
@@ -860,19 +860,19 @@ public class NativeTrackPlayerImpl: NSObject {
     emit(event: EventType.PlaybackError, body: ["error": error?.localizedDescription])
   }
 
-  func handleCurrentItemChange(
-    item: AudioItem?,
+  func handleCurrentTrackChange(
+    track: Track?,
     index: Int?,
-    lastItem: AudioItem?,
+    lastTrack: Track?,
     lastIndex: Int?,
     lastPosition: Double?
   ) {
     ensureMainThread {
-      if let item {
+      if let track {
         UIApplication.shared.beginReceivingRemoteControlEvents()
         // Update now playing controller with isLiveStream option from track
         if self.player.automaticallyUpdateNowPlayingInfo {
-          let isTrackLiveStream = item.isLiveStream ?? false
+          let isTrackLiveStream = track.isLiveStream ?? false
           self.player.nowPlayingInfoController
             .set(keyValue: NowPlayingInfoProperty.isLiveStream(isTrackLiveStream))
         }
@@ -880,7 +880,7 @@ public class NativeTrackPlayerImpl: NSObject {
         UIApplication.shared.endReceivingRemoteControlEvents()
       }
 
-      if (item != nil && lastItem == nil) || item == nil {
+      if (track != nil && lastTrack == nil) || track == nil {
         self.configureAudioSession()
       }
 
@@ -889,16 +889,16 @@ public class NativeTrackPlayerImpl: NSObject {
         a["lastIndex"] = lastIndex
       }
 
-      if let lastItem {
-        a["lastTrack"] = lastItem.toBridge()
+      if let lastTrack {
+        a["lastTrack"] = lastTrack.toBridge()
       }
 
       if let index {
         a["index"] = index
       }
 
-      if let item {
-        a["track"] = item.toBridge()
+      if let track {
+        a["track"] = track.toBridge()
       }
       self.emit(event: EventType.PlaybackActiveTrackChanged, body: a)
     }
@@ -908,11 +908,11 @@ public class NativeTrackPlayerImpl: NSObject {
     // because you cannot prevent the `event.secondElapse` from firing
     // do not emit an event if `progressUpdateEventInterval` is nil
     // additionally, there are certain instances in which this event is emitted
-    // _after_ a manipulation to the queu causing no currentItem to exist (see reset)
+    // _after_ a manipulation to the queu causing no currentTrack to exist (see reset)
     // in which case we shouldn't emit anything or we'll get an exception.
     guard shouldEmitProgressEvent else { return }
     ensureMainThread {
-      guard self.player.currentItem != nil else { return }
+      guard self.player.currentTrack != nil else { return }
       self.emit(
         event: EventType.PlaybackProgressUpdated,
         body: [

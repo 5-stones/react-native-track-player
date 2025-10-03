@@ -23,7 +23,7 @@ class PlayerItemPropertyObserver: NSObject {
 
   private(set) var isObserving: Bool = false
 
-  private(set) weak var observingItem: AVPlayerItem?
+  private(set) weak var observingAVItem: AVPlayerItem?
   weak var player: TrackPlayer?
 
   deinit {
@@ -31,67 +31,67 @@ class PlayerItemPropertyObserver: NSObject {
   }
 
   /**
-   Start observing an item. Will remove self as observer from old item, if any.
+   Start observing an AVPlayerItem. Will remove self as observer from old item, if any.
 
-   - parameter item: The player item to observe.
+   - parameter avItem: The AVPlayerItem to observe.
    */
-  func startObserving(item: AVPlayerItem) {
+  func startObserving(item avItem: AVPlayerItem) {
     stopObservingCurrentItem()
 
     isObserving = true
-    observingItem = item
-    item.addObserver(
+    observingAVItem = avItem
+    avItem.addObserver(
       self,
       forKeyPath: AVPlayerItemKeyPath.duration,
       options: [.new],
       context: &PlayerItemPropertyObserver.context
     )
-    item.addObserver(
+    avItem.addObserver(
       self,
       forKeyPath: AVPlayerItemKeyPath.loadedTimeRanges,
       options: [.new],
       context: &PlayerItemPropertyObserver.context
     )
-    item.addObserver(
+    avItem.addObserver(
       self,
       forKeyPath: AVPlayerItemKeyPath.playbackLikelyToKeepUp,
       options: [.new],
       context: &PlayerItemPropertyObserver.context
     )
 
-    // Create and add a new metadata output to the item.
+    // Create and add a new metadata output to the AVPlayerItem.
     let metadataOutput = AVPlayerItemMetadataOutput()
     metadataOutput.setDelegate(self, queue: .main)
-    item.add(metadataOutput)
+    avItem.add(metadataOutput)
     currentMetadataOutput = metadataOutput
   }
 
   func stopObservingCurrentItem() {
-    guard let observingItem, isObserving else {
+    guard let observingAVItem, isObserving else {
       return
     }
 
-    observingItem.removeObserver(
+    observingAVItem.removeObserver(
       self,
       forKeyPath: AVPlayerItemKeyPath.duration,
       context: &PlayerItemPropertyObserver.context
     )
-    observingItem.removeObserver(
+    observingAVItem.removeObserver(
       self,
       forKeyPath: AVPlayerItemKeyPath.loadedTimeRanges,
       context: &PlayerItemPropertyObserver.context
     )
-    observingItem.removeObserver(
+    observingAVItem.removeObserver(
       self,
       forKeyPath: AVPlayerItemKeyPath.playbackLikelyToKeepUp,
       context: &PlayerItemPropertyObserver.context
     )
 
-    // Remove all metadata outputs from the item.
-    observingItem.removeAllMetadataOutputs()
+    // Remove all metadata outputs from the AVPlayerItem.
+    observingAVItem.removeAllMetadataOutputs()
 
     isObserving = false
-    self.observingItem = nil
+    self.observingAVItem = nil
     currentMetadataOutput = nil
   }
 
@@ -121,7 +121,7 @@ class PlayerItemPropertyObserver: NSObject {
 
     case AVPlayerItemKeyPath.playbackLikelyToKeepUp:
       if let playbackLikelyToKeepUp = change?[.newKey] as? Bool {
-        player?.itemDidUpdatePlaybackLikelyToKeepUp(playbackLikelyToKeepUp)
+        player?.avItemDidUpdatePlaybackLikelyToKeepUp(playbackLikelyToKeepUp)
       }
 
     default: break

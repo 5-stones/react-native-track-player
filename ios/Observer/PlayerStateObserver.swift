@@ -105,14 +105,14 @@ class PlayerStateObserver: NSObject {
     } else {
       .unknown
     }
-    player?.playerStatusDidChange(status)
+    player?.avPlayerStatusDidChange(status)
   }
 
   private func handleTimeControlStatusChange(_ change: [NSKeyValueChangeKey: Any]?) {
     let status: AVPlayer.TimeControlStatus
     if let statusNumber = change?[.newKey] as? NSNumber {
       status = AVPlayer.TimeControlStatus(rawValue: statusNumber.intValue)!
-      player?.playerDidChangeTimeControlStatus(status)
+      player?.avPlayerDidChangeTimeControlStatus(status)
     }
   }
 }

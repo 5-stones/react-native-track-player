@@ -17,7 +17,7 @@ import MediaPlayer
  */
 public extension TrackPlayer {
   typealias PlayWhenReadyChangeData = Bool
-  typealias StateChangeEventData = AudioPlayerState
+  typealias StateChangeEventData = PlaybackState
   typealias PlaybackEndEventData = PlaybackEndedReason
   typealias SecondElapseEventData = TimeInterval
   typealias FailEventData = Error?
@@ -26,10 +26,10 @@ public extension TrackPlayer {
   typealias MetadataCommonEventData = [AVMetadataItem]
   typealias MetadataTimedEventData = [AVTimedMetadataGroup]
   typealias DidRecreateAVPlayerEventData = Void
-  typealias CurrentItemEventData = (
-    item: AudioItem?,
+  typealias CurrentTrackEventData = (
+    track: Track?,
     index: Int?,
-    lastItem: AudioItem?,
+    lastTrack: Track?,
     lastIndex: Int?,
     lastPosition: Double?
   )
@@ -61,7 +61,7 @@ public extension TrackPlayer {
 
     /**
      Emitted when the player encounters an error. This will ultimately result in the AVPlayer instance to be recreated.
-     If this event is emitted, it means you will need to load a new item in some way. Calling play() will not resume playback.
+     If this event is emitted, it means you will need to load a new track in some way. Calling play() will not resume playback.
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
     public let fail: TrackPlayer.Event<FailEventData> = TrackPlayer.Event()
@@ -109,7 +109,7 @@ public extension TrackPlayer {
      Emitted when the current track has changed.
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
-    public let currentItem: TrackPlayer.Event<CurrentItemEventData> = TrackPlayer.Event()
+    public let currentTrack: TrackPlayer.Event<CurrentTrackEventData> = TrackPlayer.Event()
   }
 
   typealias EventClosure<EventData> = (EventData) -> Void

@@ -1,5 +1,5 @@
 //
-//  AudioItem.swift
+//  Track.swift
 //  SwiftAudio
 //
 //  Created by Jørgen Henrichsen on 18/03/2018.
@@ -10,7 +10,7 @@ import Foundation
 import MediaPlayer
 import UIKit
 
-public class AudioItem {
+public class Track {
   // MARK: - Public Properties
 
   /// The URL string used by AVPlayer to load the audio resource
@@ -21,16 +21,16 @@ public class AudioItem {
   public var album: String?
   public var sourceType: SourceType
 
-  /// Optional time pitch algorithm for this item. If nil, the player's default will be used.
+  /// Optional time pitch algorithm for this track. If nil, the player's default will be used.
   public var pitchAlgorithm: PitchAlgorithm?
 
-  /// Optional initial playback time for this item.
+  /// Optional initial playback time for this track.
   public var initialTime: TimeInterval?
 
   /// Optional asset initialization options.
   public var assetOptions: [String: Any]?
 
-  /// Optional remote commands for this item. If nil, the player's default commands will be used.
+  /// Optional remote commands for this track. If nil, the player's default commands will be used.
   public var remoteCommands: [RemoteCommand]?
 
   // MARK: - Internal Bridge Properties
@@ -56,7 +56,7 @@ public class AudioItem {
 
   // MARK: - Initialization
 
-  /// Internal initializer - use `fromBridge()` to create items from React Native
+  /// Internal initializer - use `Track.fromBridge()` to create tracks from React Native
   internal init(
     audioUrl: String,
     artist: String? = nil,
@@ -99,10 +99,10 @@ public class AudioItem {
 
   // MARK: - Bridge Communication
 
-  /// Creates an AudioItem from a React Native bridge dictionary
-  public static func fromBridge(dictionary: [String: Any]) -> AudioItem? {
+  /// Creates a Track from a React Native bridge dictionary
+  public static func fromBridge(dictionary: [String: Any]) -> Track? {
     guard let url = MediaURL(object: dictionary["url"]) else {
-      print("AudioItem.fromBridge: Failed to create track - invalid or missing URL. Dictionary: \(dictionary)")
+      print("Track.fromBridge: Failed to create track - invalid or missing URL. Dictionary: \(dictionary)")
       return nil
     }
 
@@ -110,7 +110,7 @@ public class AudioItem {
     let userAgent = dictionary["userAgent"] as? String
     let pitchAlgorithm = (dictionary["pitchAlgorithm"] as? String).flatMap { PitchAlgorithm(rawValue: $0) }
 
-    let item = AudioItem(
+    let track = Track(
       audioUrl: url.isLocal ? url.value.path : url.value.absoluteString,
       artist: dictionary["artist"] as? String,
       title: dictionary["title"] as? String,
@@ -123,11 +123,11 @@ public class AudioItem {
       userAgent: userAgent
     )
 
-    item.updateMetadata(dictionary: dictionary)
-    return item
+    track.updateMetadata(dictionary: dictionary)
+    return track
   }
 
-  /// Serializes the AudioItem back to a React Native bridge dictionary
+  /// Serializes the Track back to a React Native bridge dictionary
   /// Preserves custom fields from the original bridge dictionary
   public func toBridge() -> [String: Any] {
     // Start with the original object to preserve custom fields
@@ -259,7 +259,7 @@ public class AudioItem {
           handler(artwork)
         } else {
           if let error = error {
-            print("AudioItem.loadArtwork: Failed to load from \(artworkURL) - \(error)")
+            print("Track.loadArtwork: Failed to load from \(artworkURL) - \(error)")
           }
           handler(nil)
         }

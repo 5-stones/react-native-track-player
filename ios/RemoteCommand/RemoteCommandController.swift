@@ -228,7 +228,7 @@ public class RemoteCommandController {
        let interval = command.preferredIntervals.first,
        let player
     {
-      player.seek(to: player.currentTime + Double(truncating: interval))
+      player.seekTo(player.currentTime + Double(truncating: interval))
       return MPRemoteCommandHandlerStatus.success
     }
     return MPRemoteCommandHandlerStatus.commandFailed
@@ -241,7 +241,7 @@ public class RemoteCommandController {
        let interval = command.preferredIntervals.first,
        let player
     {
-      player.seek(to: player.currentTime - Double(truncating: interval))
+      player.seekTo(player.currentTime - Double(truncating: interval))
       return MPRemoteCommandHandlerStatus.success
     }
     return MPRemoteCommandHandlerStatus.commandFailed
@@ -253,7 +253,7 @@ public class RemoteCommandController {
     if let event = event as? MPChangePlaybackPositionCommandEvent,
        let player
     {
-      player.seek(to: event.positionTime)
+      player.seekTo(event.positionTime)
       return MPRemoteCommandHandlerStatus.success
     }
     return MPRemoteCommandHandlerStatus.commandFailed
@@ -300,7 +300,7 @@ public class RemoteCommandController {
   private func getRemoteCommandHandlerStatus(forError error: Error)
     -> MPRemoteCommandHandlerStatus
   {
-    return error is AudioPlayerError.QueueError
+    return error is TrackPlayerError.QueueError
       ? MPRemoteCommandHandlerStatus.noSuchContent
       : MPRemoteCommandHandlerStatus.commandFailed
   }

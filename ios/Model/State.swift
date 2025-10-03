@@ -10,7 +10,7 @@ import Foundation
 enum State: String {
   case none, ready, playing, paused, stopped, buffering, loading, error, ended
 
-  static func fromPlayerState(state: AudioPlayerState) -> State {
+  static func fromPlayerState(state: PlaybackState) -> State {
     switch state {
     case .paused: return .paused
     case .buffering: return .buffering
