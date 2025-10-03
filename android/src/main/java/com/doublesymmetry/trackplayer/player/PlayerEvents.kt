@@ -5,12 +5,12 @@ import androidx.media3.common.Metadata
 import com.doublesymmetry.trackplayer.event.AudioItemTransition
 import com.doublesymmetry.trackplayer.event.EventControllerConnection
 import com.doublesymmetry.trackplayer.event.MediaSessionCallback
-import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
 import com.doublesymmetry.trackplayer.event.PlayWhenReadyChange
+import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackEndedReason
 import com.doublesymmetry.trackplayer.event.PlaybackError
-import com.doublesymmetry.trackplayer.model.PlaybackState
 import com.doublesymmetry.trackplayer.event.PositionChangedReason
+import com.doublesymmetry.trackplayer.model.PlaybackState
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableSharedFlow

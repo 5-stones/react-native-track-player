@@ -859,26 +859,20 @@ public class NativeTrackPlayerImpl: NSObject {
     guard shouldEmitProgressEvent else { return }
     ensureMainThread {
       guard self.player.currentTrack != nil else { return }
-      self.emit(
-        event: EventType.PlaybackProgressUpdated,
-        body: [
-          "position": self.player.currentTime,
-          "duration": self.player.duration,
-          "buffered": self.player.bufferedPosition,
-          "track": self.player.currentIndex,
-        ]
+      let event = PlaybackProgressUpdatedEvent(
+        position: self.player.currentTime,
+        duration: self.player.duration,
+        buffered: self.player.bufferedPosition,
+        track: self.player.currentIndex
       )
+      self.emit(event: EventType.PlaybackProgressUpdated, body: event.toBridge())
     }
   }
 
   func handlePlayWhenReadyChange(playWhenReady: Bool) {
     configureAudioSession()
-    emit(
-      event: EventType.PlaybackPlayWhenReadyChanged,
-      body: [
-        "playWhenReady": playWhenReady,
-      ]
-    )
+    let event = PlaybackPlayWhenReadyChangedEvent(playWhenReady: playWhenReady)
+    emit(event: EventType.PlaybackPlayWhenReadyChanged, body: event.toBridge())
   }
 }
 

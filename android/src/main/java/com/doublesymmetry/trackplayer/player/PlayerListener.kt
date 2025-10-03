@@ -9,10 +9,10 @@ import androidx.media3.common.util.UnstableApi
 import com.doublesymmetry.trackplayer.TrackPlayer
 import com.doublesymmetry.trackplayer.event.AudioItemTransition
 import com.doublesymmetry.trackplayer.event.AudioItemTransitionReason
-import com.doublesymmetry.trackplayer.model.State
 import com.doublesymmetry.trackplayer.event.PlayWhenReadyChange
 import com.doublesymmetry.trackplayer.event.PlaybackError
 import com.doublesymmetry.trackplayer.event.PositionChangedReason
+import com.doublesymmetry.trackplayer.model.State
 import java.util.Locale
 
 @UnstableApi
@@ -131,20 +131,16 @@ class PlayerListener(private val trackPlayer: TrackPlayer) : Player.Listener {
               Player.STATE_IDLE ->
                 // Avoid transitioning to idle from error or stopped
                 if (
-                  trackPlayer.playerState == State.ERROR ||
-                    trackPlayer.playerState == State.STOPPED
+                  trackPlayer.playerState == State.ERROR || trackPlayer.playerState == State.STOPPED
                 )
                   null
                 else State.NONE
-              Player.STATE_ENDED ->
-                if (player.mediaItemCount > 0) State.ENDED else State.NONE
+              Player.STATE_ENDED -> if (player.mediaItemCount > 0) State.ENDED else State.NONE
               else -> null // noop
             }
           if (state != null && state != trackPlayer.playerState) {
             // Clear error when recovering from ERROR state to a successful state
-            if (
-              trackPlayer.playerState == State.ERROR && state != State.ERROR
-            ) {
+            if (trackPlayer.playerState == State.ERROR && state != State.ERROR) {
               trackPlayer.playbackError = null
             }
             trackPlayer.setPlayerState(state)

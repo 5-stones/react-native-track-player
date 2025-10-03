@@ -4,9 +4,7 @@ import com.doublesymmetry.trackplayer.model.Track
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.WritableMap
 
-/**
- * Event data for when the active track changes.
- */
+/** Event data for when the active track changes. */
 data class PlaybackActiveTrackChangedEvent(
   /** The index of previously active track. */
   val lastIndex: Int? = null,
@@ -17,7 +15,7 @@ data class PlaybackActiveTrackChangedEvent(
   /** The newly active track index or null if there is no longer an active track. */
   val index: Int? = null,
   /** The newly active track or null if there is no longer an active track. */
-  val track: Track? = null
+  val track: Track? = null,
 ) {
   fun toBridge(): WritableMap {
     return Arguments.createMap().apply {

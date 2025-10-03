@@ -196,7 +196,8 @@ private constructor(
             }
           }
           ReadableType.String -> bundle.putString(key, map.getString(key))
-          ReadableType.Map -> map.getMap(key)?.let { bundle.putBundle(key, readableMapToBundle(it)) }
+          ReadableType.Map ->
+            map.getMap(key)?.let { bundle.putBundle(key, readableMapToBundle(it)) }
           ReadableType.Array -> {
             // Store array as an ArrayList to preserve it in the bundle
             map.getArray(key)?.let { array ->

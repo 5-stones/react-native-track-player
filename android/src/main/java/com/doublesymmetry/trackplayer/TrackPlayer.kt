@@ -3,7 +3,6 @@ package com.doublesymmetry.trackplayer
 import android.content.Context
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
-import androidx.media3.common.IllegalSeekPositionException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
@@ -59,13 +58,14 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
   }
 
   internal fun emitActiveTrackChanged(lastPosition: Double) {
-    val event = PlaybackActiveTrackChangedEvent(
-      lastIndex = lastIndex,
-      lastTrack = lastTrack,
-      lastPosition = lastPosition,
-      index = currentIndex,
-      track = currentTrack
-    )
+    val event =
+      PlaybackActiveTrackChangedEvent(
+        lastIndex = lastIndex,
+        lastTrack = lastTrack,
+        lastPosition = lastPosition,
+        index = currentIndex,
+        track = currentTrack,
+      )
     events.currentTrackChange.emit(event)
 
     // Update last track info for next transition
@@ -249,8 +249,8 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
   }
 
   /**
-   * Loads a track into the player. If there is a current track, it will be replaced. If the queue is
-   * empty, the track will be added.
+   * Loads a track into the player. If there is a current track, it will be replaced. If the queue
+   * is empty, the track will be added.
    *
    * @param track The [Track] to load.
    */
@@ -266,7 +266,8 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
   }
 
   /**
-   * Add a single track to the queue. If the AudioPlayer has no track loaded, it will load the `track`.
+   * Add a single track to the queue. If the AudioPlayer has no track loaded, it will load the
+   * `track`.
    *
    * @param track The [Track] to add.
    */
@@ -277,8 +278,8 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
   }
 
   /**
-   * Add multiple tracks to the queue. If the AudioPlayer has no track loaded, it will load the first
-   * track in the list.
+   * Add multiple tracks to the queue. If the AudioPlayer has no track loaded, it will load the
+   * first track in the list.
    *
    * @param tracks The [Track]s to add.
    */
@@ -318,7 +319,8 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
    * Remove tracks from the queue.
    *
    * @param indexes The indexes of the tracks to remove.
-   * @throws IllegalArgumentException if any index is out of bounds or if duplicate indexes are provided.
+   * @throws IllegalArgumentException if any index is out of bounds or if duplicate indexes are
+   *   provided.
    */
   fun remove(indexes: List<Int>) {
     if (indexes.toSet().size != indexes.size) {
@@ -412,8 +414,8 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
 
   /**
    * Stops playback, without clearing the active track. Calling this method will cause the playback
-   * state to transition to State.NONE and the player will release the loaded media and
-   * resources required for playback.
+   * state to transition to State.NONE and the player will release the loaded media and resources
+   * required for playback.
    */
   fun stop() {
     playerState = State.STOPPED

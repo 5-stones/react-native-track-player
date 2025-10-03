@@ -10,16 +10,16 @@ import android.support.v4.media.RatingCompat
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
 import com.doublesymmetry.trackplayer.event.MediaSessionCallback
-import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
+import com.doublesymmetry.trackplayer.event.PlaybackPlayWhenReadyChangedEvent
+import com.doublesymmetry.trackplayer.event.PlaybackProgressUpdatedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackQueueEndedEvent
-import com.doublesymmetry.trackplayer.model.PlaybackState
-import com.doublesymmetry.trackplayer.model.State
 import com.doublesymmetry.trackplayer.event.bridge
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
-import com.doublesymmetry.trackplayer.model.RatingType
-import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
+import com.doublesymmetry.trackplayer.model.RatingType
+import com.doublesymmetry.trackplayer.model.State
 import com.doublesymmetry.trackplayer.model.TrackFactory
+import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
 import com.doublesymmetry.trackplayer.option.PlayerCapability
 import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
 import com.doublesymmetry.trackplayer.player.PlaybackProgressUpdateManager
@@ -34,7 +34,6 @@ import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.module.annotations.ReactModule
-import java.util.ArrayList
 import java.util.HashMap
 import java.util.concurrent.TimeUnit
 import javax.annotation.Nonnull
@@ -92,14 +91,14 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
           PlaybackProgressUpdateManager() {
             val service = connectedService ?: return@PlaybackProgressUpdateManager
             val currentIndex = service.player.currentIndex ?: return@PlaybackProgressUpdateManager
-            emitOnPlaybackProgressUpdated(
-              Arguments.createMap().apply {
-                putDouble("position", service.player.position.toSeconds())
-                putDouble("duration", service.player.duration.toSeconds())
-                putDouble("buffered", service.player.bufferedPosition.toSeconds())
-                putInt("track", currentIndex)
-              }
-            )
+            val event =
+              PlaybackProgressUpdatedEvent(
+                position = service.player.position.toSeconds(),
+                duration = service.player.duration.toSeconds(),
+                buffered = service.player.bufferedPosition.toSeconds(),
+                track = currentIndex,
+              )
+            emitOnPlaybackProgressUpdated(event.toBridge())
           }
         connectedService?.setupPlayer(playerOptions)
         playerSetUpPromise?.resolve(null)
@@ -356,7 +355,9 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     player.currentIndex?.toDouble()
   }
 
-  override fun getActiveTrack(): WritableMap? = runBlockingOnMain { player.currentTrack?.toBridge() }
+  override fun getActiveTrack(): WritableMap? = runBlockingOnMain {
+    player.currentTrack?.toBridge()
+  }
 
   override fun getProgress(): WritableMap = runBlockingOnMain {
     Arguments.createMap().let {
@@ -439,11 +440,9 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     private fun observePlayWhenReadyChange() {
       mainScope.launch {
         player.events.playWhenReadyChange.collect { playWhenReadyData ->
-          emitOnPlaybackPlayWhenReadyChanged(
-            Arguments.createMap().apply {
-              putBoolean("playWhenReady", playWhenReadyData.playWhenReady)
-            }
-          )
+          val event =
+            PlaybackPlayWhenReadyChangedEvent(playWhenReady = playWhenReadyData.playWhenReady)
+          emitOnPlaybackPlayWhenReadyChanged(event.toBridge())
         }
       }
     }
@@ -529,10 +528,11 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
         player.events.stateChange.collect { playbackState ->
           if (playbackState.state == State.ENDED && player.isLastTrack) {
             player.currentIndex?.let { currentIndex ->
-              val event = PlaybackQueueEndedEvent(
-                track = currentIndex,
-                position = player.position.toSeconds()
-              )
+              val event =
+                PlaybackQueueEndedEvent(
+                  track = currentIndex,
+                  position = player.position.toSeconds(),
+                )
               emitOnPlaybackQueueEnded(event.toBridge())
             }
           }

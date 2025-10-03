@@ -24,8 +24,8 @@ import androidx.media3.session.SessionResult
 import com.doublesymmetry.trackplayer.event.EventControllerConnection
 import com.doublesymmetry.trackplayer.extension.find
 import com.doublesymmetry.trackplayer.model.AppKilledPlaybackBehavior
-import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
 import com.doublesymmetry.trackplayer.model.CustomCommandButton
+import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
 import com.doublesymmetry.trackplayer.option.PlayerCapability
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.jstasks.HeadlessJsTaskConfig
