@@ -9,6 +9,7 @@ import com.doublesymmetry.trackplayer.event.PlayWhenReadyChange
 import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackEndedReason
 import com.doublesymmetry.trackplayer.event.PlaybackError
+import com.doublesymmetry.trackplayer.event.PlaybackProgressUpdatedEvent
 import com.doublesymmetry.trackplayer.event.PositionChangedReason
 import com.doublesymmetry.trackplayer.model.PlaybackState
 import kotlinx.coroutines.MainScope
@@ -44,6 +45,7 @@ class PlayerEvents {
   val audioItemTransition = event<AudioItemTransition>(replay = 1)
   val currentTrackChange = event<PlaybackActiveTrackChangedEvent>(replay = 1)
   val positionChanged = event<PositionChangedReason?>(replay = 1)
+  val progressUpdate = event<PlaybackProgressUpdatedEvent>(replay = 0)
   val onCommonMetadata = event<MediaMetadata>(replay = 1)
   val onTimedMetadata = event<Metadata>(replay = 1)
   val onPlayerActionTriggeredExternally = event<MediaSessionCallback>(replay = 0)

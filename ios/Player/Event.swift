@@ -12,7 +12,7 @@ public extension TrackPlayer {
   typealias PlayWhenReadyChangeData = Bool
   typealias StateChangeEventData = PlaybackState
   typealias PlaybackEndEventData = PlaybackEndedReason
-  typealias SecondElapseEventData = TimeInterval
+  typealias ProgressUpdateEventData = PlaybackProgressUpdatedEvent
   typealias FailEventData = Error?
   typealias SeekEventData = (seconds: Double, didFinish: Bool)
   typealias UpdateDurationEventData = Double
@@ -41,10 +41,10 @@ public extension TrackPlayer {
     public let playbackEnd: TrackPlayer.Event<PlaybackEndEventData> = TrackPlayer.Event()
 
     /**
-     Emitted when a second is elapsed in the `TrackPlayer`.
+     Emitted periodically with playback progress updates.
      - Important: Remember to dispatch to the main queue if any UI is updated in the event handler.
      */
-    public let secondElapse: TrackPlayer.Event<SecondElapseEventData> = TrackPlayer.Event()
+    public let progressUpdate: TrackPlayer.Event<ProgressUpdateEventData> = TrackPlayer.Event()
 
     /**
      Emitted when the player encounters an error. This will ultimately result in the AVPlayer instance to be recreated.

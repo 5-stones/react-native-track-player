@@ -19,7 +19,6 @@ public class NativeTrackPlayerImpl: NSObject {
   private let player = TrackPlayer()
   private let audioSession = AVAudioSession.sharedInstance()
   private var audioSessionIsActive = false
-  private var shouldEmitProgressEvent: Bool = false
   private var shouldResumePlaybackAfterInterruptionEnds: Bool = false
   private var forwardJumpInterval: NSNumber?
   private var backwardJumpInterval: NSNumber?
@@ -49,7 +48,7 @@ public class NativeTrackPlayerImpl: NSObject {
     player.event.stateChange.addListener(self, handleStateChange)
     player.event.fail.addListener(self, handleFailed)
     player.event.currentTrack.addListener(self, handleActiveTrackChanged)
-    player.event.secondElapse.addListener(self, handleSecondElapse)
+    player.event.progressUpdate.addListener(self, handleProgressUpdate)
     player.event.playWhenReadyChange.addListener(self, handlePlayWhenReadyChange)
   }
 
@@ -391,17 +390,9 @@ public class NativeTrackPlayerImpl: NSObject {
           )
         }
 
-      self.configureProgressUpdateEvent(
-        interval: ((options["progressUpdateEventInterval"] as? NSNumber) ?? 0).doubleValue
-      )
+      let interval = ((options["progressUpdateEventInterval"] as? NSNumber) ?? 0).doubleValue
+      player.setProgressUpdateInterval(interval > 0 ? interval : nil)
     }
-  }
-
-  private func configureProgressUpdateEvent(interval: Double) {
-    shouldEmitProgressEvent = interval > 0
-    player.timeEventFrequency = shouldEmitProgressEvent
-      ? .custom(time: CMTime(seconds: interval, preferredTimescale: 1000))
-      : .everySecond
   }
 
   @objc
@@ -850,21 +841,8 @@ public class NativeTrackPlayerImpl: NSObject {
     }
   }
 
-  func handleSecondElapse(seconds _: Double) {
-    // because you cannot prevent the `event.secondElapse` from firing
-    // do not emit an event if `progressUpdateEventInterval` is nil
-    // additionally, there are certain instances in which this event is emitted
-    // _after_ a manipulation to the queu causing no currentTrack to exist (see reset)
-    // in which case we shouldn't emit anything or we'll get an exception.
-    guard shouldEmitProgressEvent else { return }
+  func handleProgressUpdate(event: PlaybackProgressUpdatedEvent) {
     ensureMainThread {
-      guard self.player.currentTrack != nil else { return }
-      let event = PlaybackProgressUpdatedEvent(
-        position: self.player.currentTime,
-        duration: self.player.duration,
-        buffered: self.player.bufferedPosition,
-        track: self.player.currentIndex
-      )
       self.emit(event: EventType.PlaybackProgressUpdated, body: event.toBridge())
     }
   }

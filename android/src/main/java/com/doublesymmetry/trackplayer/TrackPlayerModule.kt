@@ -22,7 +22,6 @@ import com.doublesymmetry.trackplayer.model.TrackFactory
 import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
 import com.doublesymmetry.trackplayer.option.PlayerCapability
 import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
-import com.doublesymmetry.trackplayer.player.PlaybackProgressUpdateManager
 import com.doublesymmetry.trackplayer.util.AppForegroundTracker
 import com.doublesymmetry.trackplayer.util.BundleUtils
 import com.doublesymmetry.trackplayer.util.MetadataAdapter
@@ -53,7 +52,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   private val mainScope = MainScope()
   private var connectedService: TrackPlayerService? = null
   private val context = reactContext
-  private var progressUpdateManager: PlaybackProgressUpdateManager? = null
   private val trackFactory =
     TrackFactory(context) { connectedService?.player?.ratingType ?: RatingCompat.RATING_NONE }
   private var eventObserver: PlayerEventObserver? = null
@@ -87,19 +85,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       if (connectedService == null) {
         val binder: TrackPlayerService.MusicBinder = serviceBinder as TrackPlayerService.MusicBinder
         connectedService = binder.service
-        progressUpdateManager =
-          PlaybackProgressUpdateManager() {
-            val service = connectedService ?: return@PlaybackProgressUpdateManager
-            val currentIndex = service.player.currentIndex ?: return@PlaybackProgressUpdateManager
-            val event =
-              PlaybackProgressUpdatedEvent(
-                position = service.player.position.toSeconds(),
-                duration = service.player.duration.toSeconds(),
-                buffered = service.player.bufferedPosition.toSeconds(),
-                track = currentIndex,
-              )
-            emitOnPlaybackProgressUpdated(event.toBridge())
-          }
         connectedService?.setupPlayer(playerOptions)
         playerSetUpPromise?.resolve(null)
         setupEventObserver()
@@ -110,7 +95,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   /** Called when a connection to the Service has been lost. */
   override fun onServiceDisconnected(name: ComponentName) {
     // Cancel all event observation coroutines when service disconnects
-    progressUpdateManager?.stop()
     mainScope.coroutineContext.cancelChildren()
     eventObserver = null
     connectedService = null
@@ -194,7 +178,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     val options = TrackPlayerOptions.fromBridge(data)
 
     // Store progress update interval for use during playback
-    progressUpdateManager?.setUpdateInterval(
+    player.setProgressUpdateInterval(
       if (options.progressUpdateEventInterval > 0) options.progressUpdateEventInterval else null
     )
 
@@ -411,6 +395,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       observePlayWhenReadyChange()
       observePlayerActionTriggeredExternally()
       observePositionChanged()
+      observeProgressUpdate()
       observeQueueEnded()
       observePlaybackError()
       observeCommonMetadata()
@@ -424,7 +409,14 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       mainScope.launch {
         player.events.stateChange.collect { playbackState ->
           emitOnPlaybackState(playbackState.toBridge())
-          progressUpdateManager?.onPlaybackStateChanged(playbackState.state)
+        }
+      }
+    }
+
+    private fun observeProgressUpdate() {
+      mainScope.launch {
+        player.events.progressUpdate.collect { event ->
+          emitOnPlaybackProgressUpdated(event.toBridge())
         }
       }
     }

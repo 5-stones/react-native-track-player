@@ -22,6 +22,9 @@ import com.doublesymmetry.trackplayer.player.ForwardingPlayer
 import com.doublesymmetry.trackplayer.player.MediaFactory
 import com.doublesymmetry.trackplayer.player.PlayerEvents
 import com.doublesymmetry.trackplayer.player.PlayerListener
+import com.doublesymmetry.trackplayer.event.PlaybackProgressUpdatedEvent
+import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
+import com.doublesymmetry.trackplayer.player.PlaybackProgressUpdateManager
 import com.doublesymmetry.trackplayer.util.PlayerCache
 import java.util.concurrent.TimeUnit
 
@@ -40,6 +43,10 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
   private var playerListener: PlayerListener
   private var cache: SimpleCache? = null
   val events = PlayerEvents()
+
+  private val progressUpdateManager: PlaybackProgressUpdateManager by lazy {
+    PlaybackProgressUpdateManager { handleProgressUpdate() }
+  }
 
   val currentTrack: Track?
     get() = exoPlayer.currentMediaItem?.let { Track.fromMediaItem(it) }
@@ -459,7 +466,32 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
     if (state != playerState) {
       playerState = state
       events.stateChange.emit(PlaybackState(state, playbackError))
+      progressUpdateManager.onPlaybackStateChanged(state)
     }
+  }
+
+  /**
+   * Sets the progress update interval.
+   *
+   * @param interval The interval in seconds, or null to disable progress updates
+   */
+  fun setProgressUpdateInterval(interval: Double?) {
+    progressUpdateManager.setUpdateInterval(interval)
+  }
+
+  /**
+   * Handles progress updates by emitting a progress event.
+   */
+  private fun handleProgressUpdate() {
+    val index = currentIndex ?: return
+    val event =
+      PlaybackProgressUpdatedEvent(
+        position = position.toSeconds(),
+        duration = duration.toSeconds(),
+        buffered = bufferedPosition.toSeconds(),
+        track = index,
+      )
+    events.progressUpdate.emit(event)
   }
 
   /**

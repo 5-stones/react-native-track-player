@@ -95,12 +95,12 @@ public class TrackPlayer {
 
   private lazy var playerTimeObserver: PlayerTimeObserver = {
     PlayerTimeObserver(
-      periodicObserverTimeInterval: _timeEventFrequency.getTime(),
+      periodicObserverTimeInterval: CMTime(seconds: 1, preferredTimescale: 1000),
       onAudioDidStart: { [weak self] in
         self?.audioDidStart()
       },
-      onSecondElapsed: { [weak self] time in
-        self?.handleSecondElapsed(time)
+      onSecondElapsed: { [weak self] seconds in
+        self?.handleSecondElapsed(seconds)
       }
     )
   }()
@@ -132,6 +132,13 @@ public class TrackPlayer {
       }
     )
   }()
+
+  private lazy var progressUpdateManager: PlaybackProgressUpdateManager = {
+    PlaybackProgressUpdateManager { [weak self] in
+      self?.handleProgressUpdate()
+    }
+  }()
+
   private var pendingSeek: PendingSeek?
   private var asset: AVAsset?
   private var url: URL?
@@ -150,7 +157,6 @@ public class TrackPlayer {
   private var _rate: Float = 1.0
   var _playWhenReady: Bool = false
   var _bufferDuration: TimeInterval = 0
-  var _timeEventFrequency: TimeEventFrequency = .everySecond
 
   /**
    Set this to false to disable automatic updating of now playing info for control center and lock screen.
@@ -326,17 +332,6 @@ public class TrackPlayer {
         _bufferDuration = 0
       }
       avPlayer.automaticallyWaitsToMinimizeStalling = newValue
-    }
-  }
-
-  /**
-   Set this to decide how often the player should call the delegate with time progress events.
-   */
-  public var timeEventFrequency: TimeEventFrequency {
-    get { _timeEventFrequency }
-    set {
-      _timeEventFrequency = newValue
-      playerTimeObserver.periodicObserverTimeInterval = newValue.getTime()
     }
   }
 
@@ -835,11 +830,35 @@ public class TrackPlayer {
       default: break
       }
       event.stateChange.emit(data: PlaybackState(state: state, error: playbackError))
+      progressUpdateManager.onPlaybackStateChanged(state)
     }
   }
 
+
   func handleSecondElapsed(_ seconds: Double) {
-    event.secondElapse.emit(data: seconds)
+    // Update now playing info with current playback time
+    if automaticallyUpdateNowPlayingInfo {
+      setNowPlayingCurrentTime(seconds: seconds)
+    }
+  }
+
+  private func handleProgressUpdate() {
+    guard currentIndex >= 0 else { return }
+    let progressEvent = PlaybackProgressUpdatedEvent(
+      position: currentTime,
+      duration: duration,
+      buffered: bufferedPosition,
+      track: currentIndex
+    )
+    event.progressUpdate.emit(data: progressEvent)
+  }
+
+  /**
+   Sets the progress update interval.
+   - Parameter interval: The interval in seconds, or nil to disable progress updates
+   */
+  public func setProgressUpdateInterval(_ interval: TimeInterval?) {
+    progressUpdateManager.setUpdateInterval(interval)
   }
 
   private func handlePlaybackError(_ error: Error?) {
