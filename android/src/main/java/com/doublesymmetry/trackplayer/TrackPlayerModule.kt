@@ -7,19 +7,28 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.support.v4.media.RatingCompat
+import androidx.media3.common.Metadata
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
-import com.doublesymmetry.trackplayer.event.MediaSessionCallback
+import com.doublesymmetry.trackplayer.event.ControllerConnectedEvent
+import com.doublesymmetry.trackplayer.event.ControllerDisconnectedEvent
+import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
+import com.doublesymmetry.trackplayer.event.PlaybackErrorEvent
 import com.doublesymmetry.trackplayer.event.PlaybackPlayWhenReadyChangedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackProgressUpdatedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackQueueEndedEvent
-import com.doublesymmetry.trackplayer.event.bridge
+import com.doublesymmetry.trackplayer.event.RemoteJumpBackwardEvent
+import com.doublesymmetry.trackplayer.event.RemoteJumpForwardEvent
+import com.doublesymmetry.trackplayer.event.RemoteSeekEvent
+import com.doublesymmetry.trackplayer.event.RemoteSetRatingEvent
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
+import com.doublesymmetry.trackplayer.model.PlaybackState
 import com.doublesymmetry.trackplayer.model.RatingType
 import com.doublesymmetry.trackplayer.model.State
 import com.doublesymmetry.trackplayer.model.TrackFactory
 import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
+import com.doublesymmetry.trackplayer.model.bridge
 import com.doublesymmetry.trackplayer.option.PlayerCapability
 import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
 import com.doublesymmetry.trackplayer.util.AppForegroundTracker
@@ -45,7 +54,7 @@ import timber.log.Timber
 
 @ReactModule(name = TrackPlayerModule.NAME)
 class TrackPlayerModule(reactContext: ReactApplicationContext) :
-  NativeTrackPlayerSpec(reactContext), ServiceConnection {
+  NativeTrackPlayerSpec(reactContext), ServiceConnection, TrackPlayerCallbacks {
   private lateinit var browser: MediaBrowser
   private var playerOptions: TrackPlayerOptions = TrackPlayerOptions()
   private var playerSetUpPromise: Promise? = null
@@ -54,7 +63,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   private val context = reactContext
   private val trackFactory =
     TrackFactory(context) { connectedService?.player?.ratingType ?: RatingCompat.RATING_NONE }
-  private var eventObserver: PlayerEventObserver? = null
 
   @Nonnull
   override fun getName(): String {
@@ -85,9 +93,8 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       if (connectedService == null) {
         val binder: TrackPlayerService.MusicBinder = serviceBinder as TrackPlayerService.MusicBinder
         connectedService = binder.service
-        connectedService?.setupPlayer(playerOptions)
+        connectedService?.setupPlayer(playerOptions, this@TrackPlayerModule)
         playerSetUpPromise?.resolve(null)
-        setupEventObserver()
       }
     }
   }
@@ -96,7 +103,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   override fun onServiceDisconnected(name: ComponentName) {
     // Cancel all event observation coroutines when service disconnects
     mainScope.coroutineContext.cancelChildren()
-    eventObserver = null
     connectedService = null
   }
 
@@ -199,7 +205,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     player.move(fromIndex.toInt(), toIndex.toInt())
   }
 
-  override fun remove(data: ReadableArray?) = runBlockingOnMain {
+  override fun remove(data: ReadableArray?): Unit = runBlockingOnMain {
     Arguments.toList(data)?.map { (it as Number).toInt() }?.let { player.remove(it) }
   }
 
@@ -380,244 +386,106 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   private val player
     get() = service.player
 
-  private fun setupEventObserver() {
-    connectedService ?: return
-
-    eventObserver = PlayerEventObserver()
-
-    eventObserver?.observeAll()
+  // TrackPlayerCallbacks implementation
+  override fun onPlaybackState(state: PlaybackState) {
+    emitOnPlaybackState(state.toBridge())
   }
 
-  private inner class PlayerEventObserver {
-    fun observeAll() {
-      observeStateChange()
-      observeAudioItemTransition()
-      observePlayWhenReadyChange()
-      observePlayerActionTriggeredExternally()
-      observePositionChanged()
-      observeProgressUpdate()
-      observeQueueEnded()
-      observePlaybackError()
-      observeCommonMetadata()
-      observeTimedMetadata()
-      observeRatingChanged()
-      observeControllerConnected()
-      observeControllerDisconnected()
-    }
+  override fun onPlaybackActiveTrackChanged(event: PlaybackActiveTrackChangedEvent) {
+    emitOnPlaybackActiveTrackChanged(event.toBridge())
+  }
 
-    private fun observeStateChange() {
-      mainScope.launch {
-        player.events.stateChange.collect { playbackState ->
-          emitOnPlaybackState(playbackState.toBridge())
+  override fun onPlaybackProgressUpdated(event: PlaybackProgressUpdatedEvent) {
+    emitOnPlaybackProgressUpdated(event.toBridge())
+  }
+
+  override fun onPlaybackPlayWhenReadyChanged(event: PlaybackPlayWhenReadyChangedEvent) {
+    emitOnPlaybackPlayWhenReadyChanged(event.toBridge())
+  }
+
+  override fun onPlaybackQueueEnded(event: PlaybackQueueEndedEvent) {
+    emitOnPlaybackQueueEnded(event.toBridge())
+  }
+
+  override fun onPlaybackError(event: PlaybackErrorEvent) {
+    emitOnPlaybackError(event.toBridge())
+  }
+
+  override fun onMetadataCommonReceived(metadata: WritableMap) {
+    emitOnMetadataCommonReceived(Arguments.createMap().apply { putMap("metadata", metadata) })
+  }
+
+  override fun onMetadataTimedReceived(metadata: Metadata) {
+    emitOnMetadataTimedReceived(
+      Arguments.createMap().let {
+        it.putArray(
+          "metadata",
+          Arguments.createArray().apply {
+            MetadataAdapter.Companion.fromMetadata(metadata).forEach { item -> pushMap(item) }
+          },
+        )
+        it
+      }
+    )
+  }
+
+  override fun onPlaybackMetadata(metadata: PlaybackMetadata?) {
+    metadata?.let {
+      emitOnPlaybackMetadata(
+        Arguments.createMap().apply {
+          putString("source", it.source)
+          putString("title", it.title)
+          putString("url", it.url)
+          putString("artist", it.artist)
+          putString("album", it.album)
+          putString("date", it.date)
+          putString("genre", it.genre)
         }
-      }
+      )
     }
+  }
 
-    private fun observeProgressUpdate() {
-      mainScope.launch {
-        player.events.progressUpdate.collect { event ->
-          emitOnPlaybackProgressUpdated(event.toBridge())
-        }
-      }
-    }
+  override fun onRemotePlay() {
+    emitOnRemotePlay(Arguments.createMap())
+  }
 
-    private fun observeAudioItemTransition() {
-      mainScope.launch {
-        player.events.currentTrackChange.collect { event ->
-          emitOnPlaybackActiveTrackChanged(event.toBridge())
-        }
-      }
-    }
+  override fun onRemotePause() {
+    emitOnRemotePause(Arguments.createMap())
+  }
 
-    private fun observePlayWhenReadyChange() {
-      mainScope.launch {
-        player.events.playWhenReadyChange.collect { playWhenReadyData ->
-          val event =
-            PlaybackPlayWhenReadyChangedEvent(playWhenReady = playWhenReadyData.playWhenReady)
-          emitOnPlaybackPlayWhenReadyChanged(event.toBridge())
-        }
-      }
-    }
+  override fun onRemoteStop() {
+    emitOnRemoteStop(Arguments.createMap())
+  }
 
-    private fun observePlayerActionTriggeredExternally() {
-      mainScope.launch {
-        player.events.onPlayerActionTriggeredExternally.collect { mediaSessionAction ->
-          when (mediaSessionAction) {
-            MediaSessionCallback.PLAY -> {
-              emitOnRemotePlay(Arguments.createMap())
-            }
+  override fun onRemoteNext() {
+    emitOnRemoteNext(Arguments.createMap())
+  }
 
-            MediaSessionCallback.PAUSE -> {
-              emitOnRemotePause(Arguments.createMap())
-            }
+  override fun onRemotePrevious() {
+    emitOnRemotePrevious(Arguments.createMap())
+  }
 
-            MediaSessionCallback.NEXT -> {
-              emitOnRemoteNext(Arguments.createMap())
-            }
+  override fun onRemoteJumpForward(event: RemoteJumpForwardEvent) {
+    emitOnRemoteJumpForward(event.toBridge())
+  }
 
-            MediaSessionCallback.PREVIOUS -> {
-              emitOnRemotePrevious(Arguments.createMap())
-            }
+  override fun onRemoteJumpBackward(event: RemoteJumpBackwardEvent) {
+    emitOnRemoteJumpBackward(event.toBridge())
+  }
 
-            MediaSessionCallback.STOP -> {
-              emitOnRemoteStop(Arguments.createMap())
-            }
+  override fun onRemoteSeek(event: RemoteSeekEvent) {
+    emitOnRemoteSeek(event.toBridge())
+  }
 
-            MediaSessionCallback.FORWARD -> {
-              val eventData = RemoteJumpForwardEvent(
-                interval = playerOptions.forwardJumpInterval.toDouble()
-              )
-              emitOnRemoteJumpForward(eventData.toBridge())
-            }
+  override fun onRemoteSetRating(event: RemoteSetRatingEvent) {
+    emitOnRemoteSetRating(event.toBridge())
+  }
 
-            MediaSessionCallback.REWIND -> {
-              val eventData = RemoteJumpBackwardEvent(
-                interval = playerOptions.backwardJumpInterval.toDouble()
-              )
-              emitOnRemoteJumpBackward(eventData.toBridge())
-            }
+  override fun onControllerConnected(event: ControllerConnectedEvent) {
+    emitOnAndroidControllerConnected(event.toBridge())
+  }
 
-            is MediaSessionCallback.RATING -> {
-              val ratingType = RatingType.fromString(mediaSessionAction.rating.toString())
-              if (ratingType != null) {
-                val eventData = RemoteSetRatingEvent(rating = ratingType)
-                emitOnRemoteSetRating(eventData.toBridge())
-              }
-            }
-
-            is MediaSessionCallback.SEEK -> {
-              val eventData = RemoteSeekEvent(
-                position = mediaSessionAction.positionMs.toDouble() / 1000.0
-              )
-              emitOnRemoteSeek(eventData.toBridge())
-            }
-
-            else -> {} // Handle other actions as needed
-          }
-        }
-      }
-    }
-
-    private fun observePositionChanged() {
-      mainScope.launch {
-        player.events.positionChanged.collect {
-          emitOnPlaybackProgressUpdated(
-            Arguments.createMap().apply {
-              putDouble("position", player.position.toSeconds())
-              putDouble("buffered", player.bufferedPosition.toSeconds())
-              putDouble("duration", player.duration.toSeconds())
-            }
-          )
-        }
-      }
-    }
-
-    private fun observeQueueEnded() {
-      mainScope.launch {
-        player.events.stateChange.collect { playbackState ->
-          if (playbackState.state == State.ENDED && player.isLastTrack) {
-            player.currentIndex?.let { currentIndex ->
-              val event =
-                PlaybackQueueEndedEvent(
-                  track = currentIndex,
-                  position = player.position.toSeconds(),
-                )
-              emitOnPlaybackQueueEnded(event.toBridge())
-            }
-          }
-        }
-      }
-    }
-
-    private fun observePlaybackError() {
-      mainScope.launch {
-        player.events.playbackError.collect { error -> emitOnPlaybackError(error.toBridge()) }
-      }
-    }
-
-    private fun observeCommonMetadata() {
-      mainScope.launch {
-        player.events.onCommonMetadata.collect { metadata ->
-          emitOnMetadataCommonReceived(
-            Arguments.createMap().apply {
-              putMap("metadata", MetadataAdapter.Companion.mapFromMediaMetadata(metadata))
-            }
-          )
-        }
-      }
-    }
-
-    private fun observeTimedMetadata() {
-      mainScope.launch {
-        player.events.onTimedMetadata.collect { metadata ->
-          emitOnMetadataTimedReceived(
-            Arguments.createMap().let {
-              it.putArray(
-                "metadata",
-                Arguments.createArray().apply {
-                  MetadataAdapter.Companion.fromMetadata(metadata).forEach { item -> pushMap(item) }
-                },
-              )
-              it
-            }
-          )
-
-          // TODO: Handle the different types of metadata and publish to new events
-          val playbackMetadata =
-            PlaybackMetadata.Companion.fromId3Metadata(metadata)
-              ?: PlaybackMetadata.Companion.fromIcy(metadata)
-              ?: PlaybackMetadata.Companion.fromVorbisComment(metadata)
-              ?: PlaybackMetadata.Companion.fromQuickTime(metadata)
-
-          if (playbackMetadata != null) {
-            emitOnPlaybackMetadata(
-              Arguments.createMap().apply {
-                putString("source", playbackMetadata.source)
-                putString("title", playbackMetadata.title)
-                putString("url", playbackMetadata.url)
-                putString("artist", playbackMetadata.artist)
-                putString("album", playbackMetadata.album)
-                putString("date", playbackMetadata.date)
-                putString("genre", playbackMetadata.genre)
-              }
-            )
-          }
-        }
-      }
-    }
-
-    private fun observeRatingChanged() {
-      mainScope.launch {
-        player.events.onRatingChanged.collect { rating ->
-          emitOnRemoteSetRating(
-            Arguments.createMap().apply { putString("rating", rating.toString()) }
-          )
-        }
-      }
-    }
-
-    private fun observeControllerConnected() {
-      mainScope.launch {
-        player.events.onControllerConnected.collect { controllerData ->
-          val eventData = ControllerConnectedEvent(
-            `package` = controllerData.packageName,
-            isMediaNotificationController = controllerData.isMediaNotificationController,
-            isAutomotiveController = controllerData.isAutomotiveController,
-            isAutoCompanionController = controllerData.isAutoCompanionController
-          )
-          emitOnAndroidControllerConnected(eventData.toBridge())
-        }
-      }
-    }
-
-    private fun observeControllerDisconnected() {
-      mainScope.launch {
-        player.events.onControllerDisconnected.collect { controllerName ->
-          emitOnAndroidControllerDisconnected(
-            Arguments.createMap().apply { putString("package", controllerName) }
-          )
-        }
-      }
-    }
+  override fun onControllerDisconnected(event: ControllerDisconnectedEvent) {
+    emitOnAndroidControllerDisconnected(event.toBridge())
   }
 }

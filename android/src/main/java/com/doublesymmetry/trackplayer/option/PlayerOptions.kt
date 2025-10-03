@@ -26,11 +26,12 @@ data class PlayerOptions(
    * The sources can be: media buttons on headphones, Android Wear, Android Auto, Google Assistant,
    * media notification, etc.
    *
-   * Setting this to true enables the use of
-   * [onPlayerActionTriggeredExternally][com.doublesymmetry.trackplayer.player.PlayerEvents.onPlayerActionTriggeredExternally]
-   * events.
+   * When set to true, external player actions are intercepted and dispatched as remote control
+   * events through the TrackPlayerCallbacks interface (e.g., onRemotePlay, onRemotePause).
    */
   val interceptPlayerActionsTriggeredExternally: Boolean = false,
+  val forwardJumpInterval: Double = 15.0,
+  val backwardJumpInterval: Double = 15.0,
 )
 
 data class BufferOptions(

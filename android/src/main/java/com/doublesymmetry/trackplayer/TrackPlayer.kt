@@ -3,6 +3,8 @@ package com.doublesymmetry.trackplayer
 import android.content.Context
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ForwardingPlayer
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
@@ -11,28 +13,43 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.legacy.RatingCompat
+import com.doublesymmetry.trackplayer.event.ControllerConnectedEvent
+import com.doublesymmetry.trackplayer.event.ControllerDisconnectedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackError
+import com.doublesymmetry.trackplayer.event.PlaybackErrorEvent
+import com.doublesymmetry.trackplayer.event.PlaybackPlayWhenReadyChangedEvent
+import com.doublesymmetry.trackplayer.event.PlaybackProgressUpdatedEvent
+import com.doublesymmetry.trackplayer.event.PlaybackQueueEndedEvent
+import com.doublesymmetry.trackplayer.event.RemoteJumpBackwardEvent
+import com.doublesymmetry.trackplayer.event.RemoteJumpForwardEvent
+import com.doublesymmetry.trackplayer.event.RemoteSeekEvent
+import com.doublesymmetry.trackplayer.event.RemoteSetRatingEvent
+import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
+import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import com.doublesymmetry.trackplayer.model.PlaybackState
+import com.doublesymmetry.trackplayer.model.RatingType
 import com.doublesymmetry.trackplayer.model.State
 import com.doublesymmetry.trackplayer.model.Track
 import com.doublesymmetry.trackplayer.option.PlayerOptions
 import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
-import com.doublesymmetry.trackplayer.player.ForwardingPlayer
 import com.doublesymmetry.trackplayer.player.MediaFactory
-import com.doublesymmetry.trackplayer.player.PlayerEvents
-import com.doublesymmetry.trackplayer.player.PlayerListener
-import com.doublesymmetry.trackplayer.event.PlaybackProgressUpdatedEvent
-import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
 import com.doublesymmetry.trackplayer.player.PlaybackProgressUpdateManager
+import com.doublesymmetry.trackplayer.player.PlayerListener
+import com.doublesymmetry.trackplayer.util.MetadataAdapter
 import com.doublesymmetry.trackplayer.util.PlayerCache
+import com.facebook.react.bridge.WritableMap
 import java.util.concurrent.TimeUnit
 
 @UnstableApi
-class TrackPlayer(internal val context: Context, val options: PlayerOptions = PlayerOptions()) {
+class TrackPlayer(
+  internal val context: Context,
+  val options: PlayerOptions = PlayerOptions(),
+  private val callbacks: TrackPlayerCallbacks? = null,
+) {
 
   val exoPlayer: ExoPlayer
-  val forwardingPlayer: ForwardingPlayer
+  val forwardingPlayer: Player
   val player: Player
     get() {
       return options.interceptPlayerActionsTriggeredExternally
@@ -40,9 +57,98 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
         ?.let { forwardingPlayer } ?: exoPlayer
     }
 
+  /**
+   * ForwardingPlayer that intercepts external player actions and dispatches them to callbacks.
+   *
+   * This class blocks all external media item modifications to delegate control to RNTP. These
+   * overrides prevent media controllers (like Android Auto, notifications) from directly modifying
+   * the queue, ensuring all queue changes go through the RNTP API for proper state management and
+   * event handling.
+   */
+  @UnstableApi
+  private inner class InterceptingPlayer(player: ExoPlayer) : ForwardingPlayer(player) {
+
+    // Block all external media item modifications
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>, resetPosition: Boolean) {
+      return
+    }
+
+    override fun addMediaItems(mediaItems: MutableList<MediaItem>) {
+      return
+    }
+
+    override fun addMediaItems(index: Int, mediaItems: MutableList<MediaItem>) {
+      return
+    }
+
+    override fun setMediaItems(
+      mediaItems: MutableList<MediaItem>,
+      startIndex: Int,
+      startPositionMs: Long,
+    ) {
+      return
+    }
+
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>) {
+      return
+    }
+
+    // Intercept playback controls and dispatch to callbacks or fall back to default behavior
+    override fun play() {
+      callbacks?.onRemotePlay() ?: super.play()
+    }
+
+    override fun pause() {
+      callbacks?.onRemotePause() ?: super.pause()
+    }
+
+    override fun seekToNext() {
+      callbacks?.onRemoteNext() ?: super.seekToNext()
+    }
+
+    override fun seekToNextMediaItem() {
+      callbacks?.onRemoteNext() ?: super.seekToNextMediaItem()
+    }
+
+    override fun seekToPrevious() {
+      callbacks?.onRemotePrevious() ?: super.seekToPrevious()
+    }
+
+    override fun seekToPreviousMediaItem() {
+      callbacks?.onRemotePrevious() ?: super.seekToPreviousMediaItem()
+    }
+
+    override fun seekForward() {
+      callbacks?.let {
+        it.onRemoteJumpForward(RemoteJumpForwardEvent(interval = options.forwardJumpInterval.toDouble()))
+      } ?: super.seekForward()
+    }
+
+    override fun seekBack() {
+      callbacks?.let {
+        it.onRemoteJumpBackward(RemoteJumpBackwardEvent(interval = options.backwardJumpInterval.toDouble()))
+      } ?: super.seekBack()
+    }
+
+    override fun stop() {
+      callbacks?.onRemoteStop() ?: super.stop()
+    }
+
+    override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
+      callbacks?.let {
+        it.onRemoteSeek(RemoteSeekEvent(position = positionMs.toDouble() / 1000.0))
+      } ?: super.seekTo(mediaItemIndex, positionMs)
+    }
+
+    override fun seekTo(positionMs: Long) {
+      callbacks?.let {
+        it.onRemoteSeek(RemoteSeekEvent(position = positionMs.toDouble() / 1000.0))
+      } ?: super.seekTo(positionMs)
+    }
+  }
+
   private var playerListener: PlayerListener
   private var cache: SimpleCache? = null
-  val events = PlayerEvents()
 
   private val progressUpdateManager: PlaybackProgressUpdateManager by lazy {
     PlaybackProgressUpdateManager { handleProgressUpdate() }
@@ -73,11 +179,69 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
         index = currentIndex,
         track = currentTrack,
       )
-    events.currentTrackChange.emit(event)
+    callbacks?.onPlaybackActiveTrackChanged(event)
 
     // Update last track info for next transition
     lastTrack = currentTrack
     lastIndex = currentIndex
+  }
+
+  internal fun onTimedMetadata(metadata: androidx.media3.common.Metadata) {
+    callbacks?.onMetadataTimedReceived(metadata)
+
+    // Parse playback metadata from different formats
+    val playbackMetadata =
+      PlaybackMetadata.Companion.fromId3Metadata(metadata)
+        ?: PlaybackMetadata.Companion.fromIcy(metadata)
+        ?: PlaybackMetadata.Companion.fromVorbisComment(metadata)
+        ?: PlaybackMetadata.Companion.fromQuickTime(metadata)
+
+    callbacks?.onPlaybackMetadata(playbackMetadata)
+  }
+
+  internal fun onCommonMetadata(mediaMetadata: androidx.media3.common.MediaMetadata) {
+    val metadata = MetadataAdapter.Companion.mapFromMediaMetadata(mediaMetadata)
+    // Safe cast: Arguments.createMap() returns WritableMap which extends ReadableMap
+    (metadata as? WritableMap)?.let { callbacks?.onMetadataCommonReceived(it) }
+  }
+
+  internal fun onPlayWhenReadyChanged(playWhenReady: Boolean, pausedBecauseReachedEnd: Boolean) {
+    callbacks?.onPlaybackPlayWhenReadyChanged(PlaybackPlayWhenReadyChangedEvent(playWhenReady))
+  }
+
+  internal fun onPlaybackError(playbackError: com.doublesymmetry.trackplayer.event.PlaybackError) {
+    val event =
+      PlaybackErrorEvent(
+        code = playbackError.code ?: "UNKNOWN_ERROR",
+        message = playbackError.message ?: "An unknown error occurred"
+      )
+    callbacks?.onPlaybackError(event)
+  }
+
+  internal fun onControllerConnected(
+    controllerData: com.doublesymmetry.trackplayer.event.EventControllerConnection
+  ) {
+    val event =
+      ControllerConnectedEvent(
+        `package` = controllerData.packageName,
+        isMediaNotificationController = controllerData.isMediaNotificationController,
+        isAutomotiveController = controllerData.isAutomotiveController,
+        isAutoCompanionController = controllerData.isAutoCompanionController,
+      )
+    callbacks?.onControllerConnected(event)
+  }
+
+  internal fun onControllerDisconnected(packageName: String) {
+    callbacks?.onControllerDisconnected(ControllerDisconnectedEvent(`package` = packageName))
+  }
+
+  internal fun onRatingChanged(rating: Any) {
+    if (rating is androidx.media3.common.Rating) {
+      RatingType.fromString(rating.toString())?.let { ratingType ->
+        val event = RemoteSetRatingEvent(rating = ratingType)
+        callbacks?.onRemoteSetRating(event)
+      } ?: timber.log.Timber.w("Failed to convert rating: $rating")
+    }
   }
 
   var playWhenReady: Boolean
@@ -207,7 +371,7 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
     if (options.cacheSizeKb > 0) {
       cache = PlayerCache.initCache(context, options.cacheSizeKb)
     }
-    events.stateChange.emit(PlaybackState(State.NONE))
+    callbacks?.onPlaybackState(PlaybackState(State.NONE))
 
     val renderer = DefaultRenderersFactory(context)
     renderer.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
@@ -250,7 +414,7 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
         .setContentType(options.audioContentType.toExoPlayer())
         .build()
     exoPlayer.setAudioAttributes(audioAttributes, true)
-    forwardingPlayer = ForwardingPlayer(exoPlayer, events)
+    forwardingPlayer = InterceptingPlayer(exoPlayer)
     playerListener = PlayerListener(this)
     player.addListener(playerListener)
   }
@@ -460,12 +624,28 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
    * Updates the player state and emits a state change event if the state has changed. Only emits an
    * event if the new state differs from the current state.
    *
+   * IMPORTANT: This method also triggers the queue ended event when the player reaches State.ENDED
+   * and is on the last track. All state transitions should go through this method to ensure proper
+   * event dispatching. Direct assignments to playerState will bypass event emission.
+   *
    * @param state The new player state to set
    */
   internal fun setPlayerState(state: State) {
     if (state != playerState) {
       playerState = state
-      events.stateChange.emit(PlaybackState(state, playbackError))
+      val playbackState = PlaybackState(state, playbackError)
+      callbacks?.onPlaybackState(playbackState)
+
+      // Emit queue ended event when playback ends on the last track
+      // This coupling ensures queue ended events are always triggered consistently with state
+      // changes
+      if (state == State.ENDED && isLastTrack) {
+        currentIndex?.let { index ->
+          val event = PlaybackQueueEndedEvent(track = index, position = position.toSeconds())
+          callbacks?.onPlaybackQueueEnded(event)
+        }
+      }
+
       progressUpdateManager.onPlaybackStateChanged(state)
     }
   }
@@ -479,9 +659,7 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
     progressUpdateManager.setUpdateInterval(interval)
   }
 
-  /**
-   * Handles progress updates by emitting a progress event.
-   */
+  /** Handles progress updates by emitting a progress event. */
   private fun handleProgressUpdate() {
     val index = currentIndex ?: return
     val event =
@@ -491,7 +669,7 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
         buffered = bufferedPosition.toSeconds(),
         track = index,
       )
-    events.progressUpdate.emit(event)
+    callbacks?.onPlaybackProgressUpdated(event)
   }
 
   /**

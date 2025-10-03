@@ -39,8 +39,8 @@ data class TrackPlayerOptions(
 
       val capabilities =
         map.getArray("capabilities")?.let { arr ->
-          (0 until arr.size()).map { index ->
-            val value = arr.getString(index)
+          (0 until arr.size()).mapNotNull { index ->
+            val value = arr.getString(index) ?: return@mapNotNull null
             PlayerCapability.fromString(value)
               ?: throw IllegalArgumentException("Invalid capability value: $value")
           }
@@ -48,8 +48,8 @@ data class TrackPlayerOptions(
 
       val notificationCapabilities =
         map.getArray("notificationCapabilities")?.let { arr ->
-          (0 until arr.size()).map { index ->
-            val value = arr.getString(index)
+          (0 until arr.size()).mapNotNull { index ->
+            val value = arr.getString(index) ?: return@mapNotNull null
             PlayerCapability.fromString(value)
               ?: throw IllegalArgumentException("Invalid notificationCapability value: $value")
           }
@@ -125,6 +125,8 @@ data class TrackPlayerOptions(
       interceptPlayerActionsTriggeredExternally = true,
       skipSilence = skipSilence ?: false,
       wakeMode = wakeMode,
+      forwardJumpInterval = forwardJumpInterval,
+      backwardJumpInterval = backwardJumpInterval,
     )
   }
 }

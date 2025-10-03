@@ -7,11 +7,8 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import com.doublesymmetry.trackplayer.TrackPlayer
-import com.doublesymmetry.trackplayer.event.AudioItemTransition
-import com.doublesymmetry.trackplayer.event.AudioItemTransitionReason
-import com.doublesymmetry.trackplayer.event.PlayWhenReadyChange
 import com.doublesymmetry.trackplayer.event.PlaybackError
-import com.doublesymmetry.trackplayer.event.PositionChangedReason
+import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
 import com.doublesymmetry.trackplayer.model.State
 import java.util.Locale
 
@@ -19,11 +16,11 @@ import java.util.Locale
 class PlayerListener(private val trackPlayer: TrackPlayer) : Player.Listener {
   /** Called when there is metadata associated with the current playback time. */
   override fun onMetadata(metadata: Metadata) {
-    trackPlayer.events.onTimedMetadata.emit(metadata)
+    trackPlayer.onTimedMetadata(metadata)
   }
 
   override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
-    trackPlayer.events.onCommonMetadata.emit(mediaMetadata)
+    trackPlayer.onCommonMetadata(mediaMetadata)
   }
 
   /**
@@ -37,38 +34,7 @@ class PlayerListener(private val trackPlayer: TrackPlayer) : Player.Listener {
     reason: Int,
   ) {
     trackPlayer.oldPosition = oldPosition.positionMs
-
-    when (reason) {
-      Player.DISCONTINUITY_REASON_AUTO_TRANSITION ->
-        trackPlayer.events.positionChanged.emit(
-          PositionChangedReason.AUTO(oldPosition.positionMs, newPosition.positionMs)
-        )
-      Player.DISCONTINUITY_REASON_SEEK ->
-        trackPlayer.events.positionChanged.emit(
-          PositionChangedReason.SEEK(oldPosition.positionMs, newPosition.positionMs)
-        )
-      Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT ->
-        trackPlayer.events.positionChanged.emit(
-          PositionChangedReason.SEEK_FAILED(oldPosition.positionMs, newPosition.positionMs)
-        )
-      Player.DISCONTINUITY_REASON_REMOVE ->
-        trackPlayer.events.positionChanged.emit(
-          PositionChangedReason.QUEUE_CHANGED(oldPosition.positionMs, newPosition.positionMs)
-        )
-      Player.DISCONTINUITY_REASON_SKIP ->
-        trackPlayer.events.positionChanged.emit(
-          PositionChangedReason.SKIPPED_PERIOD(oldPosition.positionMs, newPosition.positionMs)
-        )
-      Player.DISCONTINUITY_REASON_INTERNAL ->
-        trackPlayer.events.positionChanged.emit(
-          PositionChangedReason.UNKNOWN(oldPosition.positionMs, newPosition.positionMs)
-        )
-
-      Player.DISCONTINUITY_REASON_SILENCE_SKIP ->
-        trackPlayer.events.positionChanged.emit(
-          PositionChangedReason.UNKNOWN(oldPosition.positionMs, newPosition.positionMs)
-        )
-    }
+    // Position discontinuity events are not currently exposed to callbacks
   }
 
   /**
@@ -78,29 +44,7 @@ class PlayerListener(private val trackPlayer: TrackPlayer) : Player.Listener {
    */
   override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
     val lastPosition = trackPlayer.oldPosition.toSeconds()
-
-    when (reason) {
-      Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ->
-        trackPlayer.events.audioItemTransition.emit(
-          AudioItemTransition(AudioItemTransitionReason.AUTO, trackPlayer.oldPosition)
-        )
-      Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED ->
-        trackPlayer.events.audioItemTransition.emit(
-          AudioItemTransition(AudioItemTransitionReason.QUEUE_CHANGED, trackPlayer.oldPosition)
-        )
-      Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT ->
-        trackPlayer.events.audioItemTransition.emit(
-          AudioItemTransition(AudioItemTransitionReason.REPEAT, trackPlayer.oldPosition)
-        )
-      Player.MEDIA_ITEM_TRANSITION_REASON_SEEK ->
-        trackPlayer.events.audioItemTransition.emit(
-          AudioItemTransition(
-            AudioItemTransitionReason.SEEK_TO_ANOTHER_AUDIO_ITEM,
-            trackPlayer.oldPosition,
-          )
-        )
-    }
-
+    // Audio item transition events are not currently exposed to callbacks
     // Emit active track changed event with last track info
     trackPlayer.emitActiveTrackChanged(lastPosition)
   }
@@ -108,9 +52,7 @@ class PlayerListener(private val trackPlayer: TrackPlayer) : Player.Listener {
   /** Called when the value returned from Player.getPlayWhenReady() changes. */
   override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
     val pausedBecauseReachedEnd = reason == Player.PLAY_WHEN_READY_CHANGE_REASON_END_OF_MEDIA_ITEM
-    trackPlayer.events.playWhenReadyChange.emit(
-      PlayWhenReadyChange(playWhenReady, pausedBecauseReachedEnd)
-    )
+    trackPlayer.onPlayWhenReadyChanged(playWhenReady, pausedBecauseReachedEnd)
   }
 
   /**
@@ -179,7 +121,7 @@ class PlayerListener(private val trackPlayer: TrackPlayer) : Player.Listener {
           .replace("_", "-"),
         error.message,
       )
-    trackPlayer.events.playbackError.emit(playbackError)
+    trackPlayer.onPlaybackError(playbackError)
     trackPlayer.playbackError = playbackError
     trackPlayer.setPlayerState(State.ERROR)
   }

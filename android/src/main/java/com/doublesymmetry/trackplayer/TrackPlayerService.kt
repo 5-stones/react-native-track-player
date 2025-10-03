@@ -103,7 +103,7 @@ class TrackPlayerService : HeadlessJsMediaService() {
     return START_STICKY
   }
 
-  fun setupPlayer(playerOptionsData: TrackPlayerOptions) {
+  fun setupPlayer(playerOptionsData: TrackPlayerOptions, callbacks: TrackPlayerCallbacks? = null) {
     // Check if player has already been configured (not the temporary initial player)
     if (temporaryPlayer == null) {
       print("Player setup already completed. Preventing reinitialization.")
@@ -114,7 +114,7 @@ class TrackPlayerService : HeadlessJsMediaService() {
     val options = playerOptionsData.toPlayerOptions()
     val oldPlayer = player
     // Replace temporary player with properly configured one
-    player = TrackPlayer(this@TrackPlayerService, options)
+    player = TrackPlayer(this@TrackPlayerService, options, callbacks)
     oldPlayer.destroy()
     temporaryPlayer = null
     mediaSession.player = player.forwardingPlayer
@@ -299,7 +299,7 @@ class TrackPlayerService : HeadlessJsMediaService() {
     // ATM I only care that andorid auto still functions.
 
     override fun onDisconnected(session: MediaSession, controller: MediaSession.ControllerInfo) {
-      player.events.onControllerDisconnected.emit(controller.packageName)
+      player.onControllerDisconnected(controller.packageName)
       super.onDisconnected(session, controller)
     }
 
@@ -313,7 +313,7 @@ class TrackPlayerService : HeadlessJsMediaService() {
       val isMediaNotificationController = session.isMediaNotificationController(controller)
       val isAutomotiveController = session.isAutomotiveController(controller)
       val isAutoCompanionController = session.isAutoCompanionController(controller)
-      player.events.onControllerConnected.emit(
+      player.onControllerConnected(
         EventControllerConnection(
           packageName = controller.packageName,
           isMediaNotificationController = isMediaNotificationController,
@@ -381,7 +381,7 @@ class TrackPlayerService : HeadlessJsMediaService() {
       controller: MediaSession.ControllerInfo,
       rating: Rating,
     ): ListenableFuture<SessionResult> {
-      player.events.onRatingChanged.emit(rating)
+      player.onRatingChanged(rating)
       return super.onSetRating(session, controller, rating)
     }
   }
