@@ -12,9 +12,10 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.legacy.RatingCompat
-import com.doublesymmetry.trackplayer.event.AudioPlayerState
+import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackError
-import com.doublesymmetry.trackplayer.event.PlaybackState
+import com.doublesymmetry.trackplayer.model.PlaybackState
+import com.doublesymmetry.trackplayer.model.State
 import com.doublesymmetry.trackplayer.model.Track
 import com.doublesymmetry.trackplayer.option.PlayerOptions
 import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
@@ -41,14 +42,36 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
   private var cache: SimpleCache? = null
   val events = PlayerEvents()
 
-  val currentItem: Track?
+  val currentTrack: Track?
     get() = exoPlayer.currentMediaItem?.let { Track.fromMediaItem(it) }
+
+  private var lastTrack: Track? = null
+  private var lastIndex: Int? = null
 
   var playbackError: PlaybackError? = null
     internal set
 
-  internal var playerState: AudioPlayerState = AudioPlayerState.IDLE
+  internal var playerState: State = State.NONE
     private set
+
+  fun getPlaybackState(): PlaybackState {
+    return PlaybackState(playerState, playbackError)
+  }
+
+  internal fun emitActiveTrackChanged(lastPosition: Double) {
+    val event = PlaybackActiveTrackChangedEvent(
+      lastIndex = lastIndex,
+      lastTrack = lastTrack,
+      lastPosition = lastPosition,
+      index = currentIndex,
+      track = currentTrack
+    )
+    events.currentTrackChange.emit(event)
+
+    // Update last track info for next transition
+    lastTrack = currentTrack
+    lastIndex = currentIndex
+  }
 
   var playWhenReady: Boolean
     get() = exoPlayer.playWhenReady
@@ -119,27 +142,28 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
       exoPlayer.shuffleModeEnabled = v
     }
 
-  val items: List<Track>
+  val trackCount: Int
+    get() = exoPlayer.mediaItemCount
+
+  val isEmpty: Boolean
+    get() = exoPlayer.mediaItemCount == 0
+
+  val tracks: List<Track>
     get() =
       (0 until exoPlayer.mediaItemCount).map { index ->
         Track.fromMediaItem(exoPlayer.getMediaItemAt(index))
       }
 
-  val nextItem: Track?
-    get() {
-      val nextIndex = exoPlayer.currentMediaItemIndex + 1
-      return if (nextIndex < exoPlayer.mediaItemCount)
-        Track.fromMediaItem(exoPlayer.getMediaItemAt(nextIndex))
-      else null
-    }
+  val isLastTrack: Boolean
+    get() = exoPlayer.currentMediaItemIndex == exoPlayer.mediaItemCount - 1
 
   /**
-   * Get item at index with bounds checking.
+   * Get track at index with bounds checking.
    *
-   * @param index The index of the item to retrieve.
+   * @param index The index of the track to retrieve.
    * @throws IllegalArgumentException if index is out of bounds.
    */
-  fun getItem(index: Int): Track {
+  fun getTrack(index: Int): Track {
     if (index < 0 || index >= exoPlayer.mediaItemCount) {
       throw IllegalArgumentException(
         "Track index $index is out of bounds (size: ${exoPlayer.mediaItemCount})"
@@ -176,7 +200,7 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
     if (options.cacheSizeKb > 0) {
       cache = PlayerCache.initCache(context, options.cacheSizeKb)
     }
-    events.stateChange.emit(PlaybackState(AudioPlayerState.IDLE))
+    events.stateChange.emit(PlaybackState(State.NONE))
 
     val renderer = DefaultRenderersFactory(context)
     renderer.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
@@ -225,83 +249,89 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
   }
 
   /**
-   * Loads a track into the player. If there is a current item, it will be replaced. If the queue is
+   * Loads a track into the player. If there is a current track, it will be replaced. If the queue is
    * empty, the track will be added.
    *
-   * @param item The [Track] to load.
+   * @param track The [Track] to load.
    */
-  fun load(item: Track) {
+  fun load(track: Track) {
     if (exoPlayer.mediaItemCount == 0) {
-      add(item)
+      add(track)
     } else {
       val index = exoPlayer.currentMediaItemIndex
-      replaceItem(index, item)
+      replaceTrack(index, track)
       exoPlayer.seekTo(index, C.TIME_UNSET)
       exoPlayer.prepare()
     }
   }
 
   /**
-   * Add a single item to the queue. If the AudioPlayer has no item loaded, it will load the `item`.
+   * Add a single track to the queue. If the AudioPlayer has no track loaded, it will load the `track`.
    *
-   * @param item The [Track] to add.
+   * @param track The [Track] to add.
    */
-  fun add(item: Track) {
-    val mediaSource = item.toMediaItem()
+  fun add(track: Track) {
+    val mediaSource = track.toMediaItem()
     exoPlayer.addMediaItem(mediaSource)
     exoPlayer.prepare()
   }
 
   /**
-   * Add multiple items to the queue. If the AudioPlayer has no item loaded, it will load the first
-   * item in the list.
+   * Add multiple tracks to the queue. If the AudioPlayer has no track loaded, it will load the first
+   * track in the list.
    *
-   * @param items The [Track]s to add.
+   * @param tracks The [Track]s to add.
    */
-  fun add(items: List<Track>) {
-    val mediaItems = items.map { it.toMediaItem() }
+  fun add(tracks: List<Track>) {
+    val mediaItems = tracks.map { it.toMediaItem() }
     exoPlayer.addMediaItems(mediaItems)
     exoPlayer.prepare()
   }
 
   /**
-   * Add multiple items to the queue.
+   * Add multiple tracks to the queue.
    *
-   * @param items The [Track]s to add.
-   * @param atIndex Index to insert items at, if no items loaded this will not automatically start
-   *   playback.
+   * @param tracks The [Track]s to add.
+   * @param atIndex Index to insert tracks at. Use -1 to append to the end of the queue.
+   * @throws IllegalArgumentException if index is out of bounds.
    */
-  fun add(items: List<Track>, atIndex: Int) {
-    val mediaItems = items.map { it.toMediaItem() }
-    exoPlayer.addMediaItems(atIndex, mediaItems)
+  fun add(tracks: List<Track>, atIndex: Int) {
+    validateInsertIndex(atIndex)
+    val index = if (atIndex == -1) exoPlayer.mediaItemCount else atIndex
+    val mediaItems = tracks.map { it.toMediaItem() }
+    exoPlayer.addMediaItems(index, mediaItems)
     exoPlayer.prepare()
   }
 
   /**
-   * Remove an item from the queue.
+   * Remove a track from the queue.
    *
-   * @param index The index of the item to remove.
+   * @param index The index of the track to remove.
+   * @throws IllegalArgumentException if index is out of bounds.
    */
   fun remove(index: Int) {
+    validateIndex(index)
     exoPlayer.removeMediaItem(index)
   }
 
   /**
-   * Remove items from the queue.
+   * Remove tracks from the queue.
    *
-   * @param indexes The indexes of the items to remove.
+   * @param indexes The indexes of the tracks to remove.
+   * @throws IllegalArgumentException if any index is out of bounds or if duplicate indexes are provided.
    */
   fun remove(indexes: List<Int>) {
-    val sorted = indexes.toMutableList()
-    // Sort the indexes in descending order so we can safely remove them one by one
-    // without having the next index possibly newly pointing to another item than intended:
-    sorted.sortDescending()
-    sorted.forEach { remove(it) }
+    if (indexes.toSet().size != indexes.size) {
+      throw IllegalArgumentException("Duplicate indexes provided")
+    }
+    indexes.forEach { validateIndex(it) }
+    val sorted = indexes.sortedDescending()
+    sorted.forEach { exoPlayer.removeMediaItem(it) }
   }
 
   /**
-   * Skip to the next item in the queue, which may depend on the current repeat mode. Does nothing
-   * if there is no next item to skip to.
+   * Skip to the next track in the queue, which may depend on the current repeat mode. Does nothing
+   * if there is no next track to skip to.
    */
   fun next() {
     exoPlayer.seekToNextMediaItem()
@@ -309,8 +339,8 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
   }
 
   /**
-   * Skip to the previous item in the queue, which may depend on the current repeat mode. Does
-   * nothing if there is no previous item to skip to.
+   * Skip to the previous track in the queue, which may depend on the current repeat mode. Does
+   * nothing if there is no previous track to skip to.
    */
   fun previous() {
     exoPlayer.seekToPreviousMediaItem()
@@ -318,40 +348,43 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
   }
 
   /**
-   * Move an item in the queue from one position to another.
+   * Move an track in the queue from one position to another.
    *
-   * @param fromIndex The index of the item to move.
-   * @param toIndex The index to move the item to. If the index is larger than the size of the
-   *   queue, the item is moved to the end of the queue instead.
+   * @param fromIndex The index of the track to move.
+   * @param toIndex The index to move the track to. If the index is larger than the size of the
+   *   queue, the track is moved to the end of the queue instead.
+   * @throws IllegalArgumentException if fromIndex is out of bounds.
    */
   fun move(fromIndex: Int, toIndex: Int) {
+    validateIndex(fromIndex)
     exoPlayer.moveMediaItem(fromIndex, toIndex)
   }
 
   /**
-   * Jump to an item in the queue.
+   * Skips to a track in the queue.
    *
-   * @param index the index to jump to
+   * @param index the index to skip to
+   * @throws IllegalArgumentException if index is out of bounds.
    */
-  fun jumpToItem(index: Int) {
-    try {
-      exoPlayer.seekTo(index, C.TIME_UNSET)
-      exoPlayer.prepare()
-    } catch (e: IllegalSeekPositionException) {
-      throw Error(
-        "This item index $index does not exist. The size of the queue is ${exoPlayer.mediaItemCount} items."
-      )
-    }
+  fun skipTo(index: Int) {
+    validateIndex(index)
+    exoPlayer.seekTo(index, C.TIME_UNSET)
+    exoPlayer.prepare()
   }
 
-  /** Replaces item at index in queue. */
-  fun replaceItem(index: Int, item: Track) {
-    val mediaItem = item.toMediaItem()
+  /**
+   * Replaces track at index in queue.
+   *
+   * @throws IllegalArgumentException if index is out of bounds.
+   */
+  fun replaceTrack(index: Int, track: Track) {
+    validateIndex(index)
+    val mediaItem = track.toMediaItem()
     exoPlayer.replaceMediaItem(index, mediaItem)
   }
 
-  /** Removes all the upcoming items, if any (the ones returned by [next]). */
-  fun removeUpcomingItems() {
+  /** Removes all the upcoming tracks, if any (the ones returned by [next]). */
+  fun removeUpcomingTracks() {
     val index = exoPlayer.currentMediaItemIndex
     if (index == C.INDEX_UNSET) return
     val lastIndex = exoPlayer.mediaItemCount
@@ -362,13 +395,13 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
 
   fun play() {
     exoPlayer.play()
-    if (currentItem != null) {
+    if (currentTrack != null) {
       exoPlayer.prepare()
     }
   }
 
   fun prepare() {
-    if (currentItem != null) {
+    if (currentTrack != null) {
       exoPlayer.prepare()
     }
   }
@@ -378,12 +411,12 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
   }
 
   /**
-   * Stops playback, without clearing the active item. Calling this method will cause the playback
-   * state to transition to AudioPlayerState.IDLE and the player will release the loaded media and
+   * Stops playback, without clearing the active track. Calling this method will cause the playback
+   * state to transition to State.NONE and the player will release the loaded media and
    * resources required for playback.
    */
   fun stop() {
-    playerState = AudioPlayerState.STOPPED
+    playerState = State.STOPPED
     exoPlayer.playWhenReady = false
     exoPlayer.stop()
   }
@@ -404,7 +437,7 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
     cache = null
   }
 
-  fun seek(duration: Long, unit: TimeUnit) {
+  fun seekTo(duration: Long, unit: TimeUnit) {
     val positionMs = TimeUnit.MILLISECONDS.convert(duration, unit)
     exoPlayer.seekTo(positionMs)
   }
@@ -420,10 +453,38 @@ class TrackPlayer(internal val context: Context, val options: PlayerOptions = Pl
    *
    * @param state The new player state to set
    */
-  internal fun setPlayerState(state: AudioPlayerState) {
+  internal fun setPlayerState(state: State) {
     if (state != playerState) {
       playerState = state
       events.stateChange.emit(PlaybackState(state, playbackError))
+    }
+  }
+
+  /**
+   * Validates that an index is within bounds [0, trackCount).
+   *
+   * @param index The index to validate.
+   * @throws IllegalArgumentException if index is out of bounds.
+   */
+  private fun validateIndex(index: Int) {
+    if (index < 0 || index >= exoPlayer.mediaItemCount) {
+      throw IllegalArgumentException(
+        "Track index $index is out of bounds (size: ${exoPlayer.mediaItemCount})"
+      )
+    }
+  }
+
+  /**
+   * Validates that an insertion index is within bounds [0, trackCount] or -1 (append).
+   *
+   * @param index The index to validate.
+   * @throws IllegalArgumentException if index is out of bounds.
+   */
+  private fun validateInsertIndex(index: Int) {
+    if (index < -1 || index > exoPlayer.mediaItemCount) {
+      throw IllegalArgumentException(
+        "Insert index $index is out of bounds (size: ${exoPlayer.mediaItemCount}, use -1 to append)"
+      )
     }
   }
 }

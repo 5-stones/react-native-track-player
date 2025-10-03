@@ -57,7 +57,7 @@ export interface Spec extends TurboModule {
   retry(): void;
 
   // playlist management
-  add(tracks: UnsafeObject[], insertBeforeIndex?: number): number;
+  add(tracks: UnsafeObject[], insertBeforeIndex?: number): void;
   move(fromIndex: number, toIndex: number): void;
   remove(indexes: number[]): void;
   removeUpcomingTracks(): void;

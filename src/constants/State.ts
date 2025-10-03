@@ -1,7 +1,7 @@
 export enum State {
-  /** Indicates that no media is currently loaded */
+  /** Indicates that the player is idle (initial state, or no track loaded) */
   None = 'none',
-  /** Indicates that the player is paused, but ready to start playing */
+  /** Indicates that the player has loaded a track and is ready to play (but paused) */
   Ready = 'ready',
   /** Indicates that the player is currently playing */
   Playing = 'playing',

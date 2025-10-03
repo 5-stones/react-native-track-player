@@ -121,10 +121,7 @@ export function addEventListener<T extends Event>(
  * @param insertBeforeIndex (Optional) The index to insert the tracks before.
  * By default the tracks will be added to the end of the queue.
  */
-export function add(
-  tracks: AddTrack[],
-  insertBeforeIndex?: number
-): number | void;
+export function add(tracks: AddTrack[], insertBeforeIndex?: number): void;
 /**
  * Adds a track to the queue.
  *
@@ -132,15 +129,15 @@ export function add(
  * @param insertBeforeIndex (Optional) The index to insert the track before.
  * By default the track will be added to the end of the queue.
  */
-export function add(track: AddTrack, insertBeforeIndex?: number): number | void;
+export function add(track: AddTrack, insertBeforeIndex?: number): void;
 export function add(
   tracks: AddTrack | AddTrack[],
   insertBeforeIndex = -1
-): number | void {
+): void {
   const addTracks = Array.isArray(tracks) ? tracks : [tracks];
-  return addTracks.length < 1
-    ? undefined
-    : TrackPlayer.add(addTracks.map(resolveTrackAssets), insertBeforeIndex);
+  if (addTracks.length > 0) {
+    TrackPlayer.add(addTracks.map(resolveTrackAssets), insertBeforeIndex);
+  }
 }
 
 /**
@@ -148,8 +145,8 @@ export function add(
  *
  * @param track The track to load.
  */
-export function load(track: Track): number | void {
-  return TrackPlayer.load(resolveTrackAssets(track));
+export function load(track: Track): void {
+  TrackPlayer.load(resolveTrackAssets(track));
 }
 
 /**
@@ -160,7 +157,7 @@ export function load(track: Track): number | void {
  * the size of the queue, then the track is moved to the end of the queue.
  */
 export function move(fromIndex: number, toIndex: number): void {
-  return TrackPlayer.move(fromIndex, toIndex);
+  TrackPlayer.move(fromIndex, toIndex);
 }
 
 /**
@@ -184,7 +181,7 @@ export function remove(indexes: number[]): void;
  */
 export function remove(index: number): void;
 export function remove(indexOrIndexes: number | number[]): void {
-  return TrackPlayer.remove(
+  TrackPlayer.remove(
     Array.isArray(indexOrIndexes) ? indexOrIndexes : [indexOrIndexes]
   );
 }
@@ -193,7 +190,7 @@ export function remove(indexOrIndexes: number | number[]): void {
  * Clears any upcoming tracks from the queue.
  */
 export function removeUpcomingTracks(): void {
-  return TrackPlayer.removeUpcomingTracks();
+  TrackPlayer.removeUpcomingTracks();
 }
 
 /**
@@ -203,7 +200,7 @@ export function removeUpcomingTracks(): void {
  * @param initialPosition (Optional) The initial position to seek to in seconds.
  */
 export function skip(index: number, initialPosition = -1): void {
-  return TrackPlayer.skip(index, initialPosition);
+  TrackPlayer.skip(index, initialPosition);
 }
 
 /**
@@ -212,7 +209,7 @@ export function skip(index: number, initialPosition = -1): void {
  * @param initialPosition (Optional) The initial position to seek to in seconds.
  */
 export function skipToNext(initialPosition = -1): void {
-  return TrackPlayer.skipToNext(initialPosition);
+  TrackPlayer.skipToNext(initialPosition);
 }
 
 /**
@@ -221,7 +218,7 @@ export function skipToNext(initialPosition = -1): void {
  * @param initialPosition (Optional) The initial position to seek to in seconds.
  */
 export function skipToPrevious(initialPosition = -1): void {
-  return TrackPlayer.skipToPrevious(initialPosition);
+  TrackPlayer.skipToPrevious(initialPosition);
 }
 
 // MARK: - Control Center / Notifications API
@@ -233,7 +230,7 @@ export function skipToPrevious(initialPosition = -1): void {
  * @see https://rntp.dev/docs/api/functions/player#updateoptionsoptions
  */
 export function updateOptions(options: UpdateOptions = {}): void {
-  return TrackPlayer.updateOptions({
+  TrackPlayer.updateOptions({
     ...options,
     android: {
       ...options.android,
@@ -252,7 +249,7 @@ export function updateMetadataForTrack(
   trackIndex: number,
   metadata: TrackMetadataBase
 ): void {
-  return TrackPlayer.updateMetadataForTrack(trackIndex, {
+  TrackPlayer.updateMetadataForTrack(trackIndex, {
     ...metadata,
     artwork: resolveImportedAssetOrPath(metadata.artwork),
   });
@@ -263,7 +260,7 @@ export function updateMetadataForTrack(
  * without affecting the data stored for the current track.
  */
 export function updateNowPlayingMetadata(metadata: NowPlayingMetadata): void {
-  return TrackPlayer.updateNowPlayingMetadata({
+  TrackPlayer.updateNowPlayingMetadata({
     ...metadata,
     artwork: resolveImportedAssetOrPath(metadata.artwork),
   });
@@ -275,28 +272,28 @@ export function updateNowPlayingMetadata(metadata: NowPlayingMetadata): void {
  * Resets the player stopping the current track and clearing the queue.
  */
 export function reset(): void {
-  return TrackPlayer.reset();
+  TrackPlayer.reset();
 }
 
 /**
  * Plays or resumes the current track.
  */
 export function play(): void {
-  return TrackPlayer.play();
+  TrackPlayer.play();
 }
 
 /**
  * Pauses the current track.
  */
 export function pause(): void {
-  return TrackPlayer.pause();
+  TrackPlayer.pause();
 }
 
 /**
  * Stops the current track.
  */
 export function stop(): void {
-  return TrackPlayer.stop();
+  TrackPlayer.stop();
 }
 
 /**
@@ -305,7 +302,7 @@ export function stop(): void {
  * or `TrackPlayer.pause()` when `playWhenReady = false`.
  */
 export function setPlayWhenReady(playWhenReady: boolean): void {
-  return TrackPlayer.setPlayWhenReady(playWhenReady);
+  TrackPlayer.setPlayWhenReady(playWhenReady);
 }
 
 /**
@@ -321,7 +318,7 @@ export function getPlayWhenReady(): boolean {
  * @param position The position to seek to in seconds.
  */
 export function seekTo(position: number): void {
-  return TrackPlayer.seekTo(position);
+  TrackPlayer.seekTo(position);
 }
 
 /**
@@ -330,7 +327,7 @@ export function seekTo(position: number): void {
  * @param offset The time offset to seek by in seconds.
  */
 export function seekBy(offset: number): void {
-  return TrackPlayer.seekBy(offset);
+  TrackPlayer.seekBy(offset);
 }
 
 /**
@@ -339,7 +336,7 @@ export function seekBy(offset: number): void {
  * @param volume The volume as a number between 0 and 1.
  */
 export function setVolume(level: number): void {
-  return TrackPlayer.setVolume(level);
+  TrackPlayer.setVolume(level);
 }
 
 /**
@@ -349,7 +346,7 @@ export function setVolume(level: number): void {
  * 1 would be regular speed, 2 would be double speed etc.
  */
 export function setRate(rate: number): void {
-  return TrackPlayer.setRate(rate);
+  TrackPlayer.setRate(rate);
 }
 
 /**
@@ -359,7 +356,7 @@ export function setRate(rate: number): void {
  * @see https://rntp.dev/docs/api/constants/repeat-mode
  */
 export function setQueue(tracks: Track[]): void {
-  return TrackPlayer.setQueue(tracks.map(resolveTrackAssets));
+  TrackPlayer.setQueue(tracks.map(resolveTrackAssets));
 }
 
 /**
@@ -369,7 +366,7 @@ export function setQueue(tracks: Track[]): void {
  * @see https://rntp.dev/docs/api/constants/repeat-mode
  */
 export function setRepeatMode(mode: RepeatMode): void {
-  return TrackPlayer.setRepeatMode(mode);
+  TrackPlayer.setRepeatMode(mode);
 }
 
 // MARK: - Getters
@@ -452,8 +449,8 @@ export function getRepeatMode(): RepeatMode {
 /**
  * Retries the current item when the playback state is `State.Error`.
  */
-export function retry() {
-  return TrackPlayer.retry();
+export function retry(): void {
+  TrackPlayer.retry();
 }
 
 /**

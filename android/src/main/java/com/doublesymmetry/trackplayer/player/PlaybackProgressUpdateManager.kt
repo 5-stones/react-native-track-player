@@ -1,6 +1,6 @@
 package com.doublesymmetry.trackplayer.player
 
-import com.doublesymmetry.trackplayer.event.AudioPlayerState
+import com.doublesymmetry.trackplayer.model.State
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.delay
@@ -38,18 +38,18 @@ class PlaybackProgressUpdateManager(private val onProgressUpdate: () -> Unit) {
     job = null
   }
 
-  fun onPlaybackStateChanged(state: AudioPlayerState) {
+  fun onPlaybackStateChanged(state: State) {
     when (state) {
       // Start when playback is set to resume (loading, buffering) or playing
-      AudioPlayerState.LOADING,
-      AudioPlayerState.BUFFERING,
-      AudioPlayerState.PLAYING -> start()
+      State.LOADING,
+      State.BUFFERING,
+      State.PLAYING -> start()
 
       // Stop when playback pauses, stops, or errors
-      AudioPlayerState.PAUSED,
-      AudioPlayerState.STOPPED,
-      AudioPlayerState.ENDED,
-      AudioPlayerState.ERROR -> stop()
+      State.PAUSED,
+      State.STOPPED,
+      State.ENDED,
+      State.ERROR -> stop()
 
       // No action for READY, IDLE, NONE
       else -> {}

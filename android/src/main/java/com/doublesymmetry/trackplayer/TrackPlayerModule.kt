@@ -7,12 +7,13 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.support.v4.media.RatingCompat
-import androidx.media3.common.Player
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
-import com.doublesymmetry.trackplayer.event.AudioPlayerState
 import com.doublesymmetry.trackplayer.event.MediaSessionCallback
-import com.doublesymmetry.trackplayer.event.PlaybackState
+import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
+import com.doublesymmetry.trackplayer.event.PlaybackQueueEndedEvent
+import com.doublesymmetry.trackplayer.model.PlaybackState
+import com.doublesymmetry.trackplayer.model.State
 import com.doublesymmetry.trackplayer.event.bridge
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
 import com.doublesymmetry.trackplayer.model.RatingType
@@ -134,13 +135,13 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       this["CAPABILITY_JUMP_BACKWARD"] = PlayerCapability.JUMP_BACKWARD.string
 
       // States
-      this["STATE_NONE"] = AudioPlayerState.IDLE.bridge
-      this["STATE_READY"] = AudioPlayerState.READY.bridge
-      this["STATE_PLAYING"] = AudioPlayerState.PLAYING.bridge
-      this["STATE_PAUSED"] = AudioPlayerState.PAUSED.bridge
-      this["STATE_STOPPED"] = AudioPlayerState.STOPPED.bridge
-      this["STATE_BUFFERING"] = AudioPlayerState.BUFFERING.bridge
-      this["STATE_LOADING"] = AudioPlayerState.LOADING.bridge
+      this["STATE_NONE"] = State.NONE.bridge
+      this["STATE_READY"] = State.READY.bridge
+      this["STATE_PLAYING"] = State.PLAYING.bridge
+      this["STATE_PAUSED"] = State.PAUSED.bridge
+      this["STATE_STOPPED"] = State.STOPPED.bridge
+      this["STATE_BUFFERING"] = State.BUFFERING.bridge
+      this["STATE_LOADING"] = State.LOADING.bridge
 
       // Rating Types
       this["RATING_HEART"] = RatingType.HEART.string
@@ -201,15 +202,10 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     service.updateOptions(options)
   }
 
-  override fun add(data: ReadableArray, insertBeforeIndex: Double?): Double = runBlockingOnMain {
-    val insertBeforeIndexInt = insertBeforeIndex?.toInt() ?: 0
+  override fun add(data: ReadableArray, insertBeforeIndex: Double?): Unit = runBlockingOnMain {
+    val inputIndex = insertBeforeIndex?.toInt() ?: -1
     val tracks = trackFactory.tracksFromBridge(data)
-    if (insertBeforeIndexInt < -1 || insertBeforeIndexInt > player.items.size) {
-      throw Exception("The track index is out of bounds")
-    }
-    val index = if (insertBeforeIndexInt == -1) player.items.size else insertBeforeIndexInt
-    player.add(tracks, index)
-    index.toDouble()
+    player.add(tracks, inputIndex)
   }
 
   override fun load(data: ReadableMap?): Unit = runBlockingOnMain {
@@ -221,24 +217,12 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   override fun remove(data: ReadableArray?) = runBlockingOnMain {
-    val inputIndexes = Arguments.toList(data)
-    if (inputIndexes != null) {
-      val size = player.items.size
-      val indexes: ArrayList<Int> = ArrayList()
-      for (inputIndex in inputIndexes) {
-        val index = if (inputIndex is Int) inputIndex else inputIndex.toString().toInt()
-        if (index < 0 || index >= size) {
-          throw Exception("One or more indexes was out of bounds")
-        }
-        indexes.add(index)
-      }
-      player.remove(indexes)
-    }
+    Arguments.toList(data)?.map { (it as Number).toInt() }?.let { player.remove(it) }
   }
 
   override fun updateMetadataForTrack(index: Double, map: ReadableMap?): Unit = runBlockingOnMain {
     map?.let {
-      val currentTrack = player.getItem(index.toInt())
+      val currentTrack = player.getTrack(index.toInt())
       val updatedTrack =
         currentTrack.updateMetadata(
           title = it.getString("title") ?: currentTrack.title,
@@ -251,18 +235,18 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
           rating = BundleUtils.getRating(it, "rating", player.ratingType) ?: currentTrack.rating,
           mediaId = it.getString("mediaId") ?: currentTrack.mediaId,
         )
-      player.replaceItem(index.toInt(), updatedTrack)
+      player.replaceTrack(index.toInt(), updatedTrack)
     }
   }
 
   override fun updateNowPlayingMetadata(map: ReadableMap?): Unit = runBlockingOnMain {
-    if (player.items.isEmpty()) {
+    if (player.isEmpty) {
       throw Exception("There is no current item in the player")
     }
 
     map?.let {
       val currentIndex = player.currentIndex ?: throw Exception("There is no current track")
-      val currentTrack = player.currentItem ?: throw Exception("There is no current track")
+      val currentTrack = player.currentTrack ?: throw Exception("There is no current track")
       val updatedTrack =
         currentTrack.updateMetadata(
           title = it.getString("title") ?: currentTrack.title,
@@ -275,17 +259,17 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
           rating = BundleUtils.getRating(it, "rating", player.ratingType) ?: currentTrack.rating,
           mediaId = it.getString("mediaId") ?: currentTrack.mediaId,
         )
-      player.replaceItem(currentIndex, updatedTrack)
+      player.replaceTrack(currentIndex, updatedTrack)
     }
   }
 
-  override fun removeUpcomingTracks() = runBlockingOnMain { player.removeUpcomingItems() }
+  override fun removeUpcomingTracks() = runBlockingOnMain { player.removeUpcomingTracks() }
 
   override fun skip(index: Double, initialTime: Double?) = runBlockingOnMain {
-    player.jumpToItem(index.toInt())
+    player.skipTo(index.toInt())
 
     if (initialTime != null && initialTime >= 0) {
-      player.seek((initialTime * 1000).toLong(), TimeUnit.MILLISECONDS)
+      player.seekTo((initialTime * 1000).toLong(), TimeUnit.MILLISECONDS)
     }
   }
 
@@ -293,7 +277,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     player.next()
 
     if (initialTime != null && initialTime >= 0) {
-      player.seek((initialTime * 1000).toLong(), TimeUnit.MILLISECONDS)
+      player.seekTo((initialTime * 1000).toLong(), TimeUnit.MILLISECONDS)
     }
   }
 
@@ -301,7 +285,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     player.previous()
 
     if (initialTime != null && initialTime >= 0) {
-      player.seek((initialTime * 1000).toLong(), TimeUnit.MILLISECONDS)
+      player.seekTo((initialTime * 1000).toLong(), TimeUnit.MILLISECONDS)
     }
   }
 
@@ -318,7 +302,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   override fun stop() = runBlockingOnMain { player.stop() }
 
   override fun seekTo(seconds: Double) = runBlockingOnMain {
-    player.seek((seconds * 1000).toLong(), TimeUnit.MILLISECONDS)
+    player.seekTo((seconds * 1000).toLong(), TimeUnit.MILLISECONDS)
   }
 
   override fun seekBy(offset: Double) = runBlockingOnMain {
@@ -351,14 +335,14 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
 
   override fun getTrack(index: Double): WritableMap? = runBlockingOnMain {
     try {
-      player.getItem(index.toInt()).toBridge()
+      player.getTrack(index.toInt()).toBridge()
     } catch (e: IllegalArgumentException) {
       null
     }
   }
 
   override fun getQueue(): WritableArray = runBlockingOnMain {
-    Arguments.fromList(player.items.map { it.toBridge() })
+    Arguments.fromList(player.tracks.map { it.toBridge() })
   }
 
   override fun setQueue(data: ReadableArray?): Unit = runBlockingOnMain {
@@ -372,7 +356,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     player.currentIndex?.toDouble()
   }
 
-  override fun getActiveTrack(): WritableMap? = runBlockingOnMain { player.currentItem?.toBridge() }
+  override fun getActiveTrack(): WritableMap? = runBlockingOnMain { player.currentTrack?.toBridge() }
 
   override fun getProgress(): WritableMap = runBlockingOnMain {
     Arguments.createMap().let {
@@ -384,7 +368,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   override fun getPlaybackState(): WritableMap = runBlockingOnMain {
-    PlaybackState(player.playerState, player.playbackError).toBridge()
+    player.getPlaybackState().toBridge()
   }
 
   override fun acquireWakeLock() = runBlockingOnMain { service.acquireWakeLock() }
@@ -420,9 +404,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   private inner class PlayerEventObserver {
-    private var lastTrackIndex: Int? = null
-    private var lastTrack: WritableMap? = null
-
     fun observeAll() {
       observeStateChange()
       observeAudioItemTransition()
@@ -449,26 +430,8 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
 
     private fun observeAudioItemTransition() {
       mainScope.launch {
-        player.events.audioItemTransition.collect { transition ->
-          emitOnPlaybackActiveTrackChanged(
-            Arguments.createMap().apply {
-              putDouble("lastPosition", transition.oldPosition.toSeconds())
-
-              // Add last track info if available
-              lastTrackIndex?.let { putInt("lastIndex", it) }
-              lastTrack?.let { putMap("lastTrack", it) }
-
-              // Add current track info
-              player.currentIndex?.let { currentIndex ->
-                putInt("index", currentIndex)
-                player.currentItem?.toBridge()?.let { putMap("track", it) }
-              }
-            }
-          )
-
-          // Update last track info for next transition
-          lastTrackIndex = player.currentIndex
-          lastTrack = player.currentItem?.toBridge()
+        player.events.currentTrackChange.collect { event ->
+          emitOnPlaybackActiveTrackChanged(event.toBridge())
         }
       }
     }
@@ -564,14 +527,13 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     private fun observeQueueEnded() {
       mainScope.launch {
         player.events.stateChange.collect { playbackState ->
-          if (playbackState.state == AudioPlayerState.ENDED && player.nextItem == null) {
+          if (playbackState.state == State.ENDED && player.isLastTrack) {
             player.currentIndex?.let { currentIndex ->
-              emitOnPlaybackQueueEnded(
-                Arguments.createMap().apply {
-                  putInt("track", currentIndex)
-                  putDouble("position", player.position.toSeconds())
-                }
+              val event = PlaybackQueueEndedEvent(
+                track = currentIndex,
+                position = player.position.toSeconds()
               )
+              emitOnPlaybackQueueEnded(event.toBridge())
             }
           }
         }

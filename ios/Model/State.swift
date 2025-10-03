@@ -1,26 +1,48 @@
 //
 //  State.swift
-//  RNTrackPlayer
+//  SwiftAudio
 //
-//  Created by David Chavez on 02.12.21.
+//  Created by Jørgen Henrichsen on 10/03/2018.
+//  Copyright © 2018 Jørgen Henrichsen. All rights reserved.
 //
 
 import Foundation
 
-enum State: String {
-  case none, ready, playing, paused, stopped, buffering, loading, error, ended
+/**
+ The current playback state of the TrackPlayer.
+ */
+public enum State: String {
+  /// An asset is being loaded for playback.
+  case loading
 
-  static func fromPlayerState(state: PlaybackState) -> State {
-    switch state {
-    case .paused: return .paused
-    case .buffering: return .buffering
-    case .idle: return .none
-    case .loading: return .loading
-    case .playing: return .playing
-    case .ready: return .ready
-    case .failed: return .error
-    case .stopped: return .stopped
-    case .ended: return .ended
-    }
+  /// The current track is loaded, and the player is ready to start playing.
+  case ready
+
+  /// The current track is currently buffering and will start playing when
+  /// buffering is complete.
+  case buffering
+
+  /// The player is paused.
+  case paused
+
+  /// The player is stopped.
+  case stopped
+
+  /// The player is playing.
+  case playing
+
+  /// No track loaded, the player is stopped.
+  case none
+
+  /// The player stopped playing due to an error.
+  case error
+
+  /// Playback has reached the end.
+  case ended
+}
+
+extension State {
+  var bridge: String {
+    return self.rawValue
   }
 }

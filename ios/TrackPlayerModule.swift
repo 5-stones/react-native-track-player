@@ -48,7 +48,7 @@ public class NativeTrackPlayerImpl: NSObject {
     player.event.receiveCommonMetadata.addListener(self, handleCommonMetadataReceived)
     player.event.stateChange.addListener(self, handleStateChange)
     player.event.fail.addListener(self, handleFailed)
-    player.event.currentTrack.addListener(self, handleCurrentTrackChange)
+    player.event.currentTrack.addListener(self, handleActiveTrackChanged)
     player.event.secondElapse.addListener(self, handleSecondElapse)
     player.event.playWhenReadyChange.addListener(self, handlePlayWhenReadyChange)
   }
@@ -405,30 +405,29 @@ public class NativeTrackPlayerImpl: NSObject {
   }
 
   @objc
-  public func add(trackDicts: [[String: Any]], before trackIndex: NSNumber) -> Int {
-    return onMainThread {
-      guard self.hasInitialized else { return -1 }
+  public func add(tracks: [[String: Any]], before trackIndex: NSNumber) {
+    onMainThread {
+      guard self.hasInitialized else { return }
       // -1 means no index was passed and therefore should be inserted at the end.
       let index = trackIndex.intValue == -1 ? player.tracks.count : trackIndex.intValue
-      guard index >= 0, index <= player.tracks.count else { return -1 }
+      guard index >= 0, index <= player.tracks.count else { return }
 
-      var tracks = [Track]()
-      for trackDict in trackDicts {
-        guard let track = Track.fromBridge(dictionary: trackDict) else { return -1 }
-        tracks.append(track)
+      var trackObjects = [Track]()
+      for trackDict in tracks {
+        guard let track = Track.fromBridge(dictionary: trackDict) else { return }
+        trackObjects.append(track)
       }
 
-      try? player.add(tracks, at: index)
-      return index
+      try? player.add(trackObjects, at: index)
     }
   }
 
   @objc
-  public func load(trackDict: [String: Any]) {
-    guard let track = Track.fromBridge(dictionary: trackDict) else { return }
+  public func load(track: [String: Any]) {
+    guard let trackObject = Track.fromBridge(dictionary: track) else { return }
     ensureMainThread {
       guard self.hasInitialized else { return }
-      self.player.load(track)
+      self.player.load(trackObject)
     }
   }
 
@@ -436,6 +435,13 @@ public class NativeTrackPlayerImpl: NSObject {
   public func remove(tracks indexes: [Int]) {
     ensureMainThread {
       guard self.hasInitialized else { return }
+
+      // Check for duplicates
+      guard Set(indexes).count == indexes.count else {
+        print("Error: Duplicate indexes provided to remove()")
+        return
+      }
+
       // Validate all indexes first
       for index in indexes {
         guard index >= 0, index < self.player.tracks.count else { return }
@@ -444,7 +450,7 @@ public class NativeTrackPlayerImpl: NSObject {
       // Sort the indexes in descending order so we can safely remove them one by one
       // without having the next index possibly newly pointing to another track than intended:
       for index in indexes.sorted().reversed() {
-        try? self.player.removeTrack(index)
+        try? self.player.remove(index)
       }
     }
   }
@@ -455,7 +461,7 @@ public class NativeTrackPlayerImpl: NSObject {
       guard self.hasInitialized else { return }
       guard fromIndex >= 0, fromIndex < self.player.tracks.count else { return }
       guard toIndex >= 0 else { return }
-      try? self.player.moveTrack(fromIndex: fromIndex, toIndex: toIndex)
+      try? self.player.move(fromIndex: fromIndex, toIndex: toIndex)
     }
   }
 
@@ -473,7 +479,7 @@ public class NativeTrackPlayerImpl: NSObject {
       guard self.hasInitialized else { return }
       guard trackIndex >= 0, trackIndex < self.player.tracks.count else { return }
 
-      try? self.player.skipToTrack(
+      try? self.player.skipTo(
         trackIndex,
         playWhenReady: self.player.playerState == .playing
       )
@@ -654,16 +660,16 @@ public class NativeTrackPlayerImpl: NSObject {
   }
 
   @objc
-  public func setQueue(trackDicts: [[String: Any]]) {
+  public func setQueue(tracks: [[String: Any]]) {
     ensureMainThread {
       guard self.hasInitialized else { return }
-      var tracks = [Track]()
-      for trackDict in trackDicts {
+      var trackObjects = [Track]()
+      for trackDict in tracks {
         guard let track = Track.fromBridge(dictionary: trackDict) else { return }
-        tracks.append(track)
+        trackObjects.append(track)
       }
       self.player.clear()
-      try? self.player.add(tracks)
+      try? self.player.add(trackObjects)
     }
   }
 
@@ -708,7 +714,7 @@ public class NativeTrackPlayerImpl: NSObject {
   public func getPlaybackState() -> [String: Any] {
     return onMainThread {
       guard self.hasInitialized else { return [:] }
-      return getPlaybackStateBodyKeyValues(state: player.playerState)
+      return player.getPlaybackState().toBridge()
     }
   }
 
@@ -787,56 +793,18 @@ public class NativeTrackPlayerImpl: NSObject {
     }
   }
 
-  private func getPlaybackStateErrorKeyValues() -> [String: Any] {
-    switch player.playbackError {
-    case .failedToLoadKeyValue: return [
-        "message": "Failed to load resource",
-        "code": "ios_failed_to_load_resource",
-      ]
-    case .invalidSourceUrl: return [
-        "message": "The source url was invalid",
-        "code": "ios_invalid_source_url",
-      ]
-    case .notConnectedToInternet: return [
-        "message": "A network resource was requested, but an internet connection has not been established and can’t be established automatically.",
-        "code": "ios_not_connected_to_internet",
-      ]
-    case .playbackFailed: return [
-        "message": "Playback of the track failed",
-        "code": "ios_playback_failed",
-      ]
-    case .trackWasUnplayable: return [
-        "message": "The track could not be played",
-        "code": "ios_track_unplayable",
-      ]
-    default: return [
-        "message": "A playback error occurred",
-        "code": "ios_playback_error",
-      ]
-    }
-  }
-
-  private func getPlaybackStateBodyKeyValues(state: PlaybackState) -> [String: Any] {
-    var body: [String: Any] = ["state": State.fromPlayerState(state: state).rawValue]
-    if state == PlaybackState.failed {
-      body["error"] = getPlaybackStateErrorKeyValues()
-    }
-    return body
-  }
 
   // MARK: - Player Event Handlers
 
   func handleStateChange(state: PlaybackState) {
     ensureMainThread {
-      self.emit(
-        event: EventType.PlaybackState,
-        body: self.getPlaybackStateBodyKeyValues(state: state)
-      )
-      if state == .ended {
-        self.emit(event: EventType.PlaybackQueueEnded, body: [
-          "track": self.player.currentIndex,
-          "position": self.player.currentTime,
-        ] as [String: Any])
+      self.emit(event: EventType.PlaybackState, body: state.toBridge())
+      if state.state == .ended {
+        let event = PlaybackQueueEndedEvent(
+          track: self.player.currentIndex,
+          position: self.player.currentTime
+        )
+        self.emit(event: EventType.PlaybackQueueEnded, body: event.toBridge())
       }
     }
   }
@@ -860,15 +828,9 @@ public class NativeTrackPlayerImpl: NSObject {
     emit(event: EventType.PlaybackError, body: ["error": error?.localizedDescription])
   }
 
-  func handleCurrentTrackChange(
-    track: Track?,
-    index: Int?,
-    lastTrack: Track?,
-    lastIndex: Int?,
-    lastPosition: Double?
-  ) {
+  func handleActiveTrackChanged(_ event: PlaybackActiveTrackChangedEvent) {
     ensureMainThread {
-      if let track {
+      if let track = event.track {
         UIApplication.shared.beginReceivingRemoteControlEvents()
         // Update now playing controller with isLiveStream option from track
         if self.player.automaticallyUpdateNowPlayingInfo {
@@ -880,27 +842,11 @@ public class NativeTrackPlayerImpl: NSObject {
         UIApplication.shared.endReceivingRemoteControlEvents()
       }
 
-      if (track != nil && lastTrack == nil) || track == nil {
+      if (event.track != nil && event.lastTrack == nil) || event.track == nil {
         self.configureAudioSession()
       }
 
-      var a: [String: Any] = ["lastPosition": lastPosition ?? 0]
-      if let lastIndex {
-        a["lastIndex"] = lastIndex
-      }
-
-      if let lastTrack {
-        a["lastTrack"] = lastTrack.toBridge()
-      }
-
-      if let index {
-        a["index"] = index
-      }
-
-      if let track {
-        a["track"] = track.toBridge()
-      }
-      self.emit(event: EventType.PlaybackActiveTrackChanged, body: a)
+      self.emit(event: EventType.PlaybackActiveTrackChanged, body: event.toBridge())
     }
   }
 
@@ -968,14 +914,14 @@ public extension NativeTrackPlayerImpl {
   @objc(constantsToExport)
   static var constantsToExport: [AnyHashable: Any] {
     return [
-      "STATE_NONE": State.none.rawValue,
-      "STATE_READY": State.ready.rawValue,
-      "STATE_PLAYING": State.playing.rawValue,
-      "STATE_PAUSED": State.paused.rawValue,
-      "STATE_STOPPED": State.stopped.rawValue,
-      "STATE_BUFFERING": State.buffering.rawValue,
-      "STATE_LOADING": State.loading.rawValue,
-      "STATE_ERROR": State.error.rawValue,
+      "STATE_NONE": State.none.bridge,
+      "STATE_READY": State.ready.bridge,
+      "STATE_PLAYING": State.playing.bridge,
+      "STATE_PAUSED": State.paused.bridge,
+      "STATE_STOPPED": State.stopped.bridge,
+      "STATE_BUFFERING": State.buffering.bridge,
+      "STATE_LOADING": State.loading.bridge,
+      "STATE_ERROR": State.error.bridge,
 
       "TRACK_PLAYBACK_ENDED_REASON_END": PlaybackEndedReason.playedUntilEnd.rawValue,
       "TRACK_PLAYBACK_ENDED_REASON_JUMPED": PlaybackEndedReason.jumpedToIndex.rawValue,

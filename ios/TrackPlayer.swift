@@ -60,10 +60,10 @@ public class TrackPlayer {
   }
 
   /**
-   Whether there are more tracks after the current track in the queue.
+   Whether the current track is the last track in the queue.
    */
-  private var hasNextTrack: Bool {
-    currentIndex < tracks.count - 1
+  private var isLastTrack: Bool {
+    currentIndex == tracks.count - 1
   }
 
   // MARK: - AVPlayer Properties (from AVPlayerWrapper)
@@ -148,8 +148,12 @@ public class TrackPlayer {
     attributes: .concurrent
   )
   private(set) var playbackError: TrackPlayerError.PlaybackError?
-  var _state: PlaybackState = .idle
+  var _state: State = .none
   private(set) var lastPlayerTimeControlStatus: AVPlayer.TimeControlStatus = .paused
+
+  public func getPlaybackState() -> PlaybackState {
+    return PlaybackState(state: state, error: playbackError)
+  }
   private var _rate: Float = 1.0
   var _playWhenReady: Bool = false
   var _bufferDuration: TimeInterval = 0
@@ -207,9 +211,9 @@ public class TrackPlayer {
 
   // MARK: - AVPlayer State and Computed Properties
 
-  var state: PlaybackState {
+  var state: State {
     get {
-      var state: PlaybackState!
+      var state: State!
       stateQueue.sync {
         state = _state
       }
@@ -229,7 +233,7 @@ public class TrackPlayer {
 
   var playbackActive: Bool {
     switch state {
-    case .idle, .stopped, .ended, .failed:
+    case .none, .stopped, .ended, .error:
       return false
     default: return true
     }
@@ -279,7 +283,7 @@ public class TrackPlayer {
   /**
    The current state of the underlying `TrackPlayer`.
    */
-  public var playerState: PlaybackState {
+  public var playerState: State {
     state
   }
 
@@ -293,8 +297,8 @@ public class TrackPlayer {
     set {
       let oldValue = _playWhenReady
       _playWhenReady = newValue
-      if newValue == true, state == .failed || state == .stopped {
-        reload(startFromCurrentTime: state == .failed)
+      if newValue == true, state == .error || state == .stopped {
+        reload(startFromCurrentTime: state == .error)
       }
       applyAVPlayerRate()
 
@@ -672,13 +676,13 @@ public class TrackPlayer {
   }
 
   private func playbackFailed(error: TrackPlayerError.PlaybackError) {
-    state = .failed
+    state = .error
     playbackError = error
     handlePlaybackError(error)
   }
 
   func loadAVPlayer() {
-    if state == .failed {
+    if state == .error {
       recreateAVPlayer()
     } else {
       clearCurrentAVItem()
@@ -816,12 +820,12 @@ public class TrackPlayer {
 
   func unloadAVPlayer() {
     clearCurrentAVItem()
-    state = .idle
+    state = .none
   }
 
   // MARK: - Internal Event Handlers
 
-  private func handleStateChange(_ state: PlaybackState) {
+  private func handleStateChange(_ state: State) {
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
       switch state {
@@ -837,7 +841,7 @@ public class TrackPlayer {
         }
       default: break
       }
-      event.stateChange.emit(data: state)
+      event.stateChange.emit(data: PlaybackState(state: state, error: playbackError))
     }
   }
 
@@ -847,7 +851,7 @@ public class TrackPlayer {
 
   private func handlePlaybackError(_ error: Error?) {
     event.fail.emit(data: error)
-    event.playbackEnd.emit(data: .failed)
+    event.playbackEnd.emit(data: .error)
   }
 
   private func handleSeekCompleted(to seconds: Double, didFinish: Bool) {
@@ -883,7 +887,7 @@ public class TrackPlayer {
       event.playbackEnd.emit(data: .playedUntilEnd)
       if repeatMode == .track {
         replay()
-      } else if repeatMode == .queue || hasNextTrack {
+      } else if repeatMode == .queue || !isLastTrack {
         next()
       } else {
         state = .ended
@@ -908,8 +912,8 @@ public class TrackPlayer {
     case .paused:
       let currentState = state
       if asset == nil, currentState != .stopped {
-        state = .idle
-      } else if currentState != .failed, currentState != .stopped {
+        state = .none
+      } else if currentState != .error, currentState != .stopped {
         // Distinguish between external pauses (bluetooth disconnect, interruption) and natural
         // track completion:
         if playWhenReady {
@@ -1011,11 +1015,11 @@ public class TrackPlayer {
    */
   public func add(_ tracks: [Track], playWhenReady: Bool? = nil) {
     handlePlayWhenReady(playWhenReady) {
-      addTracks(tracks)
+      add(tracks)
     }
   }
 
-  private func addTracks(_ newTracks: [Track]) {
+  private func add(_ newTracks: [Track]) {
     assertMainThread()
     guard !newTracks.isEmpty else { return }
     let wasEmpty = tracks.isEmpty
@@ -1101,7 +1105,7 @@ public class TrackPlayer {
    - parameter index: The index of the track to remove.
    - throws: `TrackPlayerError.QueueError`
    */
-  public func removeTrack(_ index: Int) throws {
+  public func remove(_ index: Int) throws {
     assertMainThread()
     try throwIfQueueEmpty()
     try throwIfIndexInvalid(index: index)
@@ -1121,7 +1125,7 @@ public class TrackPlayer {
    - parameter playWhenReady: Optional, whether to start playback when the track is ready.
    - throws: `TrackPlayerError`
    */
-  public func skipToTrack(_ index: Int, playWhenReady: Bool? = nil) throws {
+  public func skipTo(_ index: Int, playWhenReady: Bool? = nil) throws {
     try handlePlayWhenReady(playWhenReady) {
       if index == currentIndex {
         seekTo(0)
@@ -1162,7 +1166,7 @@ public class TrackPlayer {
    - parameter toIndex: The index to move the track to.
    - throws: `TrackPlayerError.QueueError`
    */
-  public func moveTrack(fromIndex: Int, toIndex: Int) throws {
+  public func move(fromIndex: Int, toIndex: Int) throws {
     assertMainThread()
     try throwIfQueueEmpty()
     try throwIfIndexInvalid(index: fromIndex, name: "fromIndex")
@@ -1221,15 +1225,14 @@ public class TrackPlayer {
         event.playbackEnd.emit(data: .cleared)
       }
     }
-    event.currentTrack.emit(
-      data: (
-        track: currentTrack,
-        index: currentIndex == -1 ? nil : currentIndex,
-        lastTrack: lastTrack,
-        lastIndex: lastIndex == -1 ? nil : lastIndex,
-        lastPosition: lastPosition
-      )
+    let eventData = PlaybackActiveTrackChangedEvent(
+      lastIndex: lastIndex == -1 ? nil : lastIndex,
+      lastTrack: lastTrack,
+      lastPosition: lastPosition,
+      index: currentIndex == -1 ? nil : currentIndex,
+      track: currentTrack
     )
+    event.currentTrack.emit(data: eventData)
     lastTrack = currentTrack
     lastIndex = currentIndex
   }

@@ -39,8 +39,8 @@ RCT_EXPORT_MODULE()
 
 
 - (NSNumber *)add:(NSArray *)tracks insertBeforeIndex:(NSNumber *)insertBeforeIndex {
-  NSInteger result = [nativeTrackPlayer addWithTrackDicts:tracks before:insertBeforeIndex];
-  return @(result);
+  [nativeTrackPlayer addWithTracks:tracks before:insertBeforeIndex];
+  return insertBeforeIndex;
 }
 
 - (nonnull facebook::react::ModuleConstants<JS::NativeTrackPlayer::Constants::Builder>)constantsToExport {
@@ -92,7 +92,7 @@ RCT_EXPORT_MODULE()
 }
 
 - (void)load:(NSDictionary *)track {
-  [nativeTrackPlayer loadWithTrackDict:track];
+  [nativeTrackPlayer loadWithTrack:track];
 }
 
 - (void)move:(double)fromIndex toIndex:(double)toIndex {
@@ -136,7 +136,7 @@ RCT_EXPORT_MODULE()
 }
 
 - (void)setQueue:(NSArray *)tracks {
-  [nativeTrackPlayer setQueueWithTrackDicts:tracks];
+  [nativeTrackPlayer setQueueWithTracks:tracks];
 }
 
 - (void)setRate:(double)rate {

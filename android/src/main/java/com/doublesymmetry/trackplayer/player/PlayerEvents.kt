@@ -5,10 +5,11 @@ import androidx.media3.common.Metadata
 import com.doublesymmetry.trackplayer.event.AudioItemTransition
 import com.doublesymmetry.trackplayer.event.EventControllerConnection
 import com.doublesymmetry.trackplayer.event.MediaSessionCallback
+import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
 import com.doublesymmetry.trackplayer.event.PlayWhenReadyChange
 import com.doublesymmetry.trackplayer.event.PlaybackEndedReason
 import com.doublesymmetry.trackplayer.event.PlaybackError
-import com.doublesymmetry.trackplayer.event.PlaybackState
+import com.doublesymmetry.trackplayer.model.PlaybackState
 import com.doublesymmetry.trackplayer.event.PositionChangedReason
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.FlowCollector
@@ -41,6 +42,7 @@ class PlayerEvents {
   val playbackError = event<PlaybackError>(replay = 1)
   val playWhenReadyChange = event<PlayWhenReadyChange>(replay = 1)
   val audioItemTransition = event<AudioItemTransition>(replay = 1)
+  val currentTrackChange = event<PlaybackActiveTrackChangedEvent>(replay = 1)
   val positionChanged = event<PositionChangedReason?>(replay = 1)
   val onCommonMetadata = event<MediaMetadata>(replay = 1)
   val onTimedMetadata = event<Metadata>(replay = 1)

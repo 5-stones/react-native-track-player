@@ -15,5 +15,5 @@ public enum PlaybackEndedReason: String {
   case skippedToPrevious
   case jumpedToIndex
   case cleared
-  case failed
+  case error
 }

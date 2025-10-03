@@ -26,13 +26,7 @@ public extension TrackPlayer {
   typealias MetadataCommonEventData = [AVMetadataItem]
   typealias MetadataTimedEventData = [AVTimedMetadataGroup]
   typealias DidRecreateAVPlayerEventData = Void
-  typealias CurrentTrackEventData = (
-    track: Track?,
-    index: Int?,
-    lastTrack: Track?,
-    lastIndex: Int?,
-    lastPosition: Double?
-  )
+  typealias CurrentTrackEventData = PlaybackActiveTrackChangedEvent
 
   struct EventHolder {
     /**
