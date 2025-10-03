@@ -464,35 +464,32 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
             }
 
             MediaSessionCallback.FORWARD -> {
-              emitOnRemoteJumpForward(
-                Arguments.createMap().apply {
-                  putInt("interval", playerOptions.forwardJumpInterval.toInt())
-                }
+              val eventData = RemoteJumpForwardEvent(
+                interval = playerOptions.forwardJumpInterval.toDouble()
               )
+              emitOnRemoteJumpForward(eventData.toBridge())
             }
 
             MediaSessionCallback.REWIND -> {
-              emitOnRemoteJumpBackward(
-                Arguments.createMap().apply {
-                  putInt("interval", playerOptions.backwardJumpInterval.toInt())
-                }
+              val eventData = RemoteJumpBackwardEvent(
+                interval = playerOptions.backwardJumpInterval.toDouble()
               )
+              emitOnRemoteJumpBackward(eventData.toBridge())
             }
 
             is MediaSessionCallback.RATING -> {
-              emitOnRemoteSetRating(
-                Arguments.createMap().apply {
-                  putString("rating", mediaSessionAction.rating.toString())
-                }
-              )
+              val ratingType = RatingType.fromString(mediaSessionAction.rating.toString())
+              if (ratingType != null) {
+                val eventData = RemoteSetRatingEvent(rating = ratingType)
+                emitOnRemoteSetRating(eventData.toBridge())
+              }
             }
 
             is MediaSessionCallback.SEEK -> {
-              emitOnRemoteSeek(
-                Arguments.createMap().apply {
-                  putDouble("position", mediaSessionAction.positionMs.toDouble() / 1000.0)
-                }
+              val eventData = RemoteSeekEvent(
+                position = mediaSessionAction.positionMs.toDouble() / 1000.0
               )
+              emitOnRemoteSeek(eventData.toBridge())
             }
 
             else -> {} // Handle other actions as needed
@@ -602,17 +599,13 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     private fun observeControllerConnected() {
       mainScope.launch {
         player.events.onControllerConnected.collect { controllerData ->
-          emitOnAndroidControllerConnected(
-            Arguments.createMap().apply {
-              putString("package", controllerData.packageName)
-              putBoolean(
-                "isMediaNotificationController",
-                controllerData.isMediaNotificationController,
-              )
-              putBoolean("isAutomotiveController", controllerData.isAutomotiveController)
-              putBoolean("isAutoCompanionController", controllerData.isAutoCompanionController)
-            }
+          val eventData = ControllerConnectedEvent(
+            `package` = controllerData.packageName,
+            isMediaNotificationController = controllerData.isMediaNotificationController,
+            isAutomotiveController = controllerData.isAutomotiveController,
+            isAutoCompanionController = controllerData.isAutoCompanionController
           )
+          emitOnAndroidControllerConnected(eventData.toBridge())
         }
       }
     }

@@ -243,7 +243,8 @@ public class NativeTrackPlayerImpl: NSObject {
       self.player.remoteCommandController
         .handleChangePlaybackPositionCommand = { [weak self] event in
           if let event = event as? MPChangePlaybackPositionCommandEvent {
-            self?.emit(event: EventType.RemoteSeek, body: ["position": event.positionTime])
+            let eventData = RemoteSeekEvent(position: event.positionTime)
+            self?.emit(event: EventType.RemoteSeek, body: eventData.toBridge())
             return MPRemoteCommandHandlerStatus.success
           }
 
@@ -274,7 +275,8 @@ public class NativeTrackPlayerImpl: NSObject {
         if let command = event.command as? MPSkipIntervalCommand,
            let interval = command.preferredIntervals.first
         {
-          self?.emit(event: EventType.RemoteJumpBackward, body: ["interval": interval])
+          let eventData = RemoteJumpBackwardEvent(interval: interval.doubleValue)
+          self?.emit(event: EventType.RemoteJumpBackward, body: eventData.toBridge())
           return MPRemoteCommandHandlerStatus.success
         }
 
@@ -285,7 +287,8 @@ public class NativeTrackPlayerImpl: NSObject {
         if let command = event.command as? MPSkipIntervalCommand,
            let interval = command.preferredIntervals.first
         {
-          self?.emit(event: EventType.RemoteJumpForward, body: ["interval": interval])
+          let eventData = RemoteJumpForwardEvent(interval: interval.doubleValue)
+          self?.emit(event: EventType.RemoteJumpForward, body: eventData.toBridge())
           return MPRemoteCommandHandlerStatus.success
         }
 
@@ -816,7 +819,11 @@ public class NativeTrackPlayerImpl: NSObject {
   }
 
   func handleFailed(error: Error?) {
-    emit(event: EventType.PlaybackError, body: ["error": error?.localizedDescription])
+    let eventData = PlaybackErrorEvent(
+      code: "playback-error",
+      message: error?.localizedDescription ?? "Unknown error"
+    )
+    emit(event: EventType.PlaybackError, body: eventData.toBridge())
   }
 
   func handleActiveTrackChanged(_ event: PlaybackActiveTrackChangedEvent) {
