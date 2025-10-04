@@ -1,7 +1,7 @@
 import Foundation
 
 public enum TrackPlayerError: Error {
-  public enum PlaybackError: Error {
+  public enum PlaybackError: Error, Equatable {
     case failedToLoadKeyValue
     case invalidSourceUrl(String)
     case notConnectedToInternet
