@@ -6,3 +6,4 @@ export * from './TrackInfo';
 export * from './OptionSheet';
 export * from './ActionSheet';
 export * from './Spacer';
+export * from './PlaybackError';

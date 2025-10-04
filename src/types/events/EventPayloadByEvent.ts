@@ -24,7 +24,7 @@ import type { RemoteSkipEvent } from './RemoteSkipEvent';
 // TODO: implement exhaustive checking
 export type EventPayloadByEvent = {
   [Event.PlaybackState]: PlaybackState;
-  [Event.PlaybackError]: PlaybackErrorEvent;
+  [Event.PlaybackError]: PlaybackErrorEvent | undefined;
   [Event.PlaybackQueueEnded]: PlaybackQueueEndedEvent;
   [Event.PlaybackActiveTrackChanged]: PlaybackActiveTrackChangedEvent;
   [Event.PlaybackPlayWhenReadyChanged]: PlaybackPlayWhenReadyChangedEvent;

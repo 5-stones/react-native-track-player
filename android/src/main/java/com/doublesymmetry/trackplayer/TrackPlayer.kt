@@ -120,13 +120,17 @@ class TrackPlayer(
 
     override fun seekForward() {
       callbacks?.let {
-        it.onRemoteJumpForward(RemoteJumpForwardEvent(interval = options.forwardJumpInterval.toDouble()))
+        it.onRemoteJumpForward(
+          RemoteJumpForwardEvent(interval = options.forwardJumpInterval.toDouble())
+        )
       } ?: super.seekForward()
     }
 
     override fun seekBack() {
       callbacks?.let {
-        it.onRemoteJumpBackward(RemoteJumpBackwardEvent(interval = options.backwardJumpInterval.toDouble()))
+        it.onRemoteJumpBackward(
+          RemoteJumpBackwardEvent(interval = options.backwardJumpInterval.toDouble())
+        )
       } ?: super.seekBack()
     }
 
@@ -135,15 +139,13 @@ class TrackPlayer(
     }
 
     override fun seekTo(mediaItemIndex: Int, positionMs: Long) {
-      callbacks?.let {
-        it.onRemoteSeek(RemoteSeekEvent(position = positionMs.toDouble() / 1000.0))
-      } ?: super.seekTo(mediaItemIndex, positionMs)
+      callbacks?.let { it.onRemoteSeek(RemoteSeekEvent(position = positionMs.toDouble() / 1000.0)) }
+        ?: super.seekTo(mediaItemIndex, positionMs)
     }
 
     override fun seekTo(positionMs: Long) {
-      callbacks?.let {
-        it.onRemoteSeek(RemoteSeekEvent(position = positionMs.toDouble() / 1000.0))
-      } ?: super.seekTo(positionMs)
+      callbacks?.let { it.onRemoteSeek(RemoteSeekEvent(position = positionMs.toDouble() / 1000.0)) }
+        ?: super.seekTo(positionMs)
     }
   }
 
@@ -213,7 +215,7 @@ class TrackPlayer(
     val event =
       PlaybackErrorEvent(
         code = playbackError.code ?: "UNKNOWN_ERROR",
-        message = playbackError.message ?: "An unknown error occurred"
+        message = playbackError.message ?: "An unknown error occurred",
       )
     callbacks?.onPlaybackError(event)
   }
@@ -632,7 +634,15 @@ class TrackPlayer(
    */
   internal fun setPlayerState(state: State) {
     if (state != playerState) {
+      val oldState = playerState
       playerState = state
+
+      // Clear error when transitioning away from error state
+      if (oldState == State.ERROR && state != State.ERROR) {
+        playbackError = null
+        callbacks?.onPlaybackError(PlaybackErrorEvent())
+      }
+
       val playbackState = PlaybackState(state, playbackError)
       callbacks?.onPlaybackState(playbackState)
 

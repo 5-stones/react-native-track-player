@@ -2,23 +2,34 @@ import Foundation
 
 /**
  Event data for playback error.
+ Matches TypeScript interface: { error?: { code: string, message: string } }
  */
 public struct PlaybackErrorEvent {
-  /// The error code.
-  public let code: String
+  /// Optional error details. Nil when error is resolved.
+  public let error: ErrorDetails?
 
-  /// The error message.
-  public let message: String
+  public struct ErrorDetails {
+    public let code: String
+    public let message: String
+  }
 
   public init(code: String, message: String) {
-    self.code = code
-    self.message = message
+    error = ErrorDetails(code: code, message: message)
+  }
+
+  public init() {
+    error = nil
   }
 
   public func toBridge() -> [String: Any] {
-    return [
-      "code": code,
-      "message": message,
-    ]
+    if let error {
+      return [
+        "error": [
+          "code": error.code,
+          "message": error.message,
+        ],
+      ]
+    }
+    return [:]
   }
 }

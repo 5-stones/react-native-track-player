@@ -1,6 +1,9 @@
+/**
+ * Emitted when a playback error occurs.
+ */
 export interface PlaybackErrorEvent {
-  /** The error code */
-  code: string;
-  /** The error message */
-  message: string;
+  error?: {
+    code: string;
+    message: string;
+  };
 }

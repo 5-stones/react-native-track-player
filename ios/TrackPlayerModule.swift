@@ -659,10 +659,14 @@ public class NativeTrackPlayerImpl: NSObject {
   }
 
   func handleFailed(error: Error?) {
-    let eventData = PlaybackErrorEvent(
-      code: "playback-error",
-      message: error?.localizedDescription ?? "Unknown error"
-    )
+    let eventData = if let error {
+      PlaybackErrorEvent(
+        code: "playback-error",
+        message: error.localizedDescription
+      )
+    } else {
+      PlaybackErrorEvent()
+    }
     delegate?.emitPlaybackError(eventData.toBridge())
   }
 

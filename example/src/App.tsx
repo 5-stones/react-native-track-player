@@ -1,3 +1,4 @@
+import Icon from '@react-native-vector-icons/fontawesome6';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,11 +14,11 @@ import {
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useActiveTrack } from 'react-native-track-player';
-import Icon from '@react-native-vector-icons/fontawesome6';
 import {
   ActionSheet,
   Button,
   OptionSheet,
+  PlaybackError,
   PlayerControls,
   Progress,
   Spacer,
@@ -79,6 +80,7 @@ function Player() {
         </View>
         <TrackInfo track={track} />
         <Progress live={track?.isLiveStream} />
+        <PlaybackError />
         <Spacer />
         <PlayerControls />
         <Spacer mode={'expand'} />
