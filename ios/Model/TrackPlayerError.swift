@@ -21,7 +21,7 @@ extension TrackPlayerError.PlaybackError: LocalizedError {
     switch self {
     case .failedToLoadKeyValue:
       return "Failed to load audio track"
-    case .invalidSourceUrl(let url):
+    case let .invalidSourceUrl(url):
       return "Invalid audio source URL: \(url)"
     case .notConnectedToInternet:
       return "No internet connection"
@@ -38,7 +38,7 @@ extension TrackPlayerError.QueueError: LocalizedError {
     switch self {
     case .noCurrentItem:
       return "No current track"
-    case .invalidIndex(let index, let message):
+    case let .invalidIndex(index, message):
       return "Invalid track index \(index): \(message)"
     case .empty:
       return "Queue is empty"

@@ -153,12 +153,12 @@ public class TrackPlayer {
       callbacks?.onPlaybackError(playbackError)
     }
   }
+
   private(set) var lastPlayerTimeControlStatus: AVPlayer.TimeControlStatus = .paused
 
   public func getPlaybackState() -> PlaybackState {
     return PlaybackState(state: state, error: playbackError)
   }
-
 
   /**
    Set this to false to disable automatic updating of now playing info for control center and lock screen.
@@ -218,7 +218,7 @@ public class TrackPlayer {
       assertMainThread()
 
       // Clear error when transitioning away from error state
-      if oldValue == .error && state != .error {
+      if oldValue == .error, state != .error {
         playbackError = nil
       }
 
@@ -379,7 +379,7 @@ public class TrackPlayer {
     callbacks: TrackPlayerCallbacks? = nil
   ) {
     self.nowPlayingInfoController = nowPlayingInfoController
-    self.remoteCommandController = RemoteCommandController(callbacks: callbacks)
+    remoteCommandController = RemoteCommandController(callbacks: callbacks)
     self.callbacks = callbacks
 
     setupAVPlayer()
@@ -852,12 +852,14 @@ public class TrackPlayer {
       switch status {
       case .paused:
         let currentState = state
-        let currentTime = self.currentTime
-        let duration = self.duration
-        // Ignore pauses when near track end - let handleTrackDidPlayToEndTime handle track completion
+        let currentTime = currentTime
+        let duration = duration
+        // Ignore pauses when near track end - let handleTrackDidPlayToEndTime handle track
+        // completion
         let nearTrackEnd = currentTime >= duration - 0.5 && duration > 0
 
-        // Completely ignore pause events when near track end to avoid race with handleTrackDidPlayToEndTime
+        // Completely ignore pause events when near track end to avoid race with
+        // handleTrackDidPlayToEndTime
         if nearTrackEnd {
           // Ignore - track completion will be handled by handleTrackDidPlayToEndTime
         } else if asset == nil, currentState != .stopped {

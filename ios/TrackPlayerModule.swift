@@ -52,7 +52,6 @@ public class NativeTrackPlayerImpl: NSObject {
     reset()
   }
 
-
   // MARK: - Audio Session Interruption Handling
 
   @objc private func handleAudioSessionInterruption(notification: Notification) {
@@ -824,12 +823,12 @@ extension NativeTrackPlayerImpl: TrackPlayerCallbacks {
     handleChapterMetadataReceived(metadata: metadata)
   }
 
-  public func onSeekCompleted(position: Double, didFinish: Bool) {
+  public func onSeekCompleted(position _: Double, didFinish _: Bool) {
     // Seek events are not currently emitted to React Native
     // They could be added if needed
   }
 
-  public func onDurationUpdated(_ duration: Double) {
+  public func onDurationUpdated(_: Double) {
     // Duration updates are not currently emitted to React Native
     // They could be added if needed
   }
@@ -891,7 +890,7 @@ extension NativeTrackPlayerImpl: TrackPlayerCallbacks {
     delegate?.emitRemoteSetRating(["rating": String(describing: rating)])
   }
 
-  public func onRemotePlayId(id: String, index: Int?) {
+  public func onRemotePlayId(id: String, index _: Int?) {
     let event = RemotePlayIdEvent(id: id)
     delegate?.emitRemotePlayId(event.toBridge())
   }

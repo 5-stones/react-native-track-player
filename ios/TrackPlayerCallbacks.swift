@@ -60,7 +60,6 @@ public protocol TrackPlayerCallbacks: AnyObject {
   /// Implementation should check player state and emit appropriate event.
   func onRemotePlayPause()
 
-
   /// Called when next is triggered remotely.
   func onRemoteNext()
 
