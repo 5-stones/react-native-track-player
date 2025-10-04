@@ -153,7 +153,17 @@ class TrackPlayer(
   private var cache: SimpleCache? = null
 
   private val progressUpdateManager: PlaybackProgressUpdateManager by lazy {
-    PlaybackProgressUpdateManager { handleProgressUpdate() }
+    PlaybackProgressUpdateManager {
+      val index = currentIndex ?: return@PlaybackProgressUpdateManager
+      val event =
+        PlaybackProgressUpdatedEvent(
+          position = position.toSeconds(),
+          duration = duration.toSeconds(),
+          buffered = bufferedPosition.toSeconds(),
+          track = index,
+        )
+      callbacks?.onPlaybackProgressUpdated(event)
+    }
   }
 
   val currentTrack: Track?
@@ -667,19 +677,6 @@ class TrackPlayer(
    */
   fun setProgressUpdateInterval(interval: Double?) {
     progressUpdateManager.setUpdateInterval(interval)
-  }
-
-  /** Handles progress updates by emitting a progress event. */
-  private fun handleProgressUpdate() {
-    val index = currentIndex ?: return
-    val event =
-      PlaybackProgressUpdatedEvent(
-        position = position.toSeconds(),
-        duration = duration.toSeconds(),
-        buffered = bufferedPosition.toSeconds(),
-        track = index,
-      )
-    callbacks?.onPlaybackProgressUpdated(event)
   }
 
   /**
