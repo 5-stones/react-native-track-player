@@ -560,6 +560,14 @@ public class NativeTrackPlayerImpl: NSObject {
   }
 
   @objc
+  public func getPlayingState() -> [String: Bool] {
+    return onMainThread {
+      guard self.hasInitialized else { return ["playing": false, "buffering": false] }
+      return player.playingState.toEvent().toBridge()
+    }
+  }
+
+  @objc
   public func updateMetadata(for trackIndex: Int, metadata: [String: Any]) {
     ensureMainThread {
       guard self.hasInitialized else { return }
@@ -709,6 +717,7 @@ public class NativeTrackPlayerImpl: NSObject {
   func emitPlaybackActiveTrackChanged(_ body: [String: Any])
   func emitPlaybackProgressUpdated(_ body: [String: Any])
   func emitPlaybackPlayWhenReadyChanged(_ body: [String: Any])
+  func emitPlaybackPlayingState(_ body: [String: Bool])
   func emitPlaybackQueueEnded(_ body: [String: Any])
   func emitPlaybackError(_ body: [String: Any])
   func emitRemotePlay()
@@ -801,6 +810,10 @@ extension NativeTrackPlayerImpl: TrackPlayerCallbacks {
 
   public func onPlaybackPlayWhenReadyChanged(_ playWhenReady: Bool) {
     handlePlayWhenReadyChange(playWhenReady: playWhenReady)
+  }
+
+  public func onPlaybackPlayingState(_ event: PlaybackPlayingState) {
+    delegate?.emitPlaybackPlayingState(event.toBridge())
   }
 
   public func onPlaybackQueueEnded(_ event: PlaybackQueueEndedEvent) {

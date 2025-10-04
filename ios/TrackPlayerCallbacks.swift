@@ -20,6 +20,9 @@ public protocol TrackPlayerCallbacks: AnyObject {
   /// Called when playWhenReady changes.
   func onPlaybackPlayWhenReadyChanged(_ playWhenReady: Bool)
 
+  /// Called when the playing state changes (playing or buffering flags).
+  func onPlaybackPlayingState(_ event: PlaybackPlayingState)
+
   /// Called when the playback queue ends (player reaches the end of the last track).
   func onPlaybackQueueEnded(_ event: PlaybackQueueEndedEvent)
 

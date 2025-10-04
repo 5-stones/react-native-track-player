@@ -15,6 +15,7 @@ import com.doublesymmetry.trackplayer.event.ControllerDisconnectedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackErrorEvent
 import com.doublesymmetry.trackplayer.event.PlaybackPlayWhenReadyChangedEvent
+import com.doublesymmetry.trackplayer.event.PlaybackPlayingStateEvent
 import com.doublesymmetry.trackplayer.event.PlaybackProgressUpdatedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackQueueEndedEvent
 import com.doublesymmetry.trackplayer.event.RemoteJumpBackwardEvent
@@ -362,6 +363,10 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     player.getPlaybackState().toBridge()
   }
 
+  override fun getPlayingState(): WritableMap = runBlockingOnMain {
+    player.getPlayingState().toBridge()
+  }
+
   override fun acquireWakeLock() = runBlockingOnMain { service.acquireWakeLock() }
 
   override fun abandonWakeLock() = runBlockingOnMain { service.abandonWakeLock() }
@@ -401,6 +406,10 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
 
   override fun onPlaybackPlayWhenReadyChanged(event: PlaybackPlayWhenReadyChangedEvent) {
     emitOnPlaybackPlayWhenReadyChanged(event.toBridge())
+  }
+
+  override fun onPlaybackPlayingState(event: PlaybackPlayingStateEvent) {
+    emitOnPlaybackPlayingState(event.toBridge())
   }
 
   override fun onPlaybackQueueEnded(event: PlaybackQueueEndedEvent) {

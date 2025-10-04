@@ -67,6 +67,10 @@ RCT_EXPORT_MODULE()
   return [nativeTrackPlayer getPlaybackState];
 }
 
+- (NSDictionary *)getPlayingState {
+  return [nativeTrackPlayer getPlayingState];
+}
+
 - (NSDictionary *)getProgress {
   return [nativeTrackPlayer getProgress];
 }
@@ -206,6 +210,10 @@ RCT_EXPORT_MODULE()
 
 - (void)emitPlaybackPlayWhenReadyChanged:(NSDictionary *)body {
   [self emitOnPlaybackPlayWhenReadyChanged:body];
+}
+
+- (void)emitPlaybackPlayingState:(NSDictionary *)body {
+  [self emitOnPlaybackPlayingState:body];
 }
 
 - (void)emitPlaybackQueueEnded:(NSDictionary *)body {

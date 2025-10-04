@@ -1,36 +1,17 @@
-import { State } from '../constants';
 import * as TrackPlayer from '../trackPlayer';
-import { usePlayWhenReady } from './usePlayWhenReady';
-import { usePlaybackState } from './usePlaybackState';
+import { useUpdatedNativeValue } from './useUpdatedNativeValue';
 
 /**
  * Tells whether the TrackPlayer is in a mode that most people would describe
  * as "playing." Great for UI to decide whether to show a Play or Pause button.
- * @returns playing - whether UI should likely show as Playing, or undefined
- *   if this isn't yet known.
- * @returns bufferingDuringPlay - whether UI should show as Buffering, or
- *   undefined if this isn't yet known.
+ * @returns playing - whether UI should likely show as Playing
+ * @returns buffering - whether UI should show as Buffering
  */
 export function useIsPlaying() {
-  const state = usePlaybackState().state;
-  const playWhenReady = usePlayWhenReady();
-  return determineIsPlaying(playWhenReady, state);
-}
-
-function determineIsPlaying(playWhenReady?: boolean, state?: State) {
-  if (playWhenReady === undefined || state === undefined) {
-    return { playing: undefined, bufferingDuringPlay: undefined };
-  }
-
-  const isLoading = state === State.Loading || state === State.Buffering;
-  const isErrored = state === State.Error;
-  const isEnded = state === State.Ended;
-  const isNone = state === State.None;
-
-  return {
-    playing: playWhenReady && !(isErrored || isEnded || isNone),
-    bufferingDuringPlay: playWhenReady && isLoading,
-  };
+  return useUpdatedNativeValue(
+    TrackPlayer.getPlayingState,
+    TrackPlayer.onPlaybackPlayingState
+  );
 }
 
 /**
@@ -41,14 +22,9 @@ function determineIsPlaying(playWhenReady?: boolean, state?: State) {
  * It also exists whenever you need to know the play state outside of a React
  * component, since hooks only work in components.
  *
- * @returns playing - whether UI should likely show as Playing, or undefined
- *   if this isn't yet known.
- * @returns bufferingDuringPlay - whether UI should show as Buffering, or
- *   undefined if this isn't yet known.
+ * @returns playing - whether UI should likely show as Playing
+ * @returns buffering - whether UI should show as Buffering
  */
-export async function isPlaying() {
-  return determineIsPlaying(
-    TrackPlayer.getPlayWhenReady(),
-    TrackPlayer.getPlaybackState().state
-  );
+export function isPlaying() {
+  return TrackPlayer.getPlayingState();
 }

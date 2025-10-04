@@ -6,6 +6,7 @@ import com.doublesymmetry.trackplayer.event.ControllerDisconnectedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackErrorEvent
 import com.doublesymmetry.trackplayer.event.PlaybackPlayWhenReadyChangedEvent
+import com.doublesymmetry.trackplayer.event.PlaybackPlayingStateEvent
 import com.doublesymmetry.trackplayer.event.PlaybackProgressUpdatedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackQueueEndedEvent
 import com.doublesymmetry.trackplayer.event.RemoteJumpBackwardEvent
@@ -26,6 +27,8 @@ interface TrackPlayerCallbacks {
   fun onPlaybackProgressUpdated(event: PlaybackProgressUpdatedEvent)
 
   fun onPlaybackPlayWhenReadyChanged(event: PlaybackPlayWhenReadyChangedEvent)
+
+  fun onPlaybackPlayingState(event: PlaybackPlayingStateEvent)
 
   fun onPlaybackQueueEnded(event: PlaybackQueueEndedEvent)
 

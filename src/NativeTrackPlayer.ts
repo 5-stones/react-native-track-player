@@ -19,6 +19,7 @@ export interface Spec extends TurboModule {
   readonly onPlaybackError: EventEmitter<UnsafeObject>;
   readonly onPlaybackMetadata: EventEmitter<UnsafeObject>;
   readonly onPlaybackPlayWhenReadyChanged: EventEmitter<UnsafeObject>;
+  readonly onPlaybackPlayingState: EventEmitter<UnsafeObject>;
   readonly onPlaybackProgressUpdated: EventEmitter<UnsafeObject>;
   readonly onPlaybackQueueEnded: EventEmitter<UnsafeObject>;
   readonly onPlaybackState: EventEmitter<UnsafeObject>;
@@ -54,6 +55,7 @@ export interface Spec extends TurboModule {
   getRate(): number;
   getProgress(): UnsafeObject;
   getPlaybackState(): UnsafeObject;
+  getPlayingState(): UnsafeObject;
   retry(): void;
 
   // playlist management

@@ -136,6 +136,10 @@ public class TrackPlayer {
       callbacks?.onPlaybackProgressUpdated(progressEvent)
     }
 
+  internal lazy var playingState: PlayingState = PlayingState { [weak self] event in
+    self?.callbacks?.onPlaybackPlayingState(event)
+  }
+
   private var pendingSeek: PendingSeek?
   private var asset: AVAsset?
   private var url: URL?
@@ -250,6 +254,7 @@ public class TrackPlayer {
       }
 
       progressUpdateManager.onPlaybackStateChanged(state)
+      playingState.update(playWhenReady: playWhenReady, state: state)
     }
   }
 
@@ -323,6 +328,7 @@ public class TrackPlayer {
 
       if oldValue != playWhenReady {
         callbacks?.onPlaybackPlayWhenReadyChanged(playWhenReady)
+        playingState.update(playWhenReady: playWhenReady, state: state)
       }
     }
   }

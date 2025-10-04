@@ -10,6 +10,7 @@ import type {
   NowPlayingMetadata,
   PlaybackState,
   PlayerOptions,
+  PlayingState,
   Progress,
   ServiceHandler,
   Track,
@@ -438,12 +439,30 @@ export function getPlaybackState(): PlaybackState {
 }
 
 /**
+ * Gets the playing state (playing and buffering flags).
+ */
+export function getPlayingState(): PlayingState {
+  return TrackPlayer.getPlayingState() as PlayingState;
+}
+
+/**
+ * Subscribes to playing state changes.
+ * @param callback - Called when playing or buffering state changes
+ * @returns Cleanup function to unsubscribe
+ */
+export function onPlaybackPlayingState(
+  callback: (state: PlayingState) => void
+): () => void {
+  return TrackPlayer.onPlaybackPlayingState(callback as () => void).remove;
+}
+
+/**
  * Gets the queue repeat mode.
  *
  * @see https://rntp.dev/docs/api/constants/repeat-mode
  */
 export function getRepeatMode(): RepeatMode {
-  return TrackPlayer.getRepeatMode();
+  return TrackPlayer.getRepeatMode() as RepeatMode;
 }
 
 /**

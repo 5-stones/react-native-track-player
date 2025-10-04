@@ -9,10 +9,10 @@ import {
 import TrackPlayer, { useIsPlaying } from 'react-native-track-player';
 
 export const PlayPauseButton: React.FC = () => {
-  const { playing, bufferingDuringPlay } = useIsPlaying();
+  const { playing, buffering } = useIsPlaying();
   return (
     <View style={styles.container}>
-      {bufferingDuringPlay ? (
+      {buffering ? (
         <ActivityIndicator />
       ) : (
         <TouchableWithoutFeedback

@@ -19,6 +19,7 @@ import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackError
 import com.doublesymmetry.trackplayer.event.PlaybackErrorEvent
 import com.doublesymmetry.trackplayer.event.PlaybackPlayWhenReadyChangedEvent
+import com.doublesymmetry.trackplayer.event.PlaybackPlayingStateEvent
 import com.doublesymmetry.trackplayer.event.PlaybackProgressUpdatedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackQueueEndedEvent
 import com.doublesymmetry.trackplayer.event.RemoteJumpBackwardEvent
@@ -36,6 +37,7 @@ import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
 import com.doublesymmetry.trackplayer.player.MediaFactory
 import com.doublesymmetry.trackplayer.player.PlaybackProgressUpdateManager
 import com.doublesymmetry.trackplayer.player.PlayerListener
+import com.doublesymmetry.trackplayer.player.PlayingState
 import com.doublesymmetry.trackplayer.util.MetadataAdapter
 import com.doublesymmetry.trackplayer.util.PlayerCache
 import com.facebook.react.bridge.WritableMap
@@ -166,6 +168,10 @@ class TrackPlayer(
     }
   }
 
+  internal val playingState: PlayingState by lazy {
+    PlayingState { event -> callbacks?.onPlaybackPlayingState(event) }
+  }
+
   val currentTrack: Track?
     get() = exoPlayer.currentMediaItem?.let { Track.fromMediaItem(it) }
 
@@ -180,6 +186,10 @@ class TrackPlayer(
 
   fun getPlaybackState(): PlaybackState {
     return PlaybackState(playerState, playbackError)
+  }
+
+  fun getPlayingState(): PlaybackPlayingStateEvent {
+    return playingState.toEvent()
   }
 
   internal fun emitActiveTrackChanged(lastPosition: Double) {
@@ -219,6 +229,7 @@ class TrackPlayer(
 
   internal fun onPlayWhenReadyChanged(playWhenReady: Boolean, pausedBecauseReachedEnd: Boolean) {
     callbacks?.onPlaybackPlayWhenReadyChanged(PlaybackPlayWhenReadyChangedEvent(playWhenReady))
+    playingState.update(playWhenReady, playerState)
   }
 
   internal fun onPlaybackError(playbackError: com.doublesymmetry.trackplayer.event.PlaybackError) {
@@ -667,6 +678,7 @@ class TrackPlayer(
       }
 
       progressUpdateManager.onPlaybackStateChanged(state)
+      playingState.update(playWhenReady, state)
     }
   }
 
