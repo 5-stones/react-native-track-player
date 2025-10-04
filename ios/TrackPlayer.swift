@@ -4,10 +4,9 @@ import MediaPlayer
 public class TrackPlayer {
   public let nowPlayingInfoController: NowPlayingInfoController
   public let remoteCommandController: RemoteCommandController
-  public let event = EventHolder()
-
-  fileprivate var lastIndex: Int = -1
-  fileprivate var lastTrack: Track?
+  private weak var callbacks: TrackPlayerCallbacks?
+  private var lastIndex: Int = -1
+  private var lastTrack: Track?
 
   /// The repeat mode for the queue player.
   public var repeatMode: RepeatMode = .off
@@ -21,12 +20,12 @@ public class TrackPlayer {
   /**
    The index of the current track. `-1` when there is no current track
    */
-  private(set) public var currentIndex: Int = -1
+  public private(set) var currentIndex: Int = -1
 
   /**
    All tracks held by the queue.
    */
-  private(set) public var tracks: [Track] = []
+  public private(set) var tracks: [Track] = []
 
   public var currentTrack: Track? {
     assertMainThread()
@@ -82,81 +81,84 @@ public class TrackPlayer {
 
   private var avPlayer = AVPlayer()
 
-  private lazy var playerObserver: PlayerStateObserver = {
-    PlayerStateObserver(
-      onStatusChange: { [weak self] status in
-        self?.avPlayerStatusDidChange(status)
-      },
-      onTimeControlStatusChange: { [weak self] status in
-        self?.avPlayerDidChangeTimeControlStatus(status)
-      }
-    )
-  }()
-
-  private lazy var playerTimeObserver: PlayerTimeObserver = {
-    PlayerTimeObserver(
-      periodicObserverTimeInterval: CMTime(seconds: 1, preferredTimescale: 1000),
-      onAudioDidStart: { [weak self] in
-        self?.audioDidStart()
-      },
-      onSecondElapsed: { [weak self] seconds in
-        self?.handleSecondElapsed(seconds)
-      }
-    )
-  }()
-
-  private lazy var playerItemNotificationObserver: PlayerItemNotificationObserver = {
-    PlayerItemNotificationObserver(
-      onDidPlayToEndTime: { [weak self] in
-        self?.handleTrackDidPlayToEndTime()
-      },
-      onFailedToPlayToEndTime: { [weak self] in
-        self?.handleTrackFailedToPlayToEndTime()
-      },
-      onPlaybackStalled: { [weak self] in
-        self?.handleTrackPlaybackStalled()
-      }
-    )
-  }()
-
-  private lazy var playerItemObserver: PlayerItemPropertyObserver = {
-    PlayerItemPropertyObserver(
-      onDurationUpdate: { [weak self] duration in
-        self?.handleDurationUpdate(duration)
-      },
-      onPlaybackLikelyToKeepUpUpdate: { [weak self] isLikely in
-        self?.avItemDidUpdatePlaybackLikelyToKeepUp(isLikely)
-      },
-      onTimedMetadataReceived: { [weak self] groups in
-        self?.handleTimedMetadataReceived(groups)
-      }
-    )
-  }()
-
-  private lazy var progressUpdateManager: PlaybackProgressUpdateManager = {
-    PlaybackProgressUpdateManager { [weak self] in
-      self?.handleProgressUpdate()
+  private lazy var playerObserver: PlayerStateObserver = .init(
+    onStatusChange: { [weak self] status in
+      self?.avPlayerStatusDidChange(status)
+    },
+    onTimeControlStatusChange: { [weak self] status in
+      self?.avPlayerDidChangeTimeControlStatus(status)
     }
-  }()
+  )
+
+  private lazy var playerTimeObserver: PlayerTimeObserver = .init(
+    periodicObserverTimeInterval: CMTime(seconds: 1, preferredTimescale: 1000),
+    onAudioDidStart: { [weak self] in
+      self?.audioDidStart()
+    },
+    onSecondElapsed: { [weak self] seconds in
+      guard let self else { return }
+      if automaticallyUpdateNowPlayingInfo {
+        setNowPlayingCurrentTime(seconds: seconds)
+      }
+    }
+  )
+
+  private lazy var playerItemNotificationObserver: PlayerItemNotificationObserver = .init(
+    onDidPlayToEndTime: { [weak self] in
+      self?.handleTrackDidPlayToEndTime()
+    },
+    onFailedToPlayToEndTime: { [weak self] in
+      self?.playbackError = TrackPlayerError.PlaybackError.playbackFailed
+    }
+  )
+
+  private lazy var playerItemObserver: PlayerItemPropertyObserver = .init(
+    onDurationUpdate: { [weak self] duration in
+      self?.callbacks?.onDurationUpdated(duration)
+    },
+    onPlaybackLikelyToKeepUpUpdate: { [weak self] isLikely in
+      self?.avItemDidUpdatePlaybackLikelyToKeepUp(isLikely)
+    },
+    onTimedMetadataReceived: { [weak self] groups in
+      self?.callbacks?.onMetadataTimedReceived(groups)
+    }
+  )
+
+  private lazy var progressUpdateManager: PlaybackProgressUpdateManager =
+    PlaybackProgressUpdateManager { [weak self] in
+      guard let self, currentIndex >= 0 else { return }
+      let progressEvent = PlaybackProgressUpdatedEvent(
+        position: currentTime,
+        duration: duration,
+        buffered: bufferedPosition,
+        track: currentIndex
+      )
+      callbacks?.onPlaybackProgressUpdated(progressEvent)
+    }
 
   private var pendingSeek: PendingSeek?
   private var asset: AVAsset?
   private var url: URL?
   private var urlOptions: [String: Any]?
-  private let stateQueue = DispatchQueue(
-    label: "TrackPlayer.stateQueue",
-    attributes: .concurrent
-  )
-  private(set) var playbackError: TrackPlayerError.PlaybackError?
-  var _state: State = .none
+  private(set) var playbackError: TrackPlayerError.PlaybackError? {
+    didSet {
+      guard oldValue != playbackError else { return }
+      assertMainThread()
+
+      // Setting an error should set state to .error
+      if let _ = playbackError, state != .error {
+        state = .error
+      }
+
+      callbacks?.onPlaybackError(playbackError)
+    }
+  }
   private(set) var lastPlayerTimeControlStatus: AVPlayer.TimeControlStatus = .paused
 
   public func getPlaybackState() -> PlaybackState {
     return PlaybackState(state: state, error: playbackError)
   }
-  private var _rate: Float = 1.0
-  var _playWhenReady: Bool = false
-  var _bufferDuration: TimeInterval = 0
+
 
   /**
    Set this to false to disable automatic updating of now playing info for control center and lock screen.
@@ -210,23 +212,44 @@ public class TrackPlayer {
 
   // MARK: - AVPlayer State and Computed Properties
 
-  var state: State {
-    get {
-      var state: State!
-      stateQueue.sync {
-        state = _state
+  private(set) var state: State = .none {
+    didSet {
+      guard oldValue != state else { return }
+      assertMainThread()
+
+      // Clear error when transitioning away from error state
+      if oldValue == .error && state != .error {
+        playbackError = nil
       }
-      return state
-    }
-    set {
-      stateQueue.async(flags: .barrier) { [weak self] in
-        guard let self else { return }
-        let currentState = _state
-        if currentState != newValue {
-          _state = newValue
-          handleStateChange(newValue)
+
+      switch state {
+      case .ready, .loading:
+        setTimePitchingAlgorithmForCurrentItem()
+      default: break
+      }
+
+      switch state {
+      case .ready, .loading, .playing, .paused:
+        if automaticallyUpdateNowPlayingInfo {
+          updateNowPlayingPlaybackValues()
         }
+      default: break
       }
+
+      let playbackState = PlaybackState(state: state, error: playbackError)
+      callbacks?.onPlaybackState(playbackState)
+
+      // Emit queue ended event when playback ends on the last track
+      // This matches Android's behavior (TrackPlayer.kt:642-646)
+      if state == .ended, isLastTrack {
+        let event = PlaybackQueueEndedEvent(
+          track: currentIndex,
+          position: currentTime
+        )
+        callbacks?.onPlaybackQueueEnded(event)
+      }
+
+      progressUpdateManager.onPlaybackStateChanged(state)
     }
   }
 
@@ -291,18 +314,15 @@ public class TrackPlayer {
   /**
    Whether the player should start playing automatically when the track is ready.
    */
-  public var playWhenReady: Bool {
-    get { _playWhenReady }
-    set {
-      let oldValue = _playWhenReady
-      _playWhenReady = newValue
-      if newValue == true, state == .error || state == .stopped {
+  public var playWhenReady: Bool = false {
+    didSet {
+      if playWhenReady == true, state == .error || state == .stopped {
         reload(startFromCurrentTime: state == .error)
       }
       applyAVPlayerRate()
 
-      if oldValue != newValue {
-        handlePlayWhenReadyChange(newValue)
+      if oldValue != playWhenReady {
+        callbacks?.onPlaybackPlayWhenReadyChanged(playWhenReady)
       }
     }
   }
@@ -312,11 +332,9 @@ public class TrackPlayer {
 
    [Read more from Apple Documentation](https://developer.apple.com/documentation/avfoundation/avplayeritem/1643630-preferredforwardbufferduration)
    */
-  public var bufferDuration: TimeInterval {
-    get { _bufferDuration }
-    set {
-      _bufferDuration = newValue
-      avPlayer.automaticallyWaitsToMinimizeStalling = _bufferDuration == 0
+  public var bufferDuration: TimeInterval = 0 {
+    didSet {
+      avPlayer.automaticallyWaitsToMinimizeStalling = bufferDuration == 0
     }
   }
 
@@ -329,7 +347,7 @@ public class TrackPlayer {
     get { avPlayer.automaticallyWaitsToMinimizeStalling }
     set {
       if newValue {
-        _bufferDuration = 0
+        bufferDuration = 0
       }
       avPlayer.automaticallyWaitsToMinimizeStalling = newValue
     }
@@ -345,10 +363,8 @@ public class TrackPlayer {
     set { avPlayer.isMuted = newValue }
   }
 
-  public var rate: Float {
-    get { _rate }
-    set {
-      _rate = newValue
+  public var rate: Float = 1.0 {
+    didSet {
       applyAVPlayerRate()
       if automaticallyUpdateNowPlayingInfo {
         updateNowPlayingPlaybackValues()
@@ -360,11 +376,11 @@ public class TrackPlayer {
 
   public init(
     nowPlayingInfoController: NowPlayingInfoController = NowPlayingInfoController(),
-    remoteCommandController: RemoteCommandController = RemoteCommandController()
+    callbacks: TrackPlayerCallbacks? = nil
   ) {
     self.nowPlayingInfoController = nowPlayingInfoController
-    self.remoteCommandController = remoteCommandController
-    self.remoteCommandController.player = self
+    self.remoteCommandController = RemoteCommandController(callbacks: callbacks)
+    self.callbacks = callbacks
 
     setupAVPlayer()
   }
@@ -404,7 +420,7 @@ public class TrackPlayer {
     loadFromString(
       from: track.audioUrl,
       type: track.sourceType,
-      playWhenReady: self.playWhenReady,
+      playWhenReady: playWhenReady,
       initialTime: track.initialTime,
       options: track.assetOptions
     )
@@ -446,9 +462,6 @@ public class TrackPlayer {
     state = .stopped
     clearCurrentAVItem()
     playWhenReady = false
-    if wasActive {
-      event.playbackEnd.emit(data: .playerStopped)
-    }
   }
 
   /**
@@ -571,9 +584,6 @@ public class TrackPlayer {
     let playbackWasActive = playbackActive
     unloadAVPlayer()
     nowPlayingInfoController.clear()
-    if playbackWasActive {
-      event.playbackEnd.emit(data: .cleared)
-    }
   }
 
   // MARK: - Private
@@ -606,7 +616,7 @@ public class TrackPlayer {
   // MARK: - AVPlayer Management Methods (from AVPlayerWrapper)
 
   private func applyAVPlayerRate() {
-    avPlayer.rate = _playWhenReady ? _rate : 0
+    avPlayer.rate = playWhenReady ? rate : 0
   }
 
   private func clearCurrentAVItem() {
@@ -645,8 +655,6 @@ public class TrackPlayer {
 
     avPlayer = AVPlayer()
     setupAVPlayer()
-
-    handleAVPlayerRecreated()
   }
 
   private func setupAVPlayer() {
@@ -663,13 +671,8 @@ public class TrackPlayer {
     applyAVPlayerRate()
   }
 
-  private func playbackFailed(error: TrackPlayerError.PlaybackError) {
-    state = .error
-    playbackError = error
-    handlePlaybackError(error)
-  }
-
   func loadAVPlayer() {
+    assertMainThread()
     if state == .error {
       recreateAVPlayer()
     } else {
@@ -682,16 +685,16 @@ public class TrackPlayer {
 
       // Load metadata keys asynchronously and separate from playable, to allow that to execute as
       // quickly as it can
-      let metdataKeys = ["commonMetadata", "availableChapterLocales", "availableMetadataFormats"]
+      let metadataKeys = ["commonMetadata", "availableChapterLocales", "availableMetadataFormats"]
       pendingAsset.loadValuesAsynchronously(
-        forKeys: metdataKeys,
+        forKeys: metadataKeys,
         completionHandler: { [weak self] in
           guard let self else { return }
           if pendingAsset != asset { return }
 
           let commonData = pendingAsset.commonMetadata
           if !commonData.isEmpty {
-            handleCommonMetadataReceived(commonData)
+            callbacks?.onMetadataCommonReceived(commonData)
           }
 
           if !pendingAsset.availableChapterLocales.isEmpty {
@@ -700,7 +703,7 @@ public class TrackPlayer {
                 withTitleLocale: locale,
                 containingItemsWithCommonKeys: nil
               )
-              handleChapterMetadataReceived(chapters)
+              callbacks?.onMetadataChapterReceived(chapters)
             }
           } else {
             for format in pendingAsset.availableMetadataFormats {
@@ -712,7 +715,7 @@ public class TrackPlayer {
                 items: pendingAsset.metadata(forFormat: format),
                 timeRange: timeRange
               )
-              handleTimedMetadataReceived([group])
+              callbacks?.onMetadataTimedReceived([group])
             }
           }
         }
@@ -733,7 +736,7 @@ public class TrackPlayer {
               let keyStatus = pendingAsset.statusOfValue(forKey: key, error: &error)
               switch keyStatus {
               case .failed:
-                self.playbackFailed(error: TrackPlayerError.PlaybackError.failedToLoadKeyValue)
+                self.playbackError = TrackPlayerError.PlaybackError.failedToLoadKeyValue
                 return
               case .cancelled, .loading, .unknown:
                 return
@@ -744,7 +747,7 @@ public class TrackPlayer {
             }
 
             if !pendingAsset.isPlayable {
-              self.playbackFailed(error: TrackPlayerError.PlaybackError.trackWasUnplayable)
+              self.playbackError = TrackPlayerError.PlaybackError.trackWasUnplayable
               return
             }
 
@@ -752,7 +755,7 @@ public class TrackPlayer {
               asset: pendingAsset,
               automaticallyLoadedAssetKeys: playableKeys
             )
-            avItem.preferredForwardBufferDuration = self._bufferDuration
+            avItem.preferredForwardBufferDuration = self.bufferDuration
             self.avPlayer.replaceCurrentItem(with: avItem)
             self.startObservingAVPlayerItem(avItem)
             self.applyAVPlayerRate()
@@ -802,7 +805,7 @@ public class TrackPlayer {
       )
     } else {
       clearCurrentAVItem()
-      playbackFailed(error: TrackPlayerError.PlaybackError.invalidSourceUrl(url))
+      playbackError = TrackPlayerError.PlaybackError.invalidSourceUrl(url)
     }
   }
 
@@ -813,46 +816,6 @@ public class TrackPlayer {
 
   // MARK: - Internal Event Handlers
 
-  private func handleStateChange(_ state: State) {
-    DispatchQueue.main.async { [weak self] in
-      guard let self else { return }
-      switch state {
-      case .ready, .loading:
-        setTimePitchingAlgorithmForCurrentItem()
-      default: break
-      }
-
-      switch state {
-      case .ready, .loading, .playing, .paused:
-        if automaticallyUpdateNowPlayingInfo {
-          updateNowPlayingPlaybackValues()
-        }
-      default: break
-      }
-      event.stateChange.emit(data: PlaybackState(state: state, error: playbackError))
-      progressUpdateManager.onPlaybackStateChanged(state)
-    }
-  }
-
-
-  func handleSecondElapsed(_ seconds: Double) {
-    // Update now playing info with current playback time
-    if automaticallyUpdateNowPlayingInfo {
-      setNowPlayingCurrentTime(seconds: seconds)
-    }
-  }
-
-  private func handleProgressUpdate() {
-    guard currentIndex >= 0 else { return }
-    let progressEvent = PlaybackProgressUpdatedEvent(
-      position: currentTime,
-      duration: duration,
-      buffered: bufferedPosition,
-      track: currentIndex
-    )
-    event.progressUpdate.emit(data: progressEvent)
-  }
-
   /**
    Sets the progress update interval.
    - Parameter interval: The interval in seconds, or nil to disable progress updates
@@ -861,42 +824,16 @@ public class TrackPlayer {
     progressUpdateManager.setUpdateInterval(interval)
   }
 
-  private func handlePlaybackError(_ error: Error?) {
-    event.fail.emit(data: error)
-    event.playbackEnd.emit(data: .error)
-  }
-
   private func handleSeekCompleted(to seconds: Double, didFinish: Bool) {
     if automaticallyUpdateNowPlayingInfo {
       setNowPlayingCurrentTime(seconds: Double(seconds))
     }
-    event.seek.emit(data: (seconds, didFinish))
-  }
-
-  func handleDurationUpdate(_ duration: Double) {
-    event.updateDuration.emit(data: duration)
-  }
-
-  private func handleCommonMetadataReceived(_ metadata: [AVMetadataItem]) {
-    event.receiveCommonMetadata.emit(data: metadata)
-  }
-
-  private func handleChapterMetadataReceived(_ metadata: [AVTimedMetadataGroup]) {
-    event.receiveChapterMetadata.emit(data: metadata)
-  }
-
-  func handleTimedMetadataReceived(_ metadata: [AVTimedMetadataGroup]) {
-    event.receiveTimedMetadata.emit(data: metadata)
-  }
-
-  private func handlePlayWhenReadyChange(_ playWhenReady: Bool) {
-    event.playWhenReadyChange.emit(data: playWhenReady)
+    callbacks?.onSeekCompleted(position: seconds, didFinish: didFinish)
   }
 
   func handleTrackDidPlayToEndTime() {
     DispatchQueue.main.async { [weak self] in
       guard let self else { return }
-      event.playbackEnd.emit(data: .playedUntilEnd)
       if repeatMode == .track {
         replay()
       } else if repeatMode == .queue || !isLastTrack {
@@ -907,74 +844,69 @@ public class TrackPlayer {
     }
   }
 
-  func handleTrackFailedToPlayToEndTime() {
-    handlePlaybackError(TrackPlayerError.PlaybackError.playbackFailed)
-  }
-
-  func handleTrackPlaybackStalled() {}
-
-  private func handleAVPlayerRecreated() {
-    event.didRecreateAVPlayer.emit(data: ())
-  }
-
   // MARK: - Observer Callbacks
 
   func avPlayerDidChangeTimeControlStatus(_ status: AVPlayer.TimeControlStatus) {
-    switch status {
-    case .paused:
-      let currentState = state
-      if asset == nil, currentState != .stopped {
-        state = .none
-      } else if currentState != .error, currentState != .stopped {
-        // Distinguish between external pauses (bluetooth disconnect, interruption) and natural
-        // track completion:
-        if playWhenReady {
-          // If playback pauses unexpectedly, this is likely an external interruption (bluetooth
-          // disconnect, system interruption, etc). Set playWhenReady to false to acknowledge the
-          // pause.
-          // However, if we're near the end of the track (within 0.5s of duration), this is likely
-          // a natural pause from track completion. Let handleTrackDidPlayToEndTime handle this case to
-          // preserve auto-advance behavior between tracks in a queue/playlist.
-          if currentTime < duration - 0.5 {
-            playWhenReady = false
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      switch status {
+      case .paused:
+        let currentState = state
+        let currentTime = self.currentTime
+        let duration = self.duration
+        // Ignore pauses when near track end - let handleTrackDidPlayToEndTime handle track completion
+        let nearTrackEnd = currentTime >= duration - 0.5 && duration > 0
+
+        // Completely ignore pause events when near track end to avoid race with handleTrackDidPlayToEndTime
+        if nearTrackEnd {
+          // Ignore - track completion will be handled by handleTrackDidPlayToEndTime
+        } else if asset == nil, currentState != .stopped {
+          state = .none
+        } else if currentState != .error, currentState != .stopped {
+          // Only update state, never modify playWhenReady
+          // playWhenReady represents user intent and should only change via explicit user actions
+          if !playWhenReady {
+            state = .paused
           }
-        } else {
-          state = .paused
+          // If playWhenReady is true, this is likely buffering/seeking - don't change state
         }
+      case .waitingToPlayAtSpecifiedRate:
+        if asset != nil {
+          state = .buffering
+        }
+      case .playing:
+        state = .playing
+      @unknown default:
+        break
       }
-    case .waitingToPlayAtSpecifiedRate:
-      if asset != nil {
-        state = .buffering
-      }
-    case .playing:
-      state = .playing
-    @unknown default:
-      break
     }
   }
 
   func avPlayerStatusDidChange(_ status: AVPlayer.Status) {
-    if status == .failed {
-      let error = avPlayer.currentItem?.error as NSError?
-      playbackFailed(error: error?.code == URLError.notConnectedToInternet.rawValue
-        ? TrackPlayerError.PlaybackError.notConnectedToInternet
-        : TrackPlayerError.PlaybackError.playbackFailed
-      )
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      if status == .failed {
+        let error = avPlayer.currentItem?.error as NSError?
+        playbackError = error?.code == URLError.notConnectedToInternet.rawValue
+          ? TrackPlayerError.PlaybackError.notConnectedToInternet
+          : TrackPlayerError.PlaybackError.playbackFailed
+      }
     }
   }
 
   func audioDidStart() {
-    state = .playing
-  }
-
-  func avItemFailedToPlayToEndTime() {
-    playbackFailed(error: TrackPlayerError.PlaybackError.playbackFailed)
-    handleTrackFailedToPlayToEndTime()
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      state = .playing
+    }
   }
 
   func avItemDidUpdatePlaybackLikelyToKeepUp(_ playbackLikelyToKeepUp: Bool) {
-    if playbackLikelyToKeepUp, state != .playing {
-      state = .ready
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      if playbackLikelyToKeepUp, state != .playing {
+        state = .ready
+      }
     }
   }
 
@@ -1067,35 +999,25 @@ public class TrackPlayer {
    Step to the next track in the queue.
    */
   public func next() {
-    let lastIndex = currentIndex
-    let playbackWasActive = playbackActive
-    _ = skipBy(1, wrap: repeatMode == .queue)
-    if playbackWasActive && lastIndex != currentIndex || repeatMode == .queue {
-      event.playbackEnd.emit(data: .skippedToNext)
-    }
+    skipBy(1, wrap: repeatMode == .queue)
   }
 
   /**
    Step to the previous track in the queue.
    */
   public func previous() {
-    let lastIndex = currentIndex
-    let playbackWasActive = playbackActive
-    _ = skipBy(-1, wrap: repeatMode == .queue)
-    if playbackWasActive && lastIndex != currentIndex || repeatMode == .queue {
-      event.playbackEnd.emit(data: .skippedToPrevious)
-    }
+    skipBy(-1, wrap: repeatMode == .queue)
   }
 
-  private func skipBy(_ delta: Int, wrap: Bool) -> Track? {
+  private func skipBy(_ delta: Int, wrap: Bool) {
     assertMainThread()
-    guard currentTrack != nil, !tracks.isEmpty else { return nil }
+    guard currentTrack != nil, !tracks.isEmpty else { return }
 
     if tracks.count == 1 {
       if wrap, playWhenReady {
         replay()
       }
-      return currentTrack
+      return
     }
 
     var index = currentIndex + delta
@@ -1108,7 +1030,6 @@ public class TrackPlayer {
       currentIndex = newIndex
       handleCurrentTrackChanged()
     }
-    return currentTrack
   }
 
   /**
@@ -1142,13 +1063,12 @@ public class TrackPlayer {
       if index == currentIndex {
         seekTo(0)
       } else {
-        _ = try skipTo(index)
+        try skipTo(index)
       }
-      event.playbackEnd.emit(data: .jumpedToIndex)
     }
   }
 
-  private func skipTo(_ index: Int) throws -> Track {
+  private func skipTo(_ index: Int) throws {
     assertMainThread()
     try throwIfQueueEmpty()
     try throwIfIndexInvalid(index: index)
@@ -1161,14 +1081,6 @@ public class TrackPlayer {
       currentIndex = index
       handleCurrentTrackChanged()
     }
-
-    guard let track = currentTrack else {
-      throw TrackPlayerError.QueueError.invalidIndex(
-        index: index,
-        message: "Failed to get current track after jumping to index \(index)"
-      )
-    }
-    return track
   }
 
   /**
@@ -1233,9 +1145,6 @@ public class TrackPlayer {
       let playbackWasActive = playbackActive
       unloadAVPlayer()
       nowPlayingInfoController.clear()
-      if playbackWasActive {
-        event.playbackEnd.emit(data: .cleared)
-      }
     }
     let eventData = PlaybackActiveTrackChangedEvent(
       lastIndex: lastIndex == -1 ? nil : lastIndex,
@@ -1244,7 +1153,7 @@ public class TrackPlayer {
       index: currentIndex == -1 ? nil : currentIndex,
       track: currentTrack
     )
-    event.currentTrack.emit(data: eventData)
+    callbacks?.onPlaybackActiveTrackChanged(eventData)
     lastTrack = currentTrack
     lastIndex = currentIndex
   }

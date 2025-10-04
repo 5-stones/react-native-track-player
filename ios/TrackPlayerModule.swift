@@ -16,7 +16,8 @@ public class NativeTrackPlayerImpl: NSObject {
   // MARK: - Attributes
 
   private var hasInitialized = false
-  private let player = TrackPlayer()
+  private lazy var player: TrackPlayer = .init(callbacks: self)
+
   private let audioSession = AVAudioSession.sharedInstance()
   private var audioSessionIsActive = false
   private var shouldResumePlaybackAfterInterruptionEnds: Bool = false
@@ -40,16 +41,6 @@ public class NativeTrackPlayerImpl: NSObject {
       name: AVAudioSession.interruptionNotification,
       object: nil
     )
-
-    player.playWhenReady = false
-    player.event.receiveChapterMetadata.addListener(self, handleChapterMetadataReceived)
-    player.event.receiveTimedMetadata.addListener(self, handleTimedMetadataReceived)
-    player.event.receiveCommonMetadata.addListener(self, handleCommonMetadataReceived)
-    player.event.stateChange.addListener(self, handleStateChange)
-    player.event.fail.addListener(self, handleFailed)
-    player.event.currentTrack.addListener(self, handleActiveTrackChanged)
-    player.event.progressUpdate.addListener(self, handleProgressUpdate)
-    player.event.playWhenReadyChange.addListener(self, handlePlayWhenReadyChange)
   }
 
   deinit {
@@ -61,67 +52,6 @@ public class NativeTrackPlayerImpl: NSObject {
     reset()
   }
 
-  // MARK: - Event Emission
-
-  private func emit(event: EventType, body: Any? = nil) {
-    let bodyDict = body as? [String: Any] ?? [:]
-
-    switch event {
-    case .PlaybackState:
-      delegate?.emitPlaybackState(bodyDict)
-    case .PlaybackActiveTrackChanged:
-      delegate?.emitPlaybackActiveTrackChanged(bodyDict)
-    case .PlaybackProgressUpdated:
-      delegate?.emitPlaybackProgressUpdated(bodyDict)
-    case .PlaybackPlayWhenReadyChanged:
-      delegate?.emitPlaybackPlayWhenReadyChanged(bodyDict)
-    case .PlaybackQueueEnded:
-      delegate?.emitPlaybackQueueEnded(bodyDict)
-    case .PlaybackError:
-      delegate?.emitPlaybackError(bodyDict)
-    case .PlaybackMetadata:
-      delegate?.emitPlaybackMetadata(bodyDict)
-    case .RemotePlay:
-      delegate?.emitRemotePlay(bodyDict)
-    case .RemotePause:
-      delegate?.emitRemotePause(bodyDict)
-    case .RemoteNext:
-      delegate?.emitRemoteNext(bodyDict)
-    case .RemotePrevious:
-      delegate?.emitRemotePrevious(bodyDict)
-    case .RemoteSeek:
-      delegate?.emitRemoteSeek(bodyDict)
-    case .RemoteJumpForward:
-      delegate?.emitRemoteJumpForward(bodyDict)
-    case .RemoteJumpBackward:
-      delegate?.emitRemoteJumpBackward(bodyDict)
-    case .RemoteStop:
-      delegate?.emitRemoteStop(bodyDict)
-    case .RemoteSetRating:
-      delegate?.emitRemoteSetRating(bodyDict)
-    case .RemotePlayId:
-      delegate?.emitRemotePlayId(bodyDict)
-    case .RemotePlaySearch:
-      delegate?.emitRemotePlaySearch(bodyDict)
-    case .RemoteSkip:
-      delegate?.emitRemoteSkip(bodyDict)
-    case .RemoteLike:
-      delegate?.emitRemoteLike(bodyDict)
-    case .RemoteDislike:
-      delegate?.emitRemoteDislike(bodyDict)
-    case .RemoteBookmark:
-      delegate?.emitRemoteBookmark(bodyDict)
-    case .MetadataChapterReceived:
-      delegate?.emitMetadataChapterReceived(bodyDict)
-    case .MetadataTimedReceived:
-      delegate?.emitMetadataTimedReceived(bodyDict)
-    case .MetadataCommonReceived:
-      delegate?.emitMetadataCommonReceived(bodyDict)
-    default:
-      // Log unmapped events - these should be added to the switch statement
-      print("[TrackPlayer] Unmapped event: \(event.rawValue)")
-    }
-  }
 
   // MARK: - Audio Session Interruption Handling
 
@@ -239,90 +169,8 @@ public class NativeTrackPlayerImpl: NSObject {
 
       self.configureAudioSession()
 
-      // setup event listeners
-      self.player.remoteCommandController
-        .handleChangePlaybackPositionCommand = { [weak self] event in
-          if let event = event as? MPChangePlaybackPositionCommandEvent {
-            let eventData = RemoteSeekEvent(position: event.positionTime)
-            self?.emit(event: EventType.RemoteSeek, body: eventData.toBridge())
-            return MPRemoteCommandHandlerStatus.success
-          }
-
-          return MPRemoteCommandHandlerStatus.commandFailed
-        }
-
-      self.player.remoteCommandController.handleNextTrackCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemoteNext)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handlePauseCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemotePause)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handlePlayCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemotePlay)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handlePreviousTrackCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemotePrevious)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handleSkipBackwardCommand = { [weak self] event in
-        if let command = event.command as? MPSkipIntervalCommand,
-           let interval = command.preferredIntervals.first
-        {
-          let eventData = RemoteJumpBackwardEvent(interval: interval.doubleValue)
-          self?.emit(event: EventType.RemoteJumpBackward, body: eventData.toBridge())
-          return MPRemoteCommandHandlerStatus.success
-        }
-
-        return MPRemoteCommandHandlerStatus.commandFailed
-      }
-
-      self.player.remoteCommandController.handleSkipForwardCommand = { [weak self] event in
-        if let command = event.command as? MPSkipIntervalCommand,
-           let interval = command.preferredIntervals.first
-        {
-          let eventData = RemoteJumpForwardEvent(interval: interval.doubleValue)
-          self?.emit(event: EventType.RemoteJumpForward, body: eventData.toBridge())
-          return MPRemoteCommandHandlerStatus.success
-        }
-
-        return MPRemoteCommandHandlerStatus.commandFailed
-      }
-
-      self.player.remoteCommandController.handleStopCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemoteStop)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handleTogglePlayPauseCommand = { [weak self] _ in
-        self?.emit(event: self?.player.playerState == .paused
-          ? EventType.RemotePlay
-          : EventType.RemotePause
-        )
-
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handleLikeCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemoteLike)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handleDislikeCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemoteDislike)
-        return MPRemoteCommandHandlerStatus.success
-      }
-
-      self.player.remoteCommandController.handleBookmarkCommand = { [weak self] _ in
-        self?.emit(event: EventType.RemoteBookmark)
-        return MPRemoteCommandHandlerStatus.success
-      }
+      // Initialize playWhenReady
+      self.player.playWhenReady = false
 
       self.hasInitialized = true
       resolve(NSNull())
@@ -394,7 +242,7 @@ public class NativeTrackPlayerImpl: NSObject {
         }
 
       let interval = ((options["progressUpdateEventInterval"] as? NSNumber) ?? 0).doubleValue
-      player.setProgressUpdateInterval(interval > 0 ? interval : nil)
+      self.player.setProgressUpdateInterval(interval > 0 ? interval : nil)
     }
   }
 
@@ -787,35 +635,27 @@ public class NativeTrackPlayerImpl: NSObject {
     }
   }
 
-
   // MARK: - Player Event Handlers
 
   func handleStateChange(state: PlaybackState) {
     ensureMainThread {
-      self.emit(event: EventType.PlaybackState, body: state.toBridge())
-      if state.state == .ended {
-        let event = PlaybackQueueEndedEvent(
-          track: self.player.currentIndex,
-          position: self.player.currentTime
-        )
-        self.emit(event: EventType.PlaybackQueueEnded, body: event.toBridge())
-      }
+      self.delegate?.emitPlaybackState(state.toBridge())
     }
   }
 
   func handleCommonMetadataReceived(metadata: [AVMetadataItem]) {
     let commonMetadata = MetadataAdapter.convertToCommonMetadata(metadata: metadata, skipRaw: true)
-    emit(event: EventType.MetadataCommonReceived, body: ["metadata": commonMetadata])
+    delegate?.emitMetadataCommonReceived(["metadata": commonMetadata])
   }
 
   func handleChapterMetadataReceived(metadata: [AVTimedMetadataGroup]) {
     let metadataItems = MetadataAdapter.convertToGroupedMetadata(metadataGroups: metadata)
-    emit(event: EventType.MetadataChapterReceived, body: ["metadata": metadataItems])
+    delegate?.emitMetadataChapterReceived(["metadata": metadataItems])
   }
 
   func handleTimedMetadataReceived(metadata: [AVTimedMetadataGroup]) {
     let metadataItems = MetadataAdapter.convertToGroupedMetadata(metadataGroups: metadata)
-    emit(event: EventType.MetadataTimedReceived, body: ["metadata": metadataItems])
+    delegate?.emitMetadataTimedReceived(["metadata": metadataItems])
   }
 
   func handleFailed(error: Error?) {
@@ -823,7 +663,7 @@ public class NativeTrackPlayerImpl: NSObject {
       code: "playback-error",
       message: error?.localizedDescription ?? "Unknown error"
     )
-    emit(event: EventType.PlaybackError, body: eventData.toBridge())
+    delegate?.emitPlaybackError(eventData.toBridge())
   }
 
   func handleActiveTrackChanged(_ event: PlaybackActiveTrackChangedEvent) {
@@ -844,20 +684,20 @@ public class NativeTrackPlayerImpl: NSObject {
         self.configureAudioSession()
       }
 
-      self.emit(event: EventType.PlaybackActiveTrackChanged, body: event.toBridge())
+      self.delegate?.emitPlaybackActiveTrackChanged(event.toBridge())
     }
   }
 
   func handleProgressUpdate(event: PlaybackProgressUpdatedEvent) {
     ensureMainThread {
-      self.emit(event: EventType.PlaybackProgressUpdated, body: event.toBridge())
+      self.delegate?.emitPlaybackProgressUpdated(event.toBridge())
     }
   }
 
   func handlePlayWhenReadyChange(playWhenReady: Bool) {
     configureAudioSession()
     let event = PlaybackPlayWhenReadyChangedEvent(playWhenReady: playWhenReady)
-    emit(event: EventType.PlaybackPlayWhenReadyChanged, body: event.toBridge())
+    delegate?.emitPlaybackPlayWhenReadyChanged(event.toBridge())
   }
 }
 
@@ -868,21 +708,21 @@ public class NativeTrackPlayerImpl: NSObject {
   func emitPlaybackPlayWhenReadyChanged(_ body: [String: Any])
   func emitPlaybackQueueEnded(_ body: [String: Any])
   func emitPlaybackError(_ body: [String: Any])
-  func emitRemotePlay(_ body: [String: Any])
-  func emitRemotePause(_ body: [String: Any])
-  func emitRemoteNext(_ body: [String: Any])
-  func emitRemotePrevious(_ body: [String: Any])
+  func emitRemotePlay()
+  func emitRemotePause()
+  func emitRemoteNext()
+  func emitRemotePrevious()
   func emitRemoteSeek(_ body: [String: Any])
   func emitRemoteJumpForward(_ body: [String: Any])
   func emitRemoteJumpBackward(_ body: [String: Any])
-  func emitRemoteStop(_ body: [String: Any])
+  func emitRemoteStop()
   func emitRemoteSetRating(_ body: [String: Any])
   func emitRemotePlayId(_ body: [String: Any])
   func emitRemotePlaySearch(_ body: [String: Any])
   func emitRemoteSkip(_ body: [String: Any])
-  func emitRemoteLike(_ body: [String: Any])
-  func emitRemoteDislike(_ body: [String: Any])
-  func emitRemoteBookmark(_ body: [String: Any])
+  func emitRemoteLike()
+  func emitRemoteDislike()
+  func emitRemoteBookmark()
   func emitMetadataTimedReceived(_ body: [String: Any])
   func emitMetadataCommonReceived(_ body: [String: Any])
   func emitMetadataChapterReceived(_ body: [String: Any])
@@ -901,12 +741,6 @@ public extension NativeTrackPlayerImpl {
       "STATE_BUFFERING": State.buffering.bridge,
       "STATE_LOADING": State.loading.bridge,
       "STATE_ERROR": State.error.bridge,
-
-      "TRACK_PLAYBACK_ENDED_REASON_END": PlaybackEndedReason.playedUntilEnd.rawValue,
-      "TRACK_PLAYBACK_ENDED_REASON_JUMPED": PlaybackEndedReason.jumpedToIndex.rawValue,
-      "TRACK_PLAYBACK_ENDED_REASON_NEXT": PlaybackEndedReason.skippedToNext.rawValue,
-      "TRACK_PLAYBACK_ENDED_REASON_PREVIOUS": PlaybackEndedReason.skippedToPrevious.rawValue,
-      "TRACK_PLAYBACK_ENDED_REASON_STOPPED": PlaybackEndedReason.playerStopped.rawValue,
 
       "PITCH_ALGORITHM_LINEAR": PitchAlgorithm.linear.rawValue,
       "PITCH_ALGORITHM_MUSIC": PitchAlgorithm.music.rawValue,
@@ -944,5 +778,134 @@ public extension NativeTrackPlayerImpl {
   @objc(supportedEvents)
   static var supportedEvents: [String] {
     return EventType.allRawValues()
+  }
+}
+
+// MARK: - TrackPlayerCallbacks Implementation
+
+extension NativeTrackPlayerImpl: TrackPlayerCallbacks {
+  public func onPlaybackState(_ state: PlaybackState) {
+    handleStateChange(state: state)
+  }
+
+  public func onPlaybackActiveTrackChanged(_ event: PlaybackActiveTrackChangedEvent) {
+    handleActiveTrackChanged(event)
+  }
+
+  public func onPlaybackProgressUpdated(_ event: PlaybackProgressUpdatedEvent) {
+    handleProgressUpdate(event: event)
+  }
+
+  public func onPlaybackPlayWhenReadyChanged(_ playWhenReady: Bool) {
+    handlePlayWhenReadyChange(playWhenReady: playWhenReady)
+  }
+
+  public func onPlaybackQueueEnded(_ event: PlaybackQueueEndedEvent) {
+    delegate?.emitPlaybackQueueEnded(event.toBridge())
+  }
+
+  public func onPlaybackError(_ error: Error?) {
+    handleFailed(error: error)
+  }
+
+  public func onMetadataCommonReceived(_ metadata: [AVMetadataItem]) {
+    handleCommonMetadataReceived(metadata: metadata)
+  }
+
+  public func onMetadataTimedReceived(_ metadata: [AVTimedMetadataGroup]) {
+    handleTimedMetadataReceived(metadata: metadata)
+  }
+
+  public func onMetadataChapterReceived(_ metadata: [AVTimedMetadataGroup]) {
+    handleChapterMetadataReceived(metadata: metadata)
+  }
+
+  public func onSeekCompleted(position: Double, didFinish: Bool) {
+    // Seek events are not currently emitted to React Native
+    // They could be added if needed
+  }
+
+  public func onDurationUpdated(_ duration: Double) {
+    // Duration updates are not currently emitted to React Native
+    // They could be added if needed
+  }
+
+  // MARK: - Remote Control Callbacks
+
+  public func onRemotePlay() {
+    delegate?.emitRemotePlay()
+  }
+
+  public func onRemotePause() {
+    delegate?.emitRemotePause()
+  }
+
+  public func onRemoteStop() {
+    delegate?.emitRemoteStop()
+  }
+
+  public func onRemotePlayPause() {
+    // Check playWhenReady (user intent) and emit appropriate event
+    // If user wants to play -> emit pause, otherwise emit play
+    if player.playWhenReady {
+      delegate?.emitRemotePause()
+    } else {
+      delegate?.emitRemotePlay()
+    }
+  }
+
+  public func onRemoteNext() {
+    delegate?.emitRemoteNext()
+  }
+
+  public func onRemotePrevious() {
+    delegate?.emitRemotePrevious()
+  }
+
+  public func onRemoteJumpForward(interval: Double) {
+    let event = RemoteJumpForwardEvent(interval: interval)
+    delegate?.emitRemoteJumpForward(event.toBridge())
+  }
+
+  public func onRemoteJumpBackward(interval: Double) {
+    let event = RemoteJumpBackwardEvent(interval: interval)
+    delegate?.emitRemoteJumpBackward(event.toBridge())
+  }
+
+  public func onRemoteSeek(position: Double) {
+    let event = RemoteSeekEvent(position: position)
+    delegate?.emitRemoteSeek(event.toBridge())
+  }
+
+  public func onRemoteChangePlaybackPosition(position: Double) {
+    let event = RemoteSeekEvent(position: position)
+    delegate?.emitRemoteSeek(event.toBridge())
+  }
+
+  public func onRemoteSetRating(rating: Any) {
+    // Convert rating to appropriate format and emit
+    delegate?.emitRemoteSetRating(["rating": String(describing: rating)])
+  }
+
+  public func onRemotePlayId(id: String, index: Int?) {
+    let event = RemotePlayIdEvent(id: id)
+    delegate?.emitRemotePlayId(event.toBridge())
+  }
+
+  public func onRemotePlaySearch(query: String) {
+    let event = RemotePlaySearchEvent(query: query)
+    delegate?.emitRemotePlaySearch(event.toBridge())
+  }
+
+  public func onRemoteLike() {
+    delegate?.emitRemoteLike()
+  }
+
+  public func onRemoteDislike() {
+    delegate?.emitRemoteDislike()
+  }
+
+  public func onRemoteBookmark() {
+    delegate?.emitRemoteBookmark()
   }
 }

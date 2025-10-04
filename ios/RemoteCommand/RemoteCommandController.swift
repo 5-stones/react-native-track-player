@@ -7,12 +7,12 @@ public typealias RemoteCommandHandler = (MPRemoteCommandEvent) -> MPRemoteComman
  Manages MPRemoteCommandCenter integration for media control (lock screen, control center, CarPlay, etc.).
 
  This controller enables/disables remote commands and routes them to handlers. It provides default handlers
- that call TrackPlayer methods, but allows customization by setting the lazy handler properties.
+ that invoke TrackPlayerCallbacks, but allows customization by setting the lazy handler properties.
  */
 public class RemoteCommandController {
   private let center: MPRemoteCommandCenter
 
-  weak var player: TrackPlayer?
+  weak var callbacks: TrackPlayerCallbacks?
 
   var commandTargetPointers: [String: Any] = [:]
   private var enabledCommands: [RemoteCommand] = []
@@ -21,9 +21,14 @@ public class RemoteCommandController {
    Create a new RemoteCommandController.
 
    - parameter remoteCommandCenter: The MPRemoteCommandCenter used. Default is `MPRemoteCommandCenter.shared()`
+   - parameter callbacks: The callbacks to invoke for remote command events
    */
-  public init(remoteCommandCenter: MPRemoteCommandCenter = MPRemoteCommandCenter.shared()) {
+  public init(
+    remoteCommandCenter: MPRemoteCommandCenter = MPRemoteCommandCenter.shared(),
+    callbacks: TrackPlayerCallbacks? = nil
+  ) {
     center = remoteCommandCenter
+    self.callbacks = callbacks
   }
 
   func enable(commands: [RemoteCommand]) {
@@ -177,51 +182,38 @@ public class RemoteCommandController {
   private func handlePlayCommandDefault(event _: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
-    if let player {
-      player.play()
-      return MPRemoteCommandHandlerStatus.success
-    }
-    return MPRemoteCommandHandlerStatus.commandFailed
+    callbacks?.onRemotePlay()
+    return MPRemoteCommandHandlerStatus.success
   }
 
   private func handlePauseCommandDefault(event _: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
-    if let player {
-      player.pause()
-      return MPRemoteCommandHandlerStatus.success
-    }
-    return MPRemoteCommandHandlerStatus.commandFailed
+    callbacks?.onRemotePause()
+    return MPRemoteCommandHandlerStatus.success
   }
 
   private func handleStopCommandDefault(event _: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
-    if let player {
-      player.stop()
-      return MPRemoteCommandHandlerStatus.success
-    }
-    return MPRemoteCommandHandlerStatus.commandFailed
+    callbacks?.onRemoteStop()
+    return MPRemoteCommandHandlerStatus.success
   }
 
   private func handleTogglePlayPauseCommandDefault(event _: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
-    if let player {
-      player.togglePlaying()
-      return MPRemoteCommandHandlerStatus.success
-    }
-    return MPRemoteCommandHandlerStatus.commandFailed
+    callbacks?.onRemotePlayPause()
+    return MPRemoteCommandHandlerStatus.success
   }
 
   private func handleSkipForwardCommandDefault(event: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
     if let command = event.command as? MPSkipIntervalCommand,
-       let interval = command.preferredIntervals.first,
-       let player
+       let interval = command.preferredIntervals.first
     {
-      player.seekTo(player.currentTime + Double(truncating: interval))
+      callbacks?.onRemoteJumpForward(interval: Double(truncating: interval))
       return MPRemoteCommandHandlerStatus.success
     }
     return MPRemoteCommandHandlerStatus.commandFailed
@@ -231,10 +223,9 @@ public class RemoteCommandController {
     -> MPRemoteCommandHandlerStatus
   {
     if let command = event.command as? MPSkipIntervalCommand,
-       let interval = command.preferredIntervals.first,
-       let player
+       let interval = command.preferredIntervals.first
     {
-      player.seekTo(player.currentTime - Double(truncating: interval))
+      callbacks?.onRemoteJumpBackward(interval: Double(truncating: interval))
       return MPRemoteCommandHandlerStatus.success
     }
     return MPRemoteCommandHandlerStatus.commandFailed
@@ -243,10 +234,8 @@ public class RemoteCommandController {
   private func handleChangePlaybackPositionCommandDefault(event: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
-    if let event = event as? MPChangePlaybackPositionCommandEvent,
-       let player
-    {
-      player.seekTo(event.positionTime)
+    if let event = event as? MPChangePlaybackPositionCommandEvent {
+      callbacks?.onRemoteSeek(position: event.positionTime)
       return MPRemoteCommandHandlerStatus.success
     }
     return MPRemoteCommandHandlerStatus.commandFailed
@@ -255,38 +244,35 @@ public class RemoteCommandController {
   private func handleNextTrackCommandDefault(event _: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
-    if let player {
-      player.next()
-      return MPRemoteCommandHandlerStatus.success
-    }
-    return MPRemoteCommandHandlerStatus.commandFailed
+    callbacks?.onRemoteNext()
+    return MPRemoteCommandHandlerStatus.success
   }
 
   private func handlePreviousTrackCommandDefault(event _: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
-    if let player {
-      player.previous()
-      return MPRemoteCommandHandlerStatus.success
-    }
-    return MPRemoteCommandHandlerStatus.commandFailed
+    callbacks?.onRemotePrevious()
+    return MPRemoteCommandHandlerStatus.success
   }
 
   private func handleLikeCommandDefault(event _: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
+    callbacks?.onRemoteLike()
     return MPRemoteCommandHandlerStatus.success
   }
 
   private func handleDislikeCommandDefault(event _: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
+    callbacks?.onRemoteDislike()
     return MPRemoteCommandHandlerStatus.success
   }
 
   private func handleBookmarkCommandDefault(event _: MPRemoteCommandEvent)
     -> MPRemoteCommandHandlerStatus
   {
+    callbacks?.onRemoteBookmark()
     return MPRemoteCommandHandlerStatus.success
   }
 
