@@ -18,7 +18,6 @@ import {
   ActionSheet,
   Button,
   OptionSheet,
-  PlaybackError,
   PlayerControls,
   Progress,
   Spacer,
@@ -80,7 +79,6 @@ function Player() {
         </View>
         <TrackInfo track={track} />
         <Progress live={track?.isLiveStream} />
-        <PlaybackError />
         <Spacer />
         <PlayerControls />
         <Spacer mode={'expand'} />
