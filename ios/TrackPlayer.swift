@@ -406,33 +406,6 @@ public class TrackPlayer {
   }
 
   /**
-   Internal load method that loads a track directly without queue management.
-   Used by queue operations after updating the queue state.
-   */
-  private func loadTrack(_ track: Track) {
-    if automaticallyUpdateNowPlayingInfo {
-      // Reset playback values without updating, because that will happen in
-      // the loadNowPlayingMetaValues call straight after:
-      nowPlayingInfoController.setWithoutUpdate(keyValues: [
-        MediaItemProperty.duration(nil),
-        NowPlayingInfoProperty.playbackRate(nil),
-        NowPlayingInfoProperty.elapsedPlaybackTime(nil),
-      ])
-      loadNowPlayingMetaValues()
-    }
-
-    enableRemoteCommands(remoteCommands)
-
-    loadFromString(
-      from: track.audioUrl,
-      type: track.sourceType,
-      playWhenReady: playWhenReady,
-      initialTime: track.initialTime,
-      options: track.assetOptions
-    )
-  }
-
-  /**
    Toggle playback status.
    */
   public func togglePlaying() {
@@ -777,44 +750,6 @@ public class TrackPlayer {
     }
   }
 
-  func loadFromURL(
-    from url: URL,
-    playWhenReady: Bool,
-    initialTime: TimeInterval? = nil,
-    options: [String: Any]? = nil
-  ) {
-    self.playWhenReady = playWhenReady
-    self.url = url
-    urlOptions = options
-    loadAVPlayer()
-    if let initialTime {
-      seekTo(initialTime)
-    }
-  }
-
-  func loadFromString(
-    from url: String,
-    type: SourceType = .stream,
-    playWhenReady: Bool = false,
-    initialTime: TimeInterval? = nil,
-    options: [String: Any]? = nil
-  ) {
-    if let trackUrl = type == .file
-      ? URL(fileURLWithPath: url)
-      : URL(string: url)
-    {
-      loadFromURL(
-        from: trackUrl,
-        playWhenReady: playWhenReady,
-        initialTime: initialTime,
-        options: options
-      )
-    } else {
-      clearCurrentAVItem()
-      playbackError = TrackPlayerError.PlaybackError.invalidSourceUrl(url)
-    }
-  }
-
   func unloadAVPlayer() {
     clearCurrentAVItem()
     state = .none
@@ -952,11 +887,10 @@ public class TrackPlayer {
     if currentIndex == -1 {
       tracks.append(track)
       currentIndex = 0
-      handleCurrentTrackChanged()
     } else {
       tracks[currentIndex] = track
-      handleCurrentTrackChanged()
     }
+    handleCurrentTrackChanged()
   }
 
   /**
@@ -1148,12 +1082,44 @@ public class TrackPlayer {
     if let currentTrack {
       // Ensure playWhenReady is set before loading to preserve playback state
       playWhenReady = shouldContinuePlayback
-      loadTrack(currentTrack)
+
+      // Update now playing info
+      if automaticallyUpdateNowPlayingInfo {
+        // Reset playback values without updating, because that will happen in
+        // the loadNowPlayingMetaValues call straight after:
+        nowPlayingInfoController.setWithoutUpdate(keyValues: [
+          MediaItemProperty.duration(nil),
+          NowPlayingInfoProperty.playbackRate(nil),
+          NowPlayingInfoProperty.elapsedPlaybackTime(nil),
+        ])
+        loadNowPlayingMetaValues()
+      }
+
+      // Enable remote commands
+      enableRemoteCommands(remoteCommands)
+
+      // Load the track
+      if let trackUrl = currentTrack.sourceType == .file
+        ? URL(fileURLWithPath: currentTrack.audioUrl)
+        : URL(string: currentTrack.audioUrl)
+      {
+        url = trackUrl
+        urlOptions = currentTrack.assetOptions
+        loadAVPlayer()
+
+        if let initialTime = currentTrack.initialTime {
+          seekTo(initialTime)
+        }
+      } else {
+        clearCurrentAVItem()
+        playbackError = TrackPlayerError.PlaybackError.invalidSourceUrl(currentTrack.audioUrl)
+      }
     } else {
       let playbackWasActive = playbackActive
       unloadAVPlayer()
       nowPlayingInfoController.clear()
     }
+
     let eventData = PlaybackActiveTrackChangedEvent(
       lastIndex: lastIndex == -1 ? nil : lastIndex,
       lastTrack: lastTrack,
