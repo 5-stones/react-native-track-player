@@ -568,6 +568,14 @@ public class NativeTrackPlayerImpl: NSObject {
   }
 
   @objc
+  public func getPlaybackError() -> [String: Any]? {
+    return onMainThread {
+      guard self.hasInitialized else { return nil }
+      return player.playbackError?.toBridge()
+    }
+  }
+
+  @objc
   public func updateMetadata(for trackIndex: Int, metadata: [String: Any]) {
     ensureMainThread {
       guard self.hasInitialized else { return }

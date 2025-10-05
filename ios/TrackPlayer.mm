@@ -71,6 +71,10 @@ RCT_EXPORT_MODULE()
   return [nativeTrackPlayer getPlayingState];
 }
 
+- (NSDictionary * _Nullable)getPlaybackError {
+  return [nativeTrackPlayer getPlaybackError];
+}
+
 - (NSDictionary *)getProgress {
   return [nativeTrackPlayer getProgress];
 }

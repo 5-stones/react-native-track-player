@@ -56,6 +56,7 @@ export interface Spec extends TurboModule {
   getProgress(): UnsafeObject;
   getPlaybackState(): UnsafeObject;
   getPlayingState(): UnsafeObject;
+  getPlaybackError(): UnsafeObject | null;
   retry(): void;
 
   // playlist management

@@ -367,6 +367,10 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     player.getPlayingState().toBridge()
   }
 
+  override fun getPlaybackError(): WritableMap? = runBlockingOnMain {
+    player.playbackError?.toBridge()
+  }
+
   override fun acquireWakeLock() = runBlockingOnMain { service.acquireWakeLock() }
 
   override fun abandonWakeLock() = runBlockingOnMain { service.abandonWakeLock() }
