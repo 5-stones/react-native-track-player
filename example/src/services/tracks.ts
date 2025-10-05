@@ -13,5 +13,9 @@ export const tracks: Track[] = [
     artist: 'David Chavez',
     artwork: localArtwork,
     duration: 28,
+    // Custom data
+    data: {
+      mood: 'calm',
+    },
   },
 ];

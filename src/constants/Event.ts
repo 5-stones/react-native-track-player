@@ -40,6 +40,12 @@ export enum Event {
   PlaybackError = 'playback-error',
 
   /**
+   * Fired when the playing state of the player changes. I.e. whether the
+   * player is playing and buffering. Handy for the play/pause button.
+   **/
+  PlaybackPlayingState = 'playback-playing-state',
+
+  /**
    * Fired after playback has paused due to the queue having reached the end.
    **/
   PlaybackQueueEnded = 'playback-queue-ended',

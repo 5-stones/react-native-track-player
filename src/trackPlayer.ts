@@ -1,12 +1,10 @@
 import { AppRegistry, Platform } from 'react-native';
 
-import type { EventEmitter } from 'react-native/Libraries/Types/CodegenTypes';
-import { Event, RepeatMode } from './constants';
+import { RepeatMode } from './constants';
 import TrackPlayer from './NativeTrackPlayer';
 import resolveAssetSource from './resolveAssetSource';
 import type {
   AddTrack,
-  EventPayloadByEvent,
   NowPlayingMetadata,
   PlaybackState,
   PlayerOptions,
@@ -16,7 +14,7 @@ import type {
   Track,
   TrackMetadataBase,
   UpdateOptions,
-} from './types';
+} from './features';
 
 const isAndroid = Platform.OS === 'android';
 
@@ -69,48 +67,6 @@ export function registerPlaybackService(factory: () => ServiceHandler) {
     // Initializes and runs the service in the next tick
     setImmediate(factory());
   }
-}
-
-const callbackByEvent = {
-  'android-controller-connected': TrackPlayer.onAndroidControllerConnected,
-  'android-controller-disconnected':
-    TrackPlayer.onAndroidControllerDisconnected,
-  'metadata-chapter-received': TrackPlayer.onMetadataChapterReceived,
-  'metadata-common-received': TrackPlayer.onMetadataCommonReceived,
-  'metadata-timed-received': TrackPlayer.onMetadataTimedReceived,
-  'playback-state': TrackPlayer.onPlaybackState,
-  'playback-active-track-changed': TrackPlayer.onPlaybackActiveTrackChanged,
-  'playback-progress-updated': TrackPlayer.onPlaybackProgressUpdated,
-  'playback-play-when-ready-changed':
-    TrackPlayer.onPlaybackPlayWhenReadyChanged,
-  'playback-queue-ended': TrackPlayer.onPlaybackQueueEnded,
-  'playback-error': TrackPlayer.onPlaybackError,
-  'remote-play': TrackPlayer.onRemotePlay,
-  'remote-play-search': TrackPlayer.onRemotePlaySearch,
-  'remote-play-id': TrackPlayer.onRemotePlayId,
-  'remote-pause': TrackPlayer.onRemotePause,
-  'remote-stop': TrackPlayer.onRemoteStop,
-  'remote-next': TrackPlayer.onRemoteNext,
-  'remote-previous': TrackPlayer.onRemotePrevious,
-  'remote-seek': TrackPlayer.onRemoteSeek,
-  'remote-jump-forward': TrackPlayer.onRemoteJumpForward,
-  'remote-jump-backward': TrackPlayer.onRemoteJumpBackward,
-  'remote-set-rating': TrackPlayer.onRemoteSetRating,
-  'remote-like': TrackPlayer.onRemoteLike,
-  'remote-dislike': TrackPlayer.onRemoteDislike,
-  'remote-bookmark': TrackPlayer.onRemoteBookmark,
-  'remote-skip': TrackPlayer.onRemoteSkip,
-} satisfies Record<Event, EventEmitter<object>>;
-
-export function addEventListener<T extends Event>(
-  event: T,
-  listener: EventPayloadByEvent[T] extends never
-    ? () => void
-    : (event: EventPayloadByEvent[T]) => void
-): {
-  remove: () => void;
-} {
-  return callbackByEvent[event](listener as never);
 }
 
 // MARK: - Queue API
@@ -443,17 +399,6 @@ export function getPlaybackState(): PlaybackState {
  */
 export function getPlayingState(): PlayingState {
   return TrackPlayer.getPlayingState() as PlayingState;
-}
-
-/**
- * Subscribes to playing state changes.
- * @param callback - Called when playing or buffering state changes
- * @returns Cleanup function to unsubscribe
- */
-export function onPlaybackPlayingState(
-  callback: (state: PlayingState) => void
-): () => void {
-  return TrackPlayer.onPlaybackPlayingState(callback as () => void).remove;
 }
 
 /**

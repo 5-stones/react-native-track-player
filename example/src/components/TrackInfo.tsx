@@ -1,12 +1,7 @@
-import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import type { Track } from 'react-native-track-player';
 
-export const TrackInfo: React.FC<{
-  track?: Track;
-}> = ({ track }) => {
-  // TODO: properly fix type
-
+export function TrackInfo({ track }: { track?: Track }) {
   // @ts-ignore
   const imageUri = track?.artwork?.uri || track?.artwork;
 
@@ -15,9 +10,16 @@ export const TrackInfo: React.FC<{
       <Image style={styles.artwork} source={{ uri: imageUri }} />
       <Text style={styles.titleText}>{track?.title}</Text>
       <Text style={styles.artistText}>{track?.artist}</Text>
+      {track?.data ? (
+        <View style={styles.customData}>
+          <Text style={styles.dataText}>
+            Data: {JSON.stringify(track.data)}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -38,6 +40,14 @@ const styles = StyleSheet.create({
   artistText: {
     fontSize: 16,
     fontWeight: '200',
+    color: 'white',
+  },
+  customData: {
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  dataText: {
+    fontSize: 13,
     color: 'white',
   },
 });

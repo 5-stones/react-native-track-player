@@ -5,20 +5,22 @@ import { useEffect, useState } from 'react';
  *
  * @param getter - Synchronous function to get the current value from native
  * @param subscribe - Function that takes a callback and returns a cleanup function
+ * @param eventKey - Optional key to extract from the event object passed to the callback
  * @returns The current value, updated when the callback fires
- *
- * Note: While it is fetching the initial value from the native module, the
- * returned value will be whatever the getter returns (may be undefined or a default).
  */
-export function useUpdatedNativeValue<T>(
+export function useUpdatedNativeValue<T, E = T>(
   getter: () => T,
-  subscribe: (callback: (value: T) => void) => () => void
+  subscribe: (callback: (event: E) => void) => () => void,
+  eventKey?: keyof E
 ): T {
   const [value, setValue] = useState(() => getter());
 
   useEffect(() => {
-    return subscribe(setValue);
-  }, [subscribe]);
+    return subscribe((event) => {
+      const newValue = eventKey !== undefined ? event[eventKey] : event;
+      setValue(newValue as T);
+    });
+  }, [subscribe, eventKey]);
 
   return value;
 }

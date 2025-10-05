@@ -1,9 +1,49 @@
 import type {
   AndroidAudioContentType,
+  AppKilledPlaybackBehavior,
+  Capability,
   IOSCategory,
   IOSCategoryMode,
   IOSCategoryOptions,
+  RatingType,
 } from '../constants';
+import TrackPlayer from '../NativeTrackPlayer';
+
+// MARK: - Types
+
+export interface FeedbackOptions {
+  /** Marks wether the option should be marked as active or "done" */
+  isActive: boolean;
+
+  /** The title to give the action (relevant for iOS) */
+  title: string;
+}
+
+export interface AndroidOptions {
+  /**
+   * Whether the audio playback notification is also removed when the playback
+   * stops. **If `stoppingAppPausesPlayback` is set to false, this will be
+   * ignored.**
+   */
+  appKilledPlaybackBehavior?: AppKilledPlaybackBehavior;
+
+  /**
+   * https://developer.android.com/media/media3/exoplayer/track-selection#audioOffload
+   */
+  audioOffload?: boolean;
+
+  /**
+   * enables exoplayer's skipSilence parser
+   * @default false
+   */
+  skipSilence?: boolean;
+
+  /**
+   * enables exoplayer's shuffle mode
+   * @default false
+   */
+  shuffle?: boolean;
+}
 
 export interface PlayerOptions {
   /**
@@ -93,4 +133,40 @@ export interface PlayerOptions {
    * Defaults to `false`.
    */
   autoHandleInterruptions?: boolean;
+}
+
+export interface UpdateOptions {
+  android?: AndroidOptions;
+  ratingType?: RatingType;
+  forwardJumpInterval?: number;
+  backwardJumpInterval?: number;
+  progressUpdateEventInterval?: number; // in seconds
+
+  // ios
+  likeOptions?: FeedbackOptions;
+  dislikeOptions?: FeedbackOptions;
+  bookmarkOptions?: FeedbackOptions;
+
+  capabilities?: Capability[];
+
+  // android
+  notificationCapabilities?: Capability[];
+
+  color?: number;
+}
+
+// MARK: - Functions
+
+/**
+ * Updates the configuration for the components.
+ * @param options - The options to update.
+ * @see https://rntp.dev/docs/api/functions/player#updateoptionsoptions
+ */
+export function updateOptions(options: UpdateOptions = {}): void {
+  TrackPlayer.updateOptions({
+    ...options,
+    android: {
+      ...options.android,
+    },
+  });
 }
