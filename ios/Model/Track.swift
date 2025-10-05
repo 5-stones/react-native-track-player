@@ -23,9 +23,6 @@ public class Track {
   /// Optional asset initialization options.
   public var assetOptions: [String: Any]?
 
-  /// Optional remote commands for this track. If nil, the player's default commands will be used.
-  public var remoteCommands: [RemoteCommand]?
-
   // MARK: - Internal Bridge Properties
 
   /// The original MediaURL from the bridge (for serialization)
@@ -59,7 +56,6 @@ public class Track {
     pitchAlgorithm: PitchAlgorithm? = nil,
     initialTime: TimeInterval? = nil,
     assetOptions: [String: Any]? = nil,
-    remoteCommands: [RemoteCommand]? = nil,
     url: MediaURL? = nil,
     artworkURL: MediaURL? = nil,
     date: String? = nil,
@@ -78,7 +74,6 @@ public class Track {
     self.pitchAlgorithm = pitchAlgorithm
     self.initialTime = initialTime
     self.assetOptions = assetOptions
-    self.remoteCommands = remoteCommands
     self.url = url
     self.artworkURL = artworkURL
     self.date = date

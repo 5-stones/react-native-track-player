@@ -181,7 +181,7 @@ public class TrackPlayer {
   public var remoteCommands: [RemoteCommand] = [] {
     didSet {
       if let track = currentTrack {
-        enableRemoteCommands(track.remoteCommands ?? remoteCommands)
+        enableRemoteCommands(remoteCommands)
       }
     }
   }
@@ -421,7 +421,7 @@ public class TrackPlayer {
       loadNowPlayingMetaValues()
     }
 
-    enableRemoteCommands(track.remoteCommands ?? remoteCommands)
+    enableRemoteCommands(remoteCommands)
 
     loadFromString(
       from: track.audioUrl,
