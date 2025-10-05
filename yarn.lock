@@ -2859,16 +2859,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-native-segmented-control/segmented-control@npm:^2.5.7":
-  version: 2.5.7
-  resolution: "@react-native-segmented-control/segmented-control@npm:2.5.7"
-  peerDependencies:
-    react: ">=16.0"
-    react-native: ">=0.62"
-  checksum: 7fb157f0beae2c26cb9c15406822410d4cef0ca89144a031f8f329b71d45681efef9caf66d2b47689acdd55754a4bcc4e7a4a58f786cf4f7471361f2fdff85fe
-  languageName: node
-  linkType: hard
-
 "@react-native-vector-icons/common@npm:^12.0.1":
   version: 12.0.1
   resolution: "@react-native-vector-icons/common@npm:12.0.1"
@@ -10603,7 +10593,6 @@ __metadata:
     "@react-native-community/cli-platform-android": 19.1.1
     "@react-native-community/cli-platform-ios": 19.1.1
     "@react-native-community/slider": ^4.5.7
-    "@react-native-segmented-control/segmented-control": ^2.5.7
     "@react-native-vector-icons/fontawesome6": ^12.0.1
     "@react-native/babel-preset": 0.80.2
     "@react-native/eslint-config": 0.80.2

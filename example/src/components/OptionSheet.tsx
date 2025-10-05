@@ -1,4 +1,4 @@
-import SegmentedControl from '@react-native-segmented-control/segmented-control';
+import SegmentedControl from './SegmentedControl';
 import React, { useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import TrackPlayer, {
@@ -118,8 +118,7 @@ function Options<T>({
         appearance={'dark'}
         values={options.map((opt) => opt.label)}
         selectedIndex={selectedIndex}
-        onChange={(event) => {
-          const index = event.nativeEvent.selectedSegmentIndex;
+        onChange={(index) => {
           setSelectedIndex(index);
           const value = options[index]?.value;
           if (value !== undefined) {
