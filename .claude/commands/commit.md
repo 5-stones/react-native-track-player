@@ -20,6 +20,7 @@ description: Create a git commit from the staged changes
 - Then write the commit message
 - Don't use `git add` since everything we want to commit is already staged
 - With linting issues, **never commit using `--no-verify`**: fix the underlying issue instead
+- **IMPORTANT**: Only create the single commit for what is currently staged, then STOP. Do not automatically stage and commit other files. Wait for explicit user instruction for any additional commits.
 
 ## Style
 
