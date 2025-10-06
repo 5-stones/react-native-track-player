@@ -1,6 +1,7 @@
 import { fixupConfigRules } from '@eslint/compat';
 import { FlatCompat } from '@eslint/eslintrc';
 import js from '@eslint/js';
+import tseslint from '@typescript-eslint/eslint-plugin';
 import prettier from 'eslint-plugin-prettier';
 import { defineConfig } from 'eslint/config';
 import path from 'node:path';
@@ -15,9 +16,12 @@ const compat = new FlatCompat({
 });
 
 export default defineConfig([
+  ...fixupConfigRules(compat.extends('@react-native', 'prettier')),
   {
-    extends: fixupConfigRules(compat.extends('@react-native', 'prettier')),
-    plugins: { prettier },
+    plugins: {
+      prettier,
+      '@typescript-eslint': tseslint,
+    },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
       'react/react-in-jsx-scope': 'off',
