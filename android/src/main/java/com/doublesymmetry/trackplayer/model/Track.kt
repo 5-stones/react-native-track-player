@@ -123,6 +123,9 @@ private constructor(
     }
 
     fun fromBridge(context: Context, map: ReadableMap, ratingType: Int): Track {
+      // Validate that only expected properties exist (except for 'data' which can have anything)
+      validateFromBridge(map)
+
       // Store original map as Bundle to preserve custom fields
       val originalBundle = readableMapToBundle(map)
 
@@ -218,6 +221,29 @@ private constructor(
         }
       }
       return bundle
+    }
+
+    private val allowedBridgeKeys = setOf(
+      // From Track interface
+      "url", "type", "userAgent", "contentType", "pitchAlgorithm", "headers", "data",
+      // From TrackMetadataBase interface
+      "title", "album", "artist", "duration", "artwork", "description",
+      "genre", "date", "rating", "isLiveStream", "mediaId"
+    )
+
+    private fun validateFromBridge(map: ReadableMap) {
+      val keys = buildList {
+        val iterator = map.keySetIterator()
+        while (iterator.hasNextKey()) add(iterator.nextKey())
+      }
+      val unexpectedKeys = keys - allowedBridgeKeys
+
+      if (unexpectedKeys.isNotEmpty()) {
+        throw IllegalArgumentException(
+          "Track has unexpected properties: ${unexpectedKeys.joinToString(", ")}. " +
+          "Only 'data' field can contain custom properties."
+        )
+      }
     }
   }
 }

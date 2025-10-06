@@ -89,6 +89,14 @@ public class Track {
 
   /// Creates a Track from a React Native bridge dictionary
   public static func fromBridge(dictionary: [String: Any]) -> Track? {
+    // Validate that only expected properties exist (except for 'data' which can have anything)
+    do {
+      try validateFromBridge(dictionary: dictionary)
+    } catch {
+      print("Track.fromBridge: Validation failed - \(error)")
+      return nil
+    }
+
     guard let url = MediaURL(object: dictionary["url"]) else {
       print(
         "Track.fromBridge: Failed to create track - invalid or missing URL. Dictionary: \(dictionary)"
@@ -255,6 +263,29 @@ public class Track {
           handler(nil)
         }
       }).resume()
+    }
+  }
+
+  // MARK: - Validation
+
+  private static let allowedBridgeKeys: Set<String> = [
+    "url", "type", "userAgent", "contentType", "pitchAlgorithm", "headers", "data",
+    "title", "album", "artist", "duration", "artwork", "description",
+    "genre", "date", "rating", "isLiveStream", "mediaId"
+  ]
+
+  private static func validateFromBridge(dictionary: [String: Any]) throws {
+    let unexpectedKeys = Set(dictionary.keys).subtracting(allowedBridgeKeys)
+
+    if !unexpectedKeys.isEmpty {
+      throw NSError(
+        domain: "TrackPlayer",
+        code: -1,
+        userInfo: [
+          NSLocalizedDescriptionKey:
+            "Track has unexpected properties: \(unexpectedKeys.sorted().joined(separator: ", ")). Only 'data' field can contain custom properties."
+        ]
+      )
     }
   }
 }
