@@ -135,6 +135,9 @@
     "example"
   ],
   "packageManager": "yarn@3.6.1",
+  "engines": {
+    "node": ">=24"
+  },
   "jest": {
     "preset": "react-native",
     "modulePathIgnorePatterns": [
