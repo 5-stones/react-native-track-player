@@ -28,7 +28,7 @@ const onReset = async () => {
   await TrackPlayer.reset();
 };
 
-export const ActionSheet: React.FC = () => {
+export function ActionSheet() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Spacer />
@@ -45,7 +45,7 @@ export const ActionSheet: React.FC = () => {
       <Button title={'Reset'} onPress={onReset} type={'primary'} />
     </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {

@@ -9,7 +9,7 @@ import { PlayPauseButton } from './PlayPauseButton';
 const performSkipToNext = () => TrackPlayer.skipToNext();
 const performSkipToPrevious = () => TrackPlayer.skipToPrevious();
 
-export const PlayerControls: React.FC = () => {
+export function PlayerControls() {
   return (
     <View style={styles.container}>
       <View style={styles.row}>
@@ -24,7 +24,7 @@ export const PlayerControls: React.FC = () => {
       <PlaybackError />
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {

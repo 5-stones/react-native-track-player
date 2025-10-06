@@ -1,15 +1,14 @@
 import Icon from '@react-native-vector-icons/fontawesome6';
-import React from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import TrackPlayer, { useIsPlaying } from 'react-native-track-player';
+import TrackPlayer, { usePlayingState } from 'react-native-track-player';
 
-export const PlayPauseButton: React.FC = () => {
-  const { playing, buffering } = useIsPlaying();
+export function PlayPauseButton() {
+  const { playing, buffering } = usePlayingState();
   return (
     <View style={styles.container}>
       {buffering ? (
@@ -28,7 +27,7 @@ export const PlayPauseButton: React.FC = () => {
       )}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {

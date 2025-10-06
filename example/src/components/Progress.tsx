@@ -4,7 +4,7 @@ import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import TrackPlayer, { useProgress } from 'react-native-track-player';
 import { Spacer } from './Spacer';
 
-export const Progress: React.FC<{ live?: boolean }> = ({ live }) => {
+export function Progress({ live }: { live?: boolean }) {
   const { position, duration } = useProgress();
 
   // This is a workaround since the slider component only takes absolute widths
@@ -38,7 +38,7 @@ export const Progress: React.FC<{ live?: boolean }> = ({ live }) => {
       )}
     </View>
   );
-};
+}
 
 const formatSeconds = (time: number) =>
   new Date(time * 1000).toISOString().slice(14, 19);

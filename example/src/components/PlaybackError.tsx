@@ -1,13 +1,8 @@
-import React, { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Event, useTrackPlayerEvents } from 'react-native-track-player';
+import { usePlaybackError } from 'react-native-track-player';
 
-export const PlaybackError: React.FC = () => {
-  const [error, setError] = useState<string | undefined>();
-
-  useTrackPlayerEvents([Event.PlaybackError], (event) => {
-    setError(event.error?.message);
-  });
+export function PlaybackError() {
+  const error = usePlaybackError()?.message;
 
   if (!error) return null;
 
@@ -16,7 +11,7 @@ export const PlaybackError: React.FC = () => {
       <Text style={styles.text}>{error}</Text>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {

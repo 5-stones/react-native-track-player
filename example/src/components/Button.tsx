@@ -14,12 +14,12 @@ export interface ButtonProps {
   style?: ViewStyle | TextStyle;
 }
 
-export const Button: React.FC<ButtonProps> = ({
+export function Button({
   title,
   onPress,
   type = 'primary',
   style,
-}) => {
+}: ButtonProps) {
   return (
     <TouchableWithoutFeedback onPress={onPress}>
       <Text
@@ -32,7 +32,7 @@ export const Button: React.FC<ButtonProps> = ({
       </Text>
     </TouchableWithoutFeedback>
   );
-};
+}
 
 const styles = StyleSheet.create({
   primary: {
