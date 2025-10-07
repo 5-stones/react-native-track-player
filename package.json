@@ -150,8 +150,12 @@
       "@commitlint/config-conventional"
     ],
     "rules": {
-      "body-max-line-length": [0],
-      "footer-max-line-length": [0]
+      "body-max-line-length": [
+        0
+      ],
+      "footer-max-line-length": [
+        0
+      ]
     }
   },
   "release-it": {
@@ -187,11 +191,7 @@
     }
   },
   "prettier": {
-    "quoteProps": "consistent",
-    "singleQuote": true,
-    "tabWidth": 2,
-    "trailingComma": "es5",
-    "useTabs": false
+    "singleQuote": true
   },
   "react-native-builder-bob": {
     "source": "src",
