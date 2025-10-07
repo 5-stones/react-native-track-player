@@ -20,6 +20,7 @@ data class TrackPlayerOptions(
   val minBuffer: Double? = null,
   val maxBuffer: Double? = null,
   val playBuffer: Double? = null,
+  val rebufferBuffer: Double? = null,
   val backBuffer: Double? = null,
   val maxCacheSize: Double = 0.0,
   val audioContentType: AudioContentType = AudioContentType.MUSIC,
@@ -74,6 +75,8 @@ data class TrackPlayerOptions(
         minBuffer = if (map.hasKey("minBuffer")) map.getDouble("minBuffer") else null,
         maxBuffer = if (map.hasKey("maxBuffer")) map.getDouble("maxBuffer") else null,
         playBuffer = if (map.hasKey("playBuffer")) map.getDouble("playBuffer") else null,
+        rebufferBuffer =
+          if (map.hasKey("rebufferBuffer")) map.getDouble("rebufferBuffer") else null,
         backBuffer = if (map.hasKey("backBuffer")) map.getDouble("backBuffer") else null,
         maxCacheSize = if (map.hasKey("maxCacheSize")) map.getDouble("maxCacheSize") else 0.0,
         audioContentType =
@@ -118,6 +121,7 @@ data class TrackPlayerOptions(
           minBuffer?.toMilliseconds()?.toInt(),
           maxBuffer?.toMilliseconds()?.toInt(),
           playBuffer?.toMilliseconds()?.toInt(),
+          rebufferBuffer?.toMilliseconds()?.toInt(),
           backBuffer?.toMilliseconds()?.toInt(),
         ),
       cacheSizeKb = maxCacheSize.toLong(),

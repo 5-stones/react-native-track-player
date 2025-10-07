@@ -84,6 +84,18 @@ export interface PlayerOptions {
    */
   playBuffer?: number;
   /**
+   * Duration of media in seconds that must be buffered for playback to resume
+   * after a rebuffer (when the buffer runs empty during playback).
+   *
+   * When not specified, defaults to playBuffer * 1.6 (maintaining ExoPlayer's
+   * default ratio). Should be >= playBuffer for optimal behavior.
+   *
+   * Supported on Android only.
+   *
+   * @default playBuffer * 1.6
+   */
+  rebufferBuffer?: number;
+  /**
    * Maximum cache size in kilobytes.
    *
    * Supported on Android only.

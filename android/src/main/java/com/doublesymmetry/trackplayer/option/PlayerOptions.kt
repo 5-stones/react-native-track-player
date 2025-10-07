@@ -38,5 +38,6 @@ data class BufferOptions(
   val minBuffer: Int?,
   val maxBuffer: Int?,
   val playBuffer: Int?,
+  val rebufferBuffer: Int?,
   val backBuffer: Int?,
 )

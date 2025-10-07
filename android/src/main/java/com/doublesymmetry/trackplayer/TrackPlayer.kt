@@ -402,8 +402,8 @@ class TrackPlayer(
     val loadControl = run {
       val bufferConfig = options.bufferOptions
       val multiplier =
-        DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS /
-          DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS
+        DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS.toDouble() /
+          DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS.toDouble()
       val minBuffer =
         bufferConfig.minBuffer?.takeIf { it != 0 } ?: DefaultLoadControl.DEFAULT_MIN_BUFFER_MS
       val maxBuffer =
@@ -411,11 +411,14 @@ class TrackPlayer(
       val playBuffer =
         bufferConfig.playBuffer?.takeIf { it != 0 }
           ?: DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS
+      val playAfterRebuffer =
+        bufferConfig.rebufferBuffer?.takeIf { it != 0 }
+          ?: (playBuffer * multiplier).toInt()
       val backBuffer =
         bufferConfig.backBuffer?.takeIf { it != 0 }
           ?: DefaultLoadControl.DEFAULT_BACK_BUFFER_DURATION_MS
       DefaultLoadControl.Builder()
-        .setBufferDurationsMs(minBuffer, maxBuffer, playBuffer, playBuffer * multiplier)
+        .setBufferDurationsMs(minBuffer, maxBuffer, playBuffer, playAfterRebuffer)
         .setBackBuffer(backBuffer, false)
         .build()
     }
