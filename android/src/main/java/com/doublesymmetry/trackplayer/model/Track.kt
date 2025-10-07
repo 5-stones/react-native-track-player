@@ -223,13 +223,29 @@ private constructor(
       return bundle
     }
 
-    private val allowedBridgeKeys = setOf(
-      // From Track interface
-      "url", "type", "userAgent", "contentType", "pitchAlgorithm", "headers", "data",
-      // From TrackMetadataBase interface
-      "title", "album", "artist", "duration", "artwork", "description",
-      "genre", "date", "rating", "isLiveStream", "mediaId"
-    )
+    private val allowedBridgeKeys =
+      setOf(
+        // From Track interface
+        "url",
+        "type",
+        "userAgent",
+        "contentType",
+        "pitchAlgorithm",
+        "headers",
+        "data",
+        // From TrackMetadataBase interface
+        "title",
+        "album",
+        "artist",
+        "duration",
+        "artwork",
+        "description",
+        "genre",
+        "date",
+        "rating",
+        "isLiveStream",
+        "mediaId",
+      )
 
     private fun validateFromBridge(map: ReadableMap) {
       val keys = buildList {
@@ -241,7 +257,7 @@ private constructor(
       if (unexpectedKeys.isNotEmpty()) {
         throw IllegalArgumentException(
           "Track has unexpected properties: ${unexpectedKeys.joinToString(", ")}. " +
-          "Only 'data' field can contain custom properties."
+            "Only 'data' field can contain custom properties."
         )
       }
     }
