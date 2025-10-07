@@ -43,20 +43,12 @@ RCT_EXPORT_MODULE()
   return insertBeforeIndex;
 }
 
-- (nonnull facebook::react::ModuleConstants<JS::NativeTrackPlayer::Constants::Builder>)constantsToExport {
-  return [NativeTrackPlayerImpl constantsToExport];
-}
-
 - (NSDictionary * _Nullable)getActiveTrack {
   return [nativeTrackPlayer getActiveTrack];
 }
 
 - (NSNumber * _Nullable)getActiveTrackIndex {
   return [nativeTrackPlayer getActiveTrackIndex];
-}
-
-- (nonnull facebook::react::ModuleConstants<JS::NativeTrackPlayer::Constants::Builder>)getConstants {
-  return [self constantsToExport];
 }
 
 - (NSNumber *)getPlayWhenReady {

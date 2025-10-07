@@ -81,50 +81,6 @@ export interface Spec extends TurboModule {
   addListener(eventName: string): void;
   removeListeners(count: number): void;
 
-  // constants
-  getConstants: () => {
-    // Capabilities
-    CAPABILITY_PLAY: string;
-    CAPABILITY_PLAY_FROM_ID: string;
-    CAPABILITY_PLAY_FROM_SEARCH: string;
-    CAPABILITY_PAUSE: string;
-    CAPABILITY_STOP: string;
-    CAPABILITY_SEEK_TO: string;
-    CAPABILITY_SKIP: string;
-    CAPABILITY_SKIP_TO_NEXT: string;
-    CAPABILITY_SKIP_TO_PREVIOUS: string;
-    CAPABILITY_SET_RATING: string;
-    CAPABILITY_JUMP_FORWARD: string;
-    CAPABILITY_JUMP_BACKWARD: string;
-
-    // States
-    STATE_NONE: string;
-    STATE_READY: string;
-    STATE_PLAYING: string;
-    STATE_PAUSED: string;
-    STATE_STOPPED: string;
-    STATE_BUFFERING: string;
-    STATE_LOADING: string;
-
-    // Rating Types
-    RATING_HEART: string;
-    RATING_THUMBS_UP_DOWN: string;
-    RATING_3_STARS: string;
-    RATING_4_STARS: string;
-    RATING_5_STARS: string;
-    RATING_PERCENTAGE: string;
-
-    // Repeat Modes
-    REPEAT_OFF: string;
-    REPEAT_TRACK: string;
-    REPEAT_QUEUE: string;
-
-    // Pitch Algorithms - iOS
-    PITCH_ALGORITHM_LINEAR: string;
-    PITCH_ALGORITHM_MUSIC: string;
-    PITCH_ALGORITHM_VOICE: string;
-  };
-
   // android methods
   acquireWakeLock(): void;
   abandonWakeLock(): void;
@@ -132,5 +88,4 @@ export interface Spec extends TurboModule {
 }
 
 const module = TurboModuleRegistry.getEnforcing<Spec>('TrackPlayer');
-export const Constants = module?.getConstants();
 export default module;

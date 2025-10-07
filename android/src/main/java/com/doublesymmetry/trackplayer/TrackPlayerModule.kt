@@ -108,51 +108,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   /* ****************************** API ****************************** */
-  override fun getTypedExportedConstants(): Map<String, Any> {
-    return HashMap<String, Any>().apply {
-      // Capabilities
-      this["CAPABILITY_PLAY"] = PlayerCapability.PLAY.string
-      this["CAPABILITY_PLAY_FROM_ID"] = PlayerCapability.PLAY_FROM_ID.string
-      this["CAPABILITY_PLAY_FROM_SEARCH"] = PlayerCapability.PLAY_FROM_SEARCH.string
-      this["CAPABILITY_PAUSE"] = PlayerCapability.PAUSE.string
-      this["CAPABILITY_STOP"] = PlayerCapability.STOP.string
-      this["CAPABILITY_SEEK_TO"] = PlayerCapability.SEEK_TO.string
-      this["CAPABILITY_SKIP"] = PlayerCapability.SKIP.string
-      this["CAPABILITY_SKIP_TO_NEXT"] = PlayerCapability.SKIP_TO_NEXT.string
-      this["CAPABILITY_SKIP_TO_PREVIOUS"] = PlayerCapability.SKIP_TO_PREVIOUS.string
-      this["CAPABILITY_SET_RATING"] = PlayerCapability.SET_RATING.string
-      this["CAPABILITY_JUMP_FORWARD"] = PlayerCapability.JUMP_FORWARD.string
-      this["CAPABILITY_JUMP_BACKWARD"] = PlayerCapability.JUMP_BACKWARD.string
-
-      // States
-      this["STATE_NONE"] = State.NONE.bridge
-      this["STATE_READY"] = State.READY.bridge
-      this["STATE_PLAYING"] = State.PLAYING.bridge
-      this["STATE_PAUSED"] = State.PAUSED.bridge
-      this["STATE_STOPPED"] = State.STOPPED.bridge
-      this["STATE_BUFFERING"] = State.BUFFERING.bridge
-      this["STATE_LOADING"] = State.LOADING.bridge
-
-      // Rating Types
-      this["RATING_HEART"] = RatingType.HEART.string
-      this["RATING_THUMBS_UP_DOWN"] = RatingType.THUMBS_UP_DOWN.string
-      this["RATING_3_STARS"] = RatingType.THREE_STARS.string
-      this["RATING_4_STARS"] = RatingType.FOUR_STARS.string
-      this["RATING_5_STARS"] = RatingType.FIVE_STARS.string
-      this["RATING_PERCENTAGE"] = RatingType.PERCENTAGE.string
-
-      // Repeat Modes
-      this["REPEAT_OFF"] = PlayerRepeatMode.OFF.string
-      this["REPEAT_TRACK"] = PlayerRepeatMode.ONE.string
-      this["REPEAT_QUEUE"] = PlayerRepeatMode.ALL.string
-
-      // Pitch Algorithm: No-op on android
-      this["PITCH_ALGORITHM_LINEAR"] = "linear"
-      this["PITCH_ALGORITHM_MUSIC"] = "music"
-      this["PITCH_ALGORITHM_VOICE"] = "voice"
-    }
-  }
-
   @SuppressLint("UnspecifiedRegisterReceiverFlag")
   override fun setupPlayer(data: ReadableMap?, promise: Promise) {
     if (connectedService != null) {

@@ -8,11 +8,6 @@ public class NativeTrackPlayerImpl: NSObject {
   // Add property for the Objective-C bridge
   @objc public weak var delegate: NativeTrackPlayerImplDelegate?
 
-  // @objc
-  // func constantsToExport() -> [String: Any]! {
-  //   return ["someKey": "someValue"]
-  // }
-
   // MARK: - Attributes
 
   private var hasInitialized = false
@@ -750,51 +745,6 @@ public class NativeTrackPlayerImpl: NSObject {
 }
 
 public extension NativeTrackPlayerImpl {
-  @objc(constantsToExport)
-  static var constantsToExport: [AnyHashable: Any] {
-    return [
-      "STATE_NONE": State.none.bridge,
-      "STATE_READY": State.ready.bridge,
-      "STATE_PLAYING": State.playing.bridge,
-      "STATE_PAUSED": State.paused.bridge,
-      "STATE_STOPPED": State.stopped.bridge,
-      "STATE_BUFFERING": State.buffering.bridge,
-      "STATE_LOADING": State.loading.bridge,
-      "STATE_ERROR": State.error.bridge,
-
-      "PITCH_ALGORITHM_LINEAR": PitchAlgorithm.linear.rawValue,
-      "PITCH_ALGORITHM_MUSIC": PitchAlgorithm.music.rawValue,
-      "PITCH_ALGORITHM_VOICE": PitchAlgorithm.voice.rawValue,
-
-      "CAPABILITY_PLAY": Capability.play.rawValue,
-      "CAPABILITY_PLAY_FROM_ID": "NOOP",
-      "CAPABILITY_PLAY_FROM_SEARCH": "NOOP",
-      "CAPABILITY_PAUSE": Capability.pause.rawValue,
-      "CAPABILITY_STOP": Capability.stop.rawValue,
-      "CAPABILITY_SEEK_TO": Capability.seek.rawValue,
-      "CAPABILITY_SKIP": "NOOP",
-      "CAPABILITY_SKIP_TO_NEXT": Capability.next.rawValue,
-      "CAPABILITY_SKIP_TO_PREVIOUS": Capability.previous.rawValue,
-      "CAPABILITY_SET_RATING": "NOOP",
-      "CAPABILITY_JUMP_FORWARD": Capability.jumpForward.rawValue,
-      "CAPABILITY_JUMP_BACKWARD": Capability.jumpBackward.rawValue,
-      "CAPABILITY_LIKE": Capability.like.rawValue,
-      "CAPABILITY_DISLIKE": Capability.dislike.rawValue,
-      "CAPABILITY_BOOKMARK": Capability.bookmark.rawValue,
-
-      "REPEAT_OFF": RepeatMode.off.rawValue,
-      "REPEAT_TRACK": RepeatMode.track.rawValue,
-      "REPEAT_QUEUE": RepeatMode.queue.rawValue,
-
-      "RATING_HEART": RatingType.heart.rawValue,
-      "RATING_THUMBS_UP_DOWN": RatingType.thumbsUpDown.rawValue,
-      "RATING_3_STARS": RatingType.threeStars.rawValue,
-      "RATING_4_STARS": RatingType.fourStars.rawValue,
-      "RATING_5_STARS": RatingType.fiveStars.rawValue,
-      "RATING_PERCENTAGE": RatingType.percentage.rawValue,
-    ]
-  }
-
   @objc(supportedEvents)
   static var supportedEvents: [String] {
     return EventType.allRawValues()
