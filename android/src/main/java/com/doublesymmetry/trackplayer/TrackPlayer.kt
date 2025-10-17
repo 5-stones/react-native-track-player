@@ -169,7 +169,9 @@ class TrackPlayer(
   }
 
   internal val playingState: PlayingState by lazy {
-    PlayingState { event -> callbacks?.onPlaybackPlayingState(event) }
+    PlayingState {
+      event -> this.callbacks?.onPlaybackPlayingState(event)
+    }
   }
 
   val currentTrack: Track?
