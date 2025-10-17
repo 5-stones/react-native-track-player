@@ -55,7 +55,7 @@ import timber.log.Timber
 
 @ReactModule(name = TrackPlayerModule.NAME)
 class TrackPlayerModule(reactContext: ReactApplicationContext) :
-  NativeTrackPlayerSpec(reactContext), ServiceConnection, TrackPlayerCallbacks {
+  NativeTrackPlayerSpec(reactContext), ServiceConnection {
   private lateinit var browser: MediaBrowser
   private var playerOptions: TrackPlayerOptions = TrackPlayerOptions()
   private var playerSetUpPromise: Promise? = null
@@ -94,7 +94,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       if (connectedService == null) {
         val binder: TrackPlayerService.MusicBinder = serviceBinder as TrackPlayerService.MusicBinder
         connectedService = binder.service
-        connectedService?.setupPlayer(playerOptions, this@TrackPlayerModule)
+        connectedService?.setupPlayer(playerOptions, callbacks)
         playerSetUpPromise?.resolve(null)
       }
     }
@@ -350,110 +350,111 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   private val player
     get() = service.player
 
-  // TrackPlayerCallbacks implementation
-  override fun onPlaybackState(state: PlaybackState) {
-    emitOnPlaybackState(state.toBridge())
-  }
+  private val callbacks = object : TrackPlayerCallbacks {
+    override fun onPlaybackState(state: PlaybackState) {
+      emitOnPlaybackState(state.toBridge())
+    }
 
-  override fun onPlaybackActiveTrackChanged(event: PlaybackActiveTrackChangedEvent) {
-    emitOnPlaybackActiveTrackChanged(event.toBridge())
-  }
+    override fun onPlaybackActiveTrackChanged(event: PlaybackActiveTrackChangedEvent) {
+      emitOnPlaybackActiveTrackChanged(event.toBridge())
+    }
 
-  override fun onPlaybackProgressUpdated(event: PlaybackProgressUpdatedEvent) {
-    emitOnPlaybackProgressUpdated(event.toBridge())
-  }
+    override fun onPlaybackProgressUpdated(event: PlaybackProgressUpdatedEvent) {
+      emitOnPlaybackProgressUpdated(event.toBridge())
+    }
 
-  override fun onPlaybackPlayWhenReadyChanged(event: PlaybackPlayWhenReadyChangedEvent) {
-    emitOnPlaybackPlayWhenReadyChanged(event.toBridge())
-  }
+    override fun onPlaybackPlayWhenReadyChanged(event: PlaybackPlayWhenReadyChangedEvent) {
+      emitOnPlaybackPlayWhenReadyChanged(event.toBridge())
+    }
 
-  override fun onPlaybackPlayingState(event: PlaybackPlayingStateEvent) {
-    emitOnPlaybackPlayingState(event.toBridge())
-  }
+    override fun onPlaybackPlayingState(event: PlaybackPlayingStateEvent) {
+      emitOnPlaybackPlayingState(event.toBridge())
+    }
 
-  override fun onPlaybackQueueEnded(event: PlaybackQueueEndedEvent) {
-    emitOnPlaybackQueueEnded(event.toBridge())
-  }
+    override fun onPlaybackQueueEnded(event: PlaybackQueueEndedEvent) {
+      emitOnPlaybackQueueEnded(event.toBridge())
+    }
 
-  override fun onPlaybackError(event: PlaybackErrorEvent) {
-    emitOnPlaybackError(event.toBridge())
-  }
+    override fun onPlaybackError(event: PlaybackErrorEvent) {
+      emitOnPlaybackError(event.toBridge())
+    }
 
-  override fun onMetadataCommonReceived(metadata: WritableMap) {
-    emitOnMetadataCommonReceived(Arguments.createMap().apply { putMap("metadata", metadata) })
-  }
+    override fun onMetadataCommonReceived(metadata: WritableMap) {
+      emitOnMetadataCommonReceived(Arguments.createMap().apply { putMap("metadata", metadata) })
+    }
 
-  override fun onMetadataTimedReceived(metadata: Metadata) {
-    emitOnMetadataTimedReceived(
-      Arguments.createMap().let {
-        it.putArray(
-          "metadata",
-          Arguments.createArray().apply {
-            MetadataAdapter.Companion.fromMetadata(metadata).forEach { item -> pushMap(item) }
-          },
-        )
-        it
-      }
-    )
-  }
-
-  override fun onPlaybackMetadata(metadata: PlaybackMetadata?) {
-    metadata?.let {
-      emitOnPlaybackMetadata(
-        Arguments.createMap().apply {
-          putString("source", it.source)
-          putString("title", it.title)
-          putString("url", it.url)
-          putString("artist", it.artist)
-          putString("album", it.album)
-          putString("date", it.date)
-          putString("genre", it.genre)
+    override fun onMetadataTimedReceived(metadata: Metadata) {
+      emitOnMetadataTimedReceived(
+        Arguments.createMap().let {
+          it.putArray(
+            "metadata",
+            Arguments.createArray().apply {
+              MetadataAdapter.Companion.fromMetadata(metadata).forEach { item -> pushMap(item) }
+            },
+          )
+          it
         }
       )
     }
-  }
 
-  override fun onRemotePlay() {
-    emitOnRemotePlay(Arguments.createMap())
-  }
+    override fun onPlaybackMetadata(metadata: PlaybackMetadata?) {
+      metadata?.let {
+        emitOnPlaybackMetadata(
+          Arguments.createMap().apply {
+            putString("source", it.source)
+            putString("title", it.title)
+            putString("url", it.url)
+            putString("artist", it.artist)
+            putString("album", it.album)
+            putString("date", it.date)
+            putString("genre", it.genre)
+          }
+        )
+      }
+    }
 
-  override fun onRemotePause() {
-    emitOnRemotePause(Arguments.createMap())
-  }
+    override fun onRemotePlay() {
+      emitOnRemotePlay(Arguments.createMap())
+    }
 
-  override fun onRemoteStop() {
-    emitOnRemoteStop(Arguments.createMap())
-  }
+    override fun onRemotePause() {
+      emitOnRemotePause(Arguments.createMap())
+    }
 
-  override fun onRemoteNext() {
-    emitOnRemoteNext(Arguments.createMap())
-  }
+    override fun onRemoteStop() {
+      emitOnRemoteStop(Arguments.createMap())
+    }
 
-  override fun onRemotePrevious() {
-    emitOnRemotePrevious(Arguments.createMap())
-  }
+    override fun onRemoteNext() {
+      emitOnRemoteNext(Arguments.createMap())
+    }
 
-  override fun onRemoteJumpForward(event: RemoteJumpForwardEvent) {
-    emitOnRemoteJumpForward(event.toBridge())
-  }
+    override fun onRemotePrevious() {
+      emitOnRemotePrevious(Arguments.createMap())
+    }
 
-  override fun onRemoteJumpBackward(event: RemoteJumpBackwardEvent) {
-    emitOnRemoteJumpBackward(event.toBridge())
-  }
+    override fun onRemoteJumpForward(event: RemoteJumpForwardEvent) {
+      emitOnRemoteJumpForward(event.toBridge())
+    }
 
-  override fun onRemoteSeek(event: RemoteSeekEvent) {
-    emitOnRemoteSeek(event.toBridge())
-  }
+    override fun onRemoteJumpBackward(event: RemoteJumpBackwardEvent) {
+      emitOnRemoteJumpBackward(event.toBridge())
+    }
 
-  override fun onRemoteSetRating(event: RemoteSetRatingEvent) {
-    emitOnRemoteSetRating(event.toBridge())
-  }
+    override fun onRemoteSeek(event: RemoteSeekEvent) {
+      emitOnRemoteSeek(event.toBridge())
+    }
 
-  override fun onControllerConnected(event: ControllerConnectedEvent) {
-    emitOnAndroidControllerConnected(event.toBridge())
-  }
+    override fun onRemoteSetRating(event: RemoteSetRatingEvent) {
+      emitOnRemoteSetRating(event.toBridge())
+    }
 
-  override fun onControllerDisconnected(event: ControllerDisconnectedEvent) {
-    emitOnAndroidControllerDisconnected(event.toBridge())
+    override fun onControllerConnected(event: ControllerConnectedEvent) {
+      emitOnAndroidControllerConnected(event.toBridge())
+    }
+
+    override fun onControllerDisconnected(event: ControllerDisconnectedEvent) {
+      emitOnAndroidControllerDisconnected(event.toBridge())
+    }
   }
 }
