@@ -52,12 +52,17 @@ private constructor(
         putString("type", type.toString())
         putString("uri", uri?.toString() ?: "")
       }
+    // TODO: A playable item can still be browsable and a browsable item can be playable,
+    // this logic needs to be revisited:
+    var playable = url == null && uri == null
     val mediaMetadata =
       MediaMetadata.Builder()
         .setTitle(title)
         .setArtist(artist)
         .setArtworkUri(artwork?.toUri())
         .setExtras(extras)
+        .setIsBrowsable(!playable)
+        .setIsPlayable(playable)
         .build()
 
     return MediaItem.Builder()
