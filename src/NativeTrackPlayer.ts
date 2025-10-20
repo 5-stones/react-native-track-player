@@ -84,7 +84,6 @@ export interface Spec extends TurboModule {
   // MARK: Android methods
   acquireWakeLock(): void;
   abandonWakeLock(): void;
-  validateOnStartCommandIntent(): boolean;
 
   // MARK: Media Browser Methods:
   readonly onGetItemRequest: EventEmitter<{ requestId: string; id: string }>;

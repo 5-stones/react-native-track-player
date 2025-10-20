@@ -379,10 +379,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
 
   override fun abandonWakeLock() = runBlockingOnMain { service.abandonWakeLock() }
 
-  override fun validateOnStartCommandIntent(): Boolean = runBlockingOnMain {
-    service.onStartCommandIntentValid
-  }
-
   // Bridgeless interop layer tries to pass the `Job` from `scope.launch` to the JS side
   // which causes an exception. We can work around this using a wrapper.
   private fun launchInScope(block: suspend () -> Unit) {

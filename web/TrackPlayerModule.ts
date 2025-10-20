@@ -195,7 +195,4 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
   public removeListeners() {}
   public async acquireWakeLock() {}
   public async abandonWakeLock() {}
-  public async validateOnStartCommandIntent() {
-    return true;
-  }
 }

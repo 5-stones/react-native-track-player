@@ -65,7 +65,6 @@ class TrackPlayerService : MediaLibraryService() {
   private var sessionCommands: SessionCommands? = null
   private var playerCommands: Player.Commands? = null
   private var customLayout: List<CommandButton> = listOf()
-  var onStartCommandIntentValid: Boolean = true
 
   // Headless service binding
   private val headlessConnection: ServiceConnection =
@@ -161,13 +160,6 @@ class TrackPlayerService : MediaLibraryService() {
 
   private var appKilledPlaybackBehavior =
     AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
-
-  override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-    onStartCommandIntentValid = intent != null
-    Timber.d("${intent?.action}, ${intent?.`package`}")
-
-    return START_STICKY
-  }
 
   fun setupPlayer(playerOptionsData: TrackPlayerOptions, callbacks: TrackPlayerCallbacks? = null) {
     Timber.d("Setting up player")
