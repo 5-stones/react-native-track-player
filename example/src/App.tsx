@@ -34,7 +34,7 @@ const tracksWithIds = tracks.map((track, index) => ({
 }));
 TrackPlayer.registerMediaBrowser({
   async get({ id }) {
-    return tracksWithIds.find((item) => item.mediaId === id) ?? null;
+    return tracksWithIds.find((item) => item.mediaId === id);
   },
   async list() {
     return {
