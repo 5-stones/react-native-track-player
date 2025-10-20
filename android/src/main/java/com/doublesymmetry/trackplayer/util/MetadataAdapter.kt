@@ -29,7 +29,7 @@ sealed class MetadataAdapter {
 
             when (val entry = metadata[i]) {
               is ChapterFrame -> {
-                Timber.Forest.d("ChapterFrame: ${entry.id}")
+                Timber.d("ChapterFrame: ${entry.id}")
               }
               is TextInformationFrame -> {
                 val rawEntry = Arguments.createMap()
