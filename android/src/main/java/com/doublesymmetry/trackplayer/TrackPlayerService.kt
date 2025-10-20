@@ -1,76 +1,130 @@
 package com.doublesymmetry.trackplayer
 
 import android.annotation.SuppressLint
-import android.app.ActivityOptions
 import android.app.PendingIntent
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.ServiceConnection
 import android.os.Binder
-import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
-import android.provider.Settings
+import android.os.PowerManager
+import android.util.Log
 import androidx.annotation.MainThread
 import androidx.annotation.OptIn
 import androidx.core.net.toUri
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.Rating
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaController
+import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
+import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionCommands
 import androidx.media3.session.SessionResult
-import com.doublesymmetry.trackplayer.event.EventControllerConnection
-import com.doublesymmetry.trackplayer.extension.find
+import androidx.media3.session.SessionToken
 import com.doublesymmetry.trackplayer.model.AppKilledPlaybackBehavior
 import com.doublesymmetry.trackplayer.model.CustomCommandButton
 import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
 import com.doublesymmetry.trackplayer.option.PlayerCapability
+import com.facebook.react.ReactApplication
+import com.facebook.react.ReactInstanceManager
 import com.facebook.react.bridge.Arguments
-import com.facebook.react.jstasks.HeadlessJsTaskConfig
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.MoreExecutors
+import com.google.common.util.concurrent.SettableFuture
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.system.exitProcess
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.guava.future
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 @OptIn(UnstableApi::class)
 @MainThread
-class TrackPlayerService : HeadlessJsMediaService() {
+class TrackPlayerService : MediaLibraryService() {
   lateinit var player: TrackPlayer
-  private val binder = MusicBinder()
+  private val binder = LocalBinder()
   private val scope = MainScope()
-  // Temporary reference to the initial player's ExoPlayer, used for MediaSession initialization
-  // before the player is configured with options from JavaScript
-  private var temporaryPlayer: ExoPlayer? = null
+  private var module = CompletableDeferred<TrackPlayerModule>()
   private lateinit var mediaSession: MediaLibrarySession
   private var sessionCommands: SessionCommands? = null
   private var playerCommands: Player.Commands? = null
   private var customLayout: List<CommandButton> = listOf()
-  private var lastWake: Long = 0
   var onStartCommandIntentValid: Boolean = true
 
+  // Headless service binding
+  private val headlessConnection: ServiceConnection =
+    object : ServiceConnection {
+      override fun onServiceConnected(className: ComponentName, service: IBinder) {}
+      override fun onServiceDisconnected(className: ComponentName) {}
+    }
+
+  private val pendingGetItemRequests = ConcurrentHashMap<String, SettableFuture<MediaItem?>>()
+  private val pendingGetChildrenRequests =
+    ConcurrentHashMap<String, SettableFuture<List<MediaItem>>>()
+  private val pendingSearchRequests = ConcurrentHashMap<String, SettableFuture<List<MediaItem>>>()
+  private var mediaItemById: MutableMap<String, MediaItem> = mutableMapOf()
+
+  @SuppressLint("WakelockTimeout")
   fun acquireWakeLock() {
-    acquireWakeLockNow(this)
+    if (wakeLock?.isHeld == true) return
+    wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager).newWakeLock(
+      PowerManager.PARTIAL_WAKE_LOCK,
+      TrackPlayerService::class.java.canonicalName,
+    ).apply {
+      setReferenceCounted(false)
+      acquire()
+    }
   }
 
   fun abandonWakeLock() {
-    sWakeLock?.release()
+    wakeLock?.release()
   }
 
   override fun onCreate() {
-    Timber.Forest.plant(
-      object : Timber.DebugTree() {
-        override fun createStackElementTag(element: StackTraceElement): String? {
-          return "RNTP-${element.className}:${element.methodName}"
+    super.onCreate()
+
+    if (BuildConfig.DEBUG) {
+      Timber.Forest.plant(
+        object : Timber.DebugTree() {
+          override fun createStackElementTag(element: StackTraceElement): String? {
+            return "${element.className.substringAfterLast('.')}:${element.methodName}"
+          }
         }
-      }
-    )
-    // Create initial player with default options. This will be replaced in setupPlayer()
-    // when JavaScript provides the actual configuration
+      )
+    } else {
+      Timber.Forest.plant(
+        object : Timber.Tree() {
+          override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
+            if (priority >= Log.WARN) {
+              Log.println(priority, tag ?: "TrackPlayer", message)
+              t?.let { throwable ->
+                Log.println(priority, tag ?: "TrackPlayer", throwable.toString())
+              }
+            }
+          }
+        }
+      )
+    }
+
+    // Create initial player with default options for MediaSession
     player = TrackPlayer(this)
-    temporaryPlayer = player.exoPlayer
+
     val openAppIntent =
       packageManager.getLaunchIntentForPackage(packageName)?.apply {
         flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -90,7 +144,19 @@ class TrackPlayerService : HeadlessJsMediaService() {
           )
         )
         .build()
-    super.onCreate()
+        .also { session ->
+          session.sessionExtras = androidx.core.os.bundleOf(
+            androidx.media3.session.MediaConstants.EXTRAS_KEY_SLOT_RESERVATION_SEEK_TO_PREV to true,
+            androidx.media3.session.MediaConstants.EXTRAS_KEY_SLOT_RESERVATION_SEEK_TO_NEXT to true,
+          )
+        }
+
+    // Now set up player properly with default options
+    setupPlayer(TrackPlayerOptions())
+
+    // Bind headless service once at startup for JS task execution
+    val headlessIntent = Intent(applicationContext, TrackPlayerHeadlessTaskService::class.java)
+    bindService(headlessIntent, headlessConnection, BIND_AUTO_CREATE)
   }
 
   private var appKilledPlaybackBehavior =
@@ -98,26 +164,60 @@ class TrackPlayerService : HeadlessJsMediaService() {
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     onStartCommandIntentValid = intent != null
-    Timber.Forest.d("onStartCommand: ${intent?.action}, ${intent?.`package`}")
-    super.onStartCommand(intent, flags, startId)
+    Timber.d("${intent?.action}, ${intent?.`package`}")
+
     return START_STICKY
   }
 
   fun setupPlayer(playerOptionsData: TrackPlayerOptions, callbacks: TrackPlayerCallbacks? = null) {
-    // Check if player has already been configured (not the temporary initial player)
-    if (temporaryPlayer == null) {
-      print("Player setup already completed. Preventing reinitialization.")
-      return
-    }
-    Timber.Forest.d("Setting up player")
+    Timber.d("Setting up player")
 
     val options = playerOptionsData.toPlayerOptions()
-    val oldPlayer = player
-    // Replace temporary player with properly configured one
+
+    // Always create a new player instance
+    val oldPlayer = if (::player.isInitialized) player else null
     player = TrackPlayer(this@TrackPlayerService, options, callbacks)
-    oldPlayer.destroy()
-    temporaryPlayer = null
+    oldPlayer?.destroy()
     mediaSession.player = player.forwardingPlayer
+
+    // DEBUG: Log player state after setup
+    Timber.d("Player setup complete - ExoPlayer: ${player.exoPlayer}, ForwardingPlayer: ${player.forwardingPlayer}")
+    Timber.d("Player state: ${player.exoPlayer.playbackState}, playWhenReady: ${player.exoPlayer.playWhenReady}")
+
+    // HACK: Create a dummy MediaController connection to trigger MediaLibraryService notification behavior
+    val sessionToken = SessionToken(this, android.content.ComponentName(this, this::class.java))
+    MediaController.Builder(this, sessionToken).buildAsync()
+
+    // Callbacks will be set when module registers itself via registerModule()
+    if (callbacks == null) {
+      Timber.d("No callbacks provided - waiting for module registration")
+    } else {
+      Timber.d("Callbacks provided directly")
+    }
+  }
+
+  /**
+   * Registers a TrackPlayerModule instance with this service. Called when the module connects to
+   * the service.
+   */
+  fun registerModule(moduleInstance: TrackPlayerModule) {
+    Timber.d("TrackPlayerModule registered with service")
+
+    player.setCallbacks(moduleInstance.callbacks)
+
+    if (!module.isCompleted) {
+      module.complete(moduleInstance)
+      Timber.d("Completed module registration")
+    }
+  }
+
+  /**
+   * Resets the module registration for new registrations. Called when the app is closed but service
+   * continues running.
+   */
+  private fun resetModule() {
+    module = CompletableDeferred()
+    Timber.d("Reset module for future registrations")
   }
 
   fun updateOptions(options: TrackPlayerOptions) {
@@ -128,7 +228,7 @@ class TrackPlayerService : HeadlessJsMediaService() {
     options.ratingType?.let { ratingType -> player.ratingType = ratingType.compat }
 
     appKilledPlaybackBehavior =
-      AppKilledPlaybackBehavior::string.find(options.appKilledPlaybackBehavior)
+      AppKilledPlaybackBehavior.values().find { it.string == options.appKilledPlaybackBehavior }
         ?: AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
 
     player.shuffleMode = options.shuffle ?: false
@@ -152,6 +252,7 @@ class TrackPlayerService : HeadlessJsMediaService() {
           Player.COMMAND_GET_TEXT,
           Player.COMMAND_SEEK_TO_MEDIA_ITEM,
           Player.COMMAND_SET_MEDIA_ITEM,
+          Player.COMMAND_CHANGE_MEDIA_ITEMS,
           Player.COMMAND_PREPARE,
           Player.COMMAND_RELEASE,
         )
@@ -195,162 +296,178 @@ class TrackPlayerService : HeadlessJsMediaService() {
     }
   }
 
-  override fun getTaskConfig(intent: Intent?): HeadlessJsTaskConfig {
-    return HeadlessJsTaskConfig(TASK_KEY, Arguments.createMap(), 0, true)
-  }
-
   override fun onBind(intent: Intent?): IBinder? {
+    Timber.d("action: ${intent?.action}, package: ${intent?.`package`}")
     return if (intent?.action != null) {
+      Timber.d("Returning MediaLibraryService binder for ${intent.action}")
       super.onBind(intent)
     } else {
+      Timber.d("Service being bound by module - returning LocalBinder")
       binder
     }
   }
 
-  override fun onUpdateNotification(session: MediaSession, startInForegroundRequired: Boolean) {
-    // https://github.com/androidx/media/issues/843#issuecomment-1860555950
-    super.onUpdateNotification(session, true)
-  }
 
   override fun onTaskRemoved(rootIntent: Intent?) {
     onUnbind(rootIntent)
-    Timber.Forest.d("player = $player, appKilledPlaybackBehavior = $appKilledPlaybackBehavior")
+    Timber.d("player = $player, appKilledPlaybackBehavior = $appKilledPlaybackBehavior")
+
+    // Check if there are still external controllers connected (like Android Auto)
+    val hasExternalControllers =
+      mediaSession.connectedControllers.any { controller ->
+        controller.packageName != packageName && // Not our own app
+          controller.packageName != "com.android.systemui" // Not system UI
+      }
+
+    Timber.d("hasExternalControllers = $hasExternalControllers")
+
+    // Reset module for future registrations when app is closed
+    resetModule()
 
     when (appKilledPlaybackBehavior) {
       AppKilledPlaybackBehavior.PAUSE_PLAYBACK -> {
-        Timber.Forest.d("Pausing playback - appKilledPlaybackBehavior = $appKilledPlaybackBehavior")
+        Timber.d("Pausing playback - appKilledPlaybackBehavior = $appKilledPlaybackBehavior")
         player.pause()
+        // Service continues running for Android Auto
       }
-      AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION -> {
-        Timber.Forest.d("Killing service - appKilledPlaybackBehavior = $appKilledPlaybackBehavior")
-        mediaSession.release()
-        player.clear()
-        player.stop()
-        // HACK: the service first stops, then starts, then call onTaskRemove. Why system
-        // registers the service being restarted?
-        player.destroy()
-        scope.cancel()
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        onDestroy()
-        // https://github.com/androidx/media/issues/27#issuecomment-1456042326
-        stopSelf()
-        exitProcess(0)
-      }
-      AppKilledPlaybackBehavior.CONTINUE_PLAYBACK -> {
-        // No action needed - just continue playing
-      }
-    }
-  }
 
-  @SuppressLint("VisibleForTests")
-  private fun selfWake(clientPackageName: String): Boolean {
-    val reactActivity = reactContext?.currentActivity
-    if (
-      // HACK: validate reactActivity is present; if not, send wake intent
-      (reactActivity == null || reactActivity.isDestroyed) && Settings.canDrawOverlays(this)
-    ) {
-      val currentTime = System.currentTimeMillis()
-      if (currentTime - lastWake < 100000) {
-        return false
+      AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION -> {
+        if (hasExternalControllers) {
+          Timber.d("External controllers still connected - deferring aggressive cleanup")
+          // Just pause and remove notification, but keep service alive for external controllers
+          player.pause()
+          stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+          Timber.d("No external controllers - proceeding with service shutdown")
+          try {
+            if (::mediaSession.isInitialized) {
+              mediaSession.release()
+            }
+            player.clear()
+            player.stop()
+            player.destroy()
+            scope.cancel()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            exitProcess(0)
+          } catch (e: Exception) {
+            Timber.e(e, "Error during aggressive cleanup in onTaskRemoved")
+            // Still try to stop the service
+            stopSelf()
+          }
+        }
       }
-      lastWake = currentTime
-      val activityIntent = packageManager.getLaunchIntentForPackage(packageName)
-      activityIntent!!.data = "trackplayer://service-bound".toUri()
-      activityIntent.action = Intent.ACTION_VIEW
-      activityIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-      var activityOptions = ActivityOptions.makeBasic()
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-        activityOptions =
-          activityOptions.setPendingIntentBackgroundActivityStartMode(
-            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
-          )
+
+      AppKilledPlaybackBehavior.CONTINUE_PLAYBACK -> {
+        Timber.d("Continuing playback - service remains available for Android Auto")
+        // Service continues running for Android Auto with existing callbacks
       }
-      this.startActivity(activityIntent, activityOptions.toBundle())
-      return true
     }
-    return false
   }
 
   override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession {
-    Timber.Forest.d(controllerInfo.packageName)
+    Timber.d("onGetSession requested by: ${controllerInfo.packageName}")
+    if (!::player.isInitialized) {
+      Timber.w("Player not initialized - recreating with default options")
+      player = TrackPlayer(this)
+      setupPlayer(TrackPlayerOptions())
+    }
     return mediaSession
   }
 
-  override fun onHeadlessJsTaskFinish(taskId: Int) {
-    // This is empty so ReactNative doesn't kill this service
+  override fun onUnbind(intent: Intent?): Boolean {
+    Timber.d("onUnbind called - action: ${intent?.action}, package: ${intent?.`package`}")
+    return super.onUnbind(intent)
   }
 
   override fun onDestroy() {
+    Timber.d("onDestroy called")
+
+    // Release wake lock if held
+    wakeLock?.let {
+      if (it.isHeld) {
+        it.release()
+      }
+    }
+
     if (::player.isInitialized) {
-      Timber.Forest.d("Releasing media session and destroying player")
-      mediaSession.release()
+      Timber.d("Releasing media session and destroying player")
+      if (::mediaSession.isInitialized) {
+        mediaSession.release()
+      }
       player.destroy()
     }
 
     super.onDestroy()
   }
 
-  inner class MusicBinder : Binder() {
+  // Android Auto request resolution methods
+  fun resolveGetItemRequest(requestId: String, mediaItem: MediaItem) {
+    // Store MediaItem in lookup map for later use in onAddMediaItems/onSetMediaItems
+    mediaItem.mediaId.let { mediaId ->
+      mediaItemById[mediaId] = mediaItem
+      Timber.d("Stored single MediaItem: mediaId=$mediaId, title=${mediaItem.mediaMetadata.title}")
+    }
+
+    pendingGetItemRequests.remove(requestId)?.set(mediaItem)
+  }
+
+  fun resolveGetChildrenRequest(
+    requestId: String,
+    items: List<MediaItem>,
+    totalChildrenCount: Int,
+  ) {
+    Timber.d(
+      "resolveGetChildrenRequest service method called: requestId=$requestId, itemCount=${items.size}"
+    )
+
+    // Store MediaItems in lookup map for later use in onAddMediaItems/onSetMediaItems
+    items.forEach { mediaItem ->
+      mediaItem.mediaId?.let { mediaId ->
+        mediaItemById[mediaId] = mediaItem
+        Timber.d("Stored MediaItem: mediaId=$mediaId, title=${mediaItem.mediaMetadata.title}")
+      }
+    }
+
+    val future = pendingGetChildrenRequests.remove(requestId)
+    if (future != null) {
+      future.set(items)
+      Timber.d("Resolved future for requestId=$requestId with ${items.size} items")
+    } else {
+      Timber.w("No pending future found for requestId=$requestId")
+    }
+  }
+
+  fun resolveSearchRequest(requestId: String, items: List<MediaItem>, totalMatchesCount: Int) {
+    pendingSearchRequests.remove(requestId)?.set(items)
+  }
+
+  inner class LocalBinder : Binder() {
     val service = this@TrackPlayerService
   }
 
+  private val rootItem =
+    MediaItem.Builder()
+      .setMediaId("/")
+      .setMediaMetadata(MediaMetadata.Builder().setIsBrowsable(true).setIsPlayable(false).build())
+      .build()
+
   private inner class InnerMediaSessionCallback : MediaLibrarySession.Callback {
-    // HACK: I'm sure most of the callbacks were not implemented correctly.
-    // ATM I only care that andorid auto still functions.
-
-    override fun onDisconnected(session: MediaSession, controller: MediaSession.ControllerInfo) {
-      player.onControllerDisconnected(controller.packageName)
-      super.onDisconnected(session, controller)
-    }
-
-    // Configure commands available to the controller in onConnect()
-    @OptIn(UnstableApi::class)
     override fun onConnect(
       session: MediaSession,
       controller: MediaSession.ControllerInfo,
     ): MediaSession.ConnectionResult {
-      Timber.Forest.d(controller.packageName)
-      val isMediaNotificationController = session.isMediaNotificationController(controller)
-      val isAutomotiveController = session.isAutomotiveController(controller)
-      val isAutoCompanionController = session.isAutoCompanionController(controller)
-      player.onControllerConnected(
-        EventControllerConnection(
-          packageName = controller.packageName,
-          isMediaNotificationController = isMediaNotificationController,
-          isAutomotiveController = isAutomotiveController,
-          isAutoCompanionController = isAutoCompanionController,
+      Timber.d(controller.packageName)
+
+      return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+        .setCustomLayout(customLayout)
+        .setAvailableSessionCommands(
+          sessionCommands ?: MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
         )
-      )
-      if (
-        controller.packageName in
-          arrayOf(
-            "com.android.systemui",
-            // https://github.com/googlesamples/android-media-controller
-            "com.example.android.mediacontroller",
-            // Android Auto
-            "com.google.android.projection.gearhead",
-          )
-      ) {
-        // HACK: attempt to wake up activity (for legacy APM). if not, start headless.
-        if (!selfWake(controller.packageName)) {
-          onStartCommand(null, 0, 0)
-        }
-      }
-      return if (
-        isMediaNotificationController || isAutomotiveController || isAutoCompanionController
-      ) {
-        MediaSession.ConnectionResult.AcceptedResultBuilder(session)
-          .setCustomLayout(customLayout)
-          .setAvailableSessionCommands(
-            sessionCommands ?: MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
-          )
-          .setAvailablePlayerCommands(
-            playerCommands ?: MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
-          )
-          .build()
-      } else {
-        super.onConnect(session, controller)
-      }
+        .setAvailablePlayerCommands(
+          playerCommands ?: MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
+        )
+        .build()
     }
 
     override fun onCustomCommand(
@@ -363,12 +480,15 @@ class TrackPlayerService : HeadlessJsMediaService() {
         CustomCommandButton.JUMP_BACKWARD.customAction -> {
           player.forwardingPlayer.seekBack()
         }
+
         CustomCommandButton.JUMP_FORWARD.customAction -> {
           player.forwardingPlayer.seekForward()
         }
+
         CustomCommandButton.NEXT.customAction -> {
           player.forwardingPlayer.seekToNext()
         }
+
         CustomCommandButton.PREVIOUS.customAction -> {
           player.forwardingPlayer.seekToPrevious()
         }
@@ -384,9 +504,221 @@ class TrackPlayerService : HeadlessJsMediaService() {
       player.onRatingChanged(rating)
       return super.onSetRating(session, controller, rating)
     }
+
+    override fun onGetLibraryRoot(
+      session: MediaLibrarySession,
+      browser: MediaSession.ControllerInfo,
+      params: LibraryParams?,
+    ): ListenableFuture<LibraryResult<MediaItem>> {
+      Timber.d("onGetLibraryRoot: { package: ${browser.packageName} }")
+      val rootExtras =
+        Bundle().apply {
+          putBoolean("android.media.browse.CONTENT_STYLE_SUPPORTED", true)
+          //        putInt(
+          //          "android.media.browse.CONTENT_STYLE_BROWSABLE_HINT",
+          //          MediaConstants.DESCRIPTION_EXTRAS_VALUE_CONTENT_STYLE_LIST_ITEM
+          //        )
+          //        putInt(
+          //          "android.media.browse.CONTENT_STYLE_PLAYABLE_HINT",
+          //          MediaConstants.DESCRIPTION_EXTRAS_VALUE_CONTENT_STYLE_LIST_ITEM
+          //        )
+        }
+      val libraryParams = LibraryParams.Builder().setExtras(rootExtras).build()
+      // https://github.com/androidx/media/issues/1731#issuecomment-2411109462
+      val mRootItem =
+        when (browser.packageName) {
+          "com.google.android.googlequicksearchbox" -> {
+            // TODO: make "For You" work
+            // if (mediaTree[AA_FOR_YOU_KEY] == null) rootItem else forYouItem
+            rootItem
+          }
+
+          else -> rootItem
+        }
+      return Futures.immediateFuture(LibraryResult.ofItem(rootItem, libraryParams))
+    }
+
+    override fun onGetChildren(
+      session: MediaLibrarySession,
+      browser: MediaSession.ControllerInfo,
+      parentId: String,
+      page: Int,
+      pageSize: Int,
+      params: LibraryParams?,
+    ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+      Timber.d("onGetChildren: {parentId: $parentId, page: $page, pageSize: $pageSize }")
+
+      val requestId = UUID.randomUUID().toString()
+      val future = SettableFuture.create<List<MediaItem>>()
+
+      // Store the future for later resolution
+      pendingGetChildrenRequests[requestId] = future
+
+      // Emit event to JavaScript via module
+      CoroutineScope(Dispatchers.Main).launch {
+        try {
+          Timber.d("Getting module: requestId=$requestId, parentId=$parentId")
+          // Wait for module to be registered
+          val moduleInstance = module.await()
+
+          Timber.d("Emitting onGetChildrenRequest to JS: requestId=$requestId, parentId=$parentId")
+          moduleInstance.emitGetChildrenRequest(requestId, parentId, page, pageSize)
+          Timber.d("Emitted onGetChildrenRequest to JS: requestId=$requestId, parentId=$parentId")
+        } catch (e: Exception) {
+          Timber.e(e, "Failed to emit onGetChildrenRequest to JS")
+          // Fallback: resolve with empty list
+          pendingGetChildrenRequests.remove(requestId)?.set(emptyList())
+        }
+      }
+
+      return Futures.transform(
+        future,
+        { items -> LibraryResult.ofItemList(ImmutableList.copyOf(items), null) },
+        MoreExecutors.directExecutor(),
+      )
+    }
+
+    override fun onGetItem(
+      session: MediaLibrarySession,
+      browser: MediaSession.ControllerInfo,
+      mediaId: String,
+    ): ListenableFuture<LibraryResult<MediaItem>> {
+      Timber.d("onGetItem: ${browser.packageName}, mediaId = $mediaId")
+
+      val requestId = UUID.randomUUID().toString()
+      val future = SettableFuture.create<MediaItem>()
+
+      // Store the future for later resolution
+      pendingGetItemRequests[requestId] = future
+
+      // Emit event to JavaScript via module
+      CoroutineScope(Dispatchers.Main).launch {
+        try {
+          Timber.d("Getting module for onGetItem: requestId=$requestId, mediaId=$mediaId")
+          // Wait for module to be registered
+          val moduleInstance = module.await()
+
+          Timber.d("Emitting onGetItemRequest to JS: requestId=$requestId, mediaId=$mediaId")
+          moduleInstance.emitGetItemRequest(requestId, mediaId)
+          Timber.d("Emitted onGetItemRequest to JS: requestId=$requestId, mediaId=$mediaId")
+        } catch (e: Exception) {
+          Timber.e(e, "Failed to emit onGetItemRequest to JS")
+          // Fallback: resolve with default item
+          pendingGetItemRequests
+            .remove(requestId)
+            ?.set(
+              MediaItem.Builder()
+                .setMediaId(mediaId)
+                .setMediaMetadata(
+                  MediaMetadata.Builder()
+                    .setTitle("Error")
+                    .setIsBrowsable(false)
+                    .setIsPlayable(false)
+                    .build()
+                )
+                .build()
+            )
+        }
+      }
+
+      return Futures.transform(
+        future,
+        { item -> LibraryResult.ofItem(item, null) },
+        MoreExecutors.directExecutor(),
+      )
+    }
+
+    override fun onSearch(
+      session: MediaLibrarySession,
+      browser: MediaSession.ControllerInfo,
+      query: String,
+      params: LibraryParams?,
+    ): ListenableFuture<LibraryResult<Void>> {
+      Timber.d("onSearch: ${browser.packageName}, query = $query")
+
+      // Emit event to JavaScript via module for search initiation
+      try {
+        val requestId = UUID.randomUUID().toString()
+        if (module.isCompleted) {
+          val moduleInstance = module.getCompleted()
+          val extrasMap =
+            params?.extras?.let { bundle ->
+              Arguments.createMap().apply {
+                for (key in bundle.keySet()) {
+                  when (val value = bundle.get(key)) {
+                    is String -> putString(key, value)
+                    is Int -> putInt(key, value)
+                    is Double -> putDouble(key, value)
+                    is Boolean -> putBoolean(key, value)
+                    // Add other types as needed
+                  }
+                }
+              }
+            }
+          moduleInstance.emitSearchResultRequest(
+            requestId,
+            query,
+            extrasMap,
+            0,
+            50,
+          ) // Default page parameters
+          Timber.d("Emitted onGetSearchResultRequest to JS: requestId=$requestId, query=$query")
+        } else {
+          Timber.w("No module registered - cannot emit onGetSearchResultRequest")
+        }
+      } catch (e: Exception) {
+        Timber.e(e, "Failed to emit onGetSearchResultRequest to JS")
+      }
+
+      // Return standard void result - search completion is handled separately
+      return super.onSearch(session, browser, query, params)
+    }
+
+    override fun onSetMediaItems(
+      mediaSession: MediaSession,
+      controller: MediaSession.ControllerInfo,
+      mediaItems: MutableList<MediaItem>,
+      startIndex: Int,
+      startPositionMs: Long,
+    ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+      Timber.d(
+        "onSetMediaItems: ${controller.packageName}, mediaId=${mediaItems[0].mediaId}, uri=${mediaItems[0].localConfiguration?.uri}, title=${mediaItems[0].mediaMetadata.title}"
+      )
+
+      return CoroutineScope(Dispatchers.Main).future {
+        val resolvedItems =
+          mediaItems.map { mediaItem ->
+            val mediaId = mediaItem.mediaId
+            val fullMediaItem = mediaItemById[mediaId]
+            if (fullMediaItem != null) {
+              Timber.d(
+                "Resolved stub MediaItem in onSetMediaItems: mediaId=$mediaId -> title=${fullMediaItem.mediaMetadata.title}"
+              )
+              fullMediaItem
+            } else {
+              Timber.w("No stored MediaItem found for mediaId=$mediaId")
+              mediaItem // Return original if no lookup found
+            }
+          }
+
+        Timber.d(
+          "Returning ${resolvedItems.size} resolved MediaItems to MediaSession for onSetMediaItems"
+        )
+
+        // Return resolved items with original start position - MediaSession will handle queue
+        // management
+        MediaSession.MediaItemsWithStartPosition(
+          resolvedItems.toMutableList(),
+          startIndex,
+          startPositionMs,
+        )
+      }
+    }
   }
 
   companion object {
-    const val TASK_KEY = "TrackPlayer"
+    // Wake lock management
+    @Volatile
+    private var wakeLock: PowerManager.WakeLock? = null
   }
 }

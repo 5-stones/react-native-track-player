@@ -13,7 +13,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { useActiveTrack } from 'react-native-track-player';
+import TrackPlayer, {
+  useActiveTrack
+} from 'react-native-track-player';
 import {
   ActionSheet,
   Button,
@@ -24,6 +26,23 @@ import {
   TrackInfo,
 } from './components';
 import { useSetupPlayer } from './hooks/usePlayer';
+import { tracks } from './services';
+
+const tracksWithIds = tracks.map((track, index) => ({
+  ...track,
+  mediaId: `${index}`,
+}));
+TrackPlayer.registerMediaBrowser({
+  async get({ id }) {
+    return tracksWithIds.find((item) => item.mediaId === id) ?? null;
+  },
+  async list() {
+    return {
+      children: tracksWithIds,
+      total: tracksWithIds.length,
+    };
+  },
+});
 
 export default function App() {
   const isPlayerReady = useSetupPlayer();

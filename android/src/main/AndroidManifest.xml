@@ -22,6 +22,12 @@
             </intent-filter>
         </service>
 
+        <!-- Headless JS task execution, keeps the js side active -->
+        <service
+            android:name="com.doublesymmetry.trackplayer.TrackPlayerHeadlessTaskService"
+            android:enabled="true"
+            android:exported="false" />
+
     </application>
 
 </manifest>

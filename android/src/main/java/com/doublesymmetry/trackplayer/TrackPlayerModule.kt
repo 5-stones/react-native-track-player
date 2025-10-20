@@ -6,10 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
-import android.support.v4.media.RatingCompat
 import androidx.media3.common.Metadata
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
+import androidx.media3.session.legacy.RatingCompat
 import com.doublesymmetry.trackplayer.event.ControllerConnectedEvent
 import com.doublesymmetry.trackplayer.event.ControllerDisconnectedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
@@ -25,14 +25,9 @@ import com.doublesymmetry.trackplayer.event.RemoteSetRatingEvent
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import com.doublesymmetry.trackplayer.model.PlaybackState
-import com.doublesymmetry.trackplayer.model.RatingType
-import com.doublesymmetry.trackplayer.model.State
 import com.doublesymmetry.trackplayer.model.TrackFactory
 import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
-import com.doublesymmetry.trackplayer.model.bridge
-import com.doublesymmetry.trackplayer.option.PlayerCapability
 import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
-import com.doublesymmetry.trackplayer.util.AppForegroundTracker
 import com.doublesymmetry.trackplayer.util.BundleUtils
 import com.doublesymmetry.trackplayer.util.MetadataAdapter
 import com.facebook.react.bridge.Arguments
@@ -43,7 +38,6 @@ import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.module.annotations.ReactModule
-import java.util.HashMap
 import java.util.concurrent.TimeUnit
 import javax.annotation.Nonnull
 import kotlinx.coroutines.MainScope
@@ -57,13 +51,38 @@ import timber.log.Timber
 class TrackPlayerModule(reactContext: ReactApplicationContext) :
   NativeTrackPlayerSpec(reactContext), ServiceConnection {
   private lateinit var browser: MediaBrowser
-  private var playerOptions: TrackPlayerOptions = TrackPlayerOptions()
+  public var playerOptions: TrackPlayerOptions = TrackPlayerOptions()
   private var playerSetUpPromise: Promise? = null
   private val mainScope = MainScope()
   private var connectedService: TrackPlayerService? = null
   private val context = reactContext
   private val trackFactory =
     TrackFactory(context) { connectedService?.player?.ratingType ?: RatingCompat.RATING_NONE }
+
+  // Media browser event buffering
+  private var mediaBrowserReady = false
+  private val eventBuffer = mutableListOf<BufferedEvent>()
+  private val bufferLock = Any()
+  private val maxBufferSize = 50
+
+  sealed class BufferedEvent {
+    data class GetItem(val requestId: String, val mediaId: String) : BufferedEvent()
+
+    data class GetChildren(
+      val requestId: String,
+      val parentId: String,
+      val page: Int,
+      val pageSize: Int,
+    ) : BufferedEvent()
+
+    data class SearchResults(
+      val requestId: String,
+      val query: String,
+      val extras: ReadableMap?,
+      val page: Int,
+      val pageSize: Int,
+    ) : BufferedEvent()
+  }
 
   @Nonnull
   override fun getName(): String {
@@ -85,17 +104,49 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   override fun initialize() {
-    AppForegroundTracker.start()
+    Timber.d("TrackPlayerModule.initialize() called on instance: ${this.hashCode()}")
+    Timber.d("React context: ${context.javaClass.simpleName}")
+
+    // Auto-bind to service if it's already running (important for Android Auto scenarios)
+    launchInScope {
+      try {
+        Timber.d(
+          "Attempting to auto-bind to existing TrackPlayerService from module ${this@TrackPlayerModule.hashCode()}"
+        )
+        val intent = Intent(context, TrackPlayerService::class.java)
+        val bound = context.bindService(intent, this@TrackPlayerModule, Context.BIND_AUTO_CREATE)
+        Timber.d("Auto-bind result: $bound for module ${this@TrackPlayerModule.hashCode()}")
+
+        if (!bound) {
+          Timber.w("Failed to bind to TrackPlayerService - service may not be running")
+        }
+      } catch (e: Exception) {
+        Timber.e(e, "Failed to auto-bind to TrackPlayerService during initialization")
+      }
+    }
   }
 
   override fun onServiceConnected(name: ComponentName, serviceBinder: IBinder) {
     launchInScope {
       // If a binder already exists, don't get a new one
       if (connectedService == null) {
-        val binder: TrackPlayerService.MusicBinder = serviceBinder as TrackPlayerService.MusicBinder
+        val binder = serviceBinder as TrackPlayerService.LocalBinder
         connectedService = binder.service
-        connectedService?.setupPlayer(playerOptions, callbacks)
+        Timber.d("TrackPlayerModule ${this@TrackPlayerModule.hashCode()} connected to service")
+
+        // Register THIS module instance with the service for callbacks
+        connectedService?.registerModule(this@TrackPlayerModule)
+        Timber.d("Module registration completed")
+
+        // Service already has player set up, just send our options to update it
+        connectedService?.updateOptions(playerOptions)
+
         playerSetUpPromise?.resolve(null)
+        playerSetUpPromise = null
+      } else {
+        Timber.d(
+          "TrackPlayerModule ${this@TrackPlayerModule.hashCode()} already connected to service"
+        )
       }
     }
   }
@@ -104,35 +155,43 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   override fun onServiceDisconnected(name: ComponentName) {
     // Cancel all event observation coroutines when service disconnects
     mainScope.coroutineContext.cancelChildren()
+
     connectedService = null
+    Timber.d("TrackPlayerModule.onServiceDisconnected() - module ${this.hashCode()} unregistered")
   }
 
   /* ****************************** API ****************************** */
   @SuppressLint("UnspecifiedRegisterReceiverFlag")
   override fun setupPlayer(data: ReadableMap?, promise: Promise) {
-    if (connectedService != null) {
-      promise.reject(
-        "player_already_initialized",
-        "The player has already been initialized via setupPlayer.",
-      )
-      return
-    }
+    launchInScope {
+      playerOptions = TrackPlayerOptions.fromBridge(data)
 
-    playerSetUpPromise = promise
-    playerOptions = TrackPlayerOptions.fromBridge(data)
-
-    val musicModule = this
-    try {
-      Intent(context, TrackPlayerService::class.java).also { intent ->
-        context.bindService(intent, musicModule, Context.BIND_AUTO_CREATE)
-        val sessionToken =
-          SessionToken(context, ComponentName(context, TrackPlayerService::class.java))
-        val browserFuture = MediaBrowser.Builder(context, sessionToken).buildAsync()
-        // browser = browserFuture.get()
+      if (connectedService != null) {
+        // Service already connected (from auto-bind or previous setup), just update options
+        Timber.d("Service already connected, updating options")
+        connectedService?.updateOptions(playerOptions)
+        promise.resolve(null)
+        return@launchInScope
       }
-    } catch (exception: Exception) {
-      Timber.Forest.w(exception, "Could not initialize service")
-      throw exception
+
+      // Service not connected yet, store promise for when it connects
+      playerSetUpPromise = promise
+
+      val musicModule = this@TrackPlayerModule
+      try {
+        Timber.d("Binding to TrackPlayerService from setupPlayer")
+        Intent(context, TrackPlayerService::class.java).also { intent ->
+          val bound = context.bindService(intent, musicModule, Context.BIND_AUTO_CREATE)
+          Timber.d("SetupPlayer bind result: $bound")
+          val sessionToken =
+            SessionToken(context, ComponentName(context, TrackPlayerService::class.java))
+          val browserFuture = MediaBrowser.Builder(context, sessionToken).buildAsync()
+          // browser = browserFuture.get()
+        }
+      } catch (exception: Exception) {
+        Timber.w(exception, "Could not initialize service")
+        throw exception
+      }
     }
   }
 
@@ -350,111 +409,264 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   private val player
     get() = service.player
 
-  private val callbacks = object : TrackPlayerCallbacks {
-    override fun onPlaybackState(state: PlaybackState) {
-      emitOnPlaybackState(state.toBridge())
-    }
+  public val callbacks =
+    object : TrackPlayerCallbacks {
+      override fun onPlaybackState(state: PlaybackState) {
+        emitOnPlaybackState(state.toBridge())
+      }
 
-    override fun onPlaybackActiveTrackChanged(event: PlaybackActiveTrackChangedEvent) {
-      emitOnPlaybackActiveTrackChanged(event.toBridge())
-    }
+      override fun onPlaybackActiveTrackChanged(event: PlaybackActiveTrackChangedEvent) {
+        emitOnPlaybackActiveTrackChanged(event.toBridge())
+      }
 
-    override fun onPlaybackProgressUpdated(event: PlaybackProgressUpdatedEvent) {
-      emitOnPlaybackProgressUpdated(event.toBridge())
-    }
+      override fun onPlaybackProgressUpdated(event: PlaybackProgressUpdatedEvent) {
+        emitOnPlaybackProgressUpdated(event.toBridge())
+      }
 
-    override fun onPlaybackPlayWhenReadyChanged(event: PlaybackPlayWhenReadyChangedEvent) {
-      emitOnPlaybackPlayWhenReadyChanged(event.toBridge())
-    }
+      override fun onPlaybackPlayWhenReadyChanged(event: PlaybackPlayWhenReadyChangedEvent) {
+        emitOnPlaybackPlayWhenReadyChanged(event.toBridge())
+      }
 
-    override fun onPlaybackPlayingState(event: PlaybackPlayingStateEvent) {
-      emitOnPlaybackPlayingState(event.toBridge())
-    }
+      override fun onPlaybackPlayingState(event: PlaybackPlayingStateEvent) {
+        emitOnPlaybackPlayingState(event.toBridge())
+      }
 
-    override fun onPlaybackQueueEnded(event: PlaybackQueueEndedEvent) {
-      emitOnPlaybackQueueEnded(event.toBridge())
-    }
+      override fun onPlaybackQueueEnded(event: PlaybackQueueEndedEvent) {
+        emitOnPlaybackQueueEnded(event.toBridge())
+      }
 
-    override fun onPlaybackError(event: PlaybackErrorEvent) {
-      emitOnPlaybackError(event.toBridge())
-    }
+      override fun onPlaybackError(event: PlaybackErrorEvent) {
+        emitOnPlaybackError(event.toBridge())
+      }
 
-    override fun onMetadataCommonReceived(metadata: WritableMap) {
-      emitOnMetadataCommonReceived(Arguments.createMap().apply { putMap("metadata", metadata) })
-    }
+      override fun onMetadataCommonReceived(metadata: WritableMap) {
+        emitOnMetadataCommonReceived(Arguments.createMap().apply { putMap("metadata", metadata) })
+      }
 
-    override fun onMetadataTimedReceived(metadata: Metadata) {
-      emitOnMetadataTimedReceived(
-        Arguments.createMap().let {
-          it.putArray(
-            "metadata",
-            Arguments.createArray().apply {
-              MetadataAdapter.Companion.fromMetadata(metadata).forEach { item -> pushMap(item) }
-            },
-          )
-          it
-        }
-      )
-    }
-
-    override fun onPlaybackMetadata(metadata: PlaybackMetadata?) {
-      metadata?.let {
-        emitOnPlaybackMetadata(
-          Arguments.createMap().apply {
-            putString("source", it.source)
-            putString("title", it.title)
-            putString("url", it.url)
-            putString("artist", it.artist)
-            putString("album", it.album)
-            putString("date", it.date)
-            putString("genre", it.genre)
+      override fun onMetadataTimedReceived(metadata: Metadata) {
+        emitOnMetadataTimedReceived(
+          Arguments.createMap().let {
+            it.putArray(
+              "metadata",
+              Arguments.createArray().apply {
+                MetadataAdapter.Companion.fromMetadata(metadata).forEach { item -> pushMap(item) }
+              },
+            )
+            it
           }
         )
       }
+
+      override fun onPlaybackMetadata(metadata: PlaybackMetadata?) {
+        metadata?.let {
+          emitOnPlaybackMetadata(
+            Arguments.createMap().apply {
+              putString("source", it.source)
+              putString("title", it.title)
+              putString("url", it.url)
+              putString("artist", it.artist)
+              putString("album", it.album)
+              putString("date", it.date)
+              putString("genre", it.genre)
+            }
+          )
+        }
+      }
+
+      override fun onRemotePlay() {
+        emitOnRemotePlay(Arguments.createMap())
+      }
+
+      override fun onRemotePause() {
+        emitOnRemotePause(Arguments.createMap())
+      }
+
+      override fun onRemoteStop() {
+        emitOnRemoteStop(Arguments.createMap())
+      }
+
+      override fun onRemoteNext() {
+        emitOnRemoteNext(Arguments.createMap())
+      }
+
+      override fun onRemotePrevious() {
+        emitOnRemotePrevious(Arguments.createMap())
+      }
+
+      override fun onRemoteJumpForward(event: RemoteJumpForwardEvent) {
+        emitOnRemoteJumpForward(event.toBridge())
+      }
+
+      override fun onRemoteJumpBackward(event: RemoteJumpBackwardEvent) {
+        emitOnRemoteJumpBackward(event.toBridge())
+      }
+
+      override fun onRemoteSeek(event: RemoteSeekEvent) {
+        emitOnRemoteSeek(event.toBridge())
+      }
+
+      override fun onRemoteSetRating(event: RemoteSetRatingEvent) {
+        emitOnRemoteSetRating(event.toBridge())
+      }
+
+      override fun onControllerConnected(event: ControllerConnectedEvent) {
+        emitOnAndroidControllerConnected(event.toBridge())
+      }
+
+      override fun onControllerDisconnected(event: ControllerDisconnectedEvent) {
+        emitOnAndroidControllerDisconnected(event.toBridge())
+      }
     }
 
-    override fun onRemotePlay() {
-      emitOnRemotePlay(Arguments.createMap())
+  // Android Auto callback resolution methods
+  override fun resolveGetItemRequest(id: String, item: ReadableMap) = runBlockingOnMain {
+    val track = trackFactory.fromBridge(item)
+    service.resolveGetItemRequest(id, track.toMediaItem())
+  }
+
+  override fun resolveGetChildrenRequest(
+    requestId: String,
+    items: ReadableArray,
+    totalChildrenCount: Double,
+  ) = runBlockingOnMain {
+    Timber.d("resolveGetChildrenRequest called: requestId=$requestId, itemCount=${items.size()}")
+    val tracks = trackFactory.tracksFromBridge(items)
+    val mediaItems = tracks.map { it.toMediaItem() }
+    Timber.d("Sending MediaItem extras: ${mediaItems.first().mediaMetadata.extras?.keySet()}")
+    Timber.d("Resolving with ${mediaItems.size} items for requestId=$requestId")
+    service.resolveGetChildrenRequest(requestId, mediaItems, totalChildrenCount.toInt())
+    Timber.d("resolveGetChildrenRequest completed for requestId=$requestId")
+  }
+
+  override fun resolveSearchResultRequest(
+    requestId: String,
+    items: ReadableArray,
+    totalMatchesCount: Double,
+  ) = runBlockingOnMain {
+    val tracks = trackFactory.tracksFromBridge(items)
+    val mediaItems = tracks.map { it.toMediaItem() }
+    service.resolveSearchRequest(requestId, mediaItems, totalMatchesCount.toInt())
+  }
+
+  // Android Auto event emission methods (called by TrackPlayerService)
+  fun emitGetItemRequest(requestId: String, mediaId: String) {
+    synchronized(bufferLock) {
+      if (!mediaBrowserReady) {
+        if (eventBuffer.size < maxBufferSize) {
+          eventBuffer.add(BufferedEvent.GetItem(requestId, mediaId))
+          Timber.d("Buffered GetItem event: requestId=$requestId, mediaId=$mediaId")
+        } else {
+          Timber.w("Event buffer full, dropping GetItem event: requestId=$requestId")
+        }
+        return
+      }
     }
 
-    override fun onRemotePause() {
-      emitOnRemotePause(Arguments.createMap())
+    Arguments.createMap()
+      .apply {
+        putString("requestId", requestId)
+        putString("id", mediaId)
+      }
+      .let { eventData -> emitOnGetItemRequest(eventData) }
+  }
+
+  fun emitGetChildrenRequest(requestId: String, parentId: String, page: Int, pageSize: Int) {
+    synchronized(bufferLock) {
+      if (!mediaBrowserReady) {
+        if (eventBuffer.size < maxBufferSize) {
+          eventBuffer.add(BufferedEvent.GetChildren(requestId, parentId, page, pageSize))
+          Timber.d("Buffered GetChildren event: requestId=$requestId, parentId=$parentId")
+        } else {
+          Timber.w("Event buffer full, dropping GetChildren event: requestId=$requestId")
+        }
+        return
+      }
     }
 
-    override fun onRemoteStop() {
-      emitOnRemoteStop(Arguments.createMap())
+    Arguments.createMap()
+      .apply {
+        putString("requestId", requestId)
+        putString("id", parentId)
+        putInt("page", page)
+        putInt("pageSize", pageSize)
+      }
+      .let { eventData -> emitOnGetChildrenRequest(eventData) }
+  }
+
+  fun emitSearchResultRequest(
+    requestId: String,
+    query: String,
+    extras: ReadableMap?,
+    page: Int,
+    pageSize: Int,
+  ) {
+    synchronized(bufferLock) {
+      if (!mediaBrowserReady) {
+        if (eventBuffer.size < maxBufferSize) {
+          eventBuffer.add(BufferedEvent.SearchResults(requestId, query, extras, page, pageSize))
+          Timber.d("Buffered SearchResults event: requestId=$requestId, query=$query")
+        } else {
+          Timber.w("Event buffer full, dropping SearchResults event: requestId=$requestId")
+        }
+        return
+      }
     }
 
-    override fun onRemoteNext() {
-      emitOnRemoteNext(Arguments.createMap())
-    }
+    Arguments.createMap()
+      .apply {
+        putString("requestId", requestId)
+        putString("query", query)
+        extras?.let { putMap("extras", it) }
+        putInt("page", page)
+        putInt("pageSize", pageSize)
+      }
+      .let { eventData -> emitOnGetSearchResultRequest(eventData) }
+  }
 
-    override fun onRemotePrevious() {
-      emitOnRemotePrevious(Arguments.createMap())
-    }
+  override fun setMediaBrowserReady() = runBlockingOnMain {
+    synchronized(bufferLock) {
+      mediaBrowserReady = true
+      val bufferedEvents = eventBuffer.toList()
+      eventBuffer.clear()
 
-    override fun onRemoteJumpForward(event: RemoteJumpForwardEvent) {
-      emitOnRemoteJumpForward(event.toBridge())
-    }
+      Timber.d(
+        "Media browser ready signal received, flushing ${bufferedEvents.size} buffered events"
+      )
 
-    override fun onRemoteJumpBackward(event: RemoteJumpBackwardEvent) {
-      emitOnRemoteJumpBackward(event.toBridge())
-    }
-
-    override fun onRemoteSeek(event: RemoteSeekEvent) {
-      emitOnRemoteSeek(event.toBridge())
-    }
-
-    override fun onRemoteSetRating(event: RemoteSetRatingEvent) {
-      emitOnRemoteSetRating(event.toBridge())
-    }
-
-    override fun onControllerConnected(event: ControllerConnectedEvent) {
-      emitOnAndroidControllerConnected(event.toBridge())
-    }
-
-    override fun onControllerDisconnected(event: ControllerDisconnectedEvent) {
-      emitOnAndroidControllerDisconnected(event.toBridge())
+      // Emit all buffered events
+      bufferedEvents.forEach { event ->
+        when (event) {
+          is BufferedEvent.GetItem -> {
+            Arguments.createMap()
+              .apply {
+                putString("requestId", event.requestId)
+                putString("id", event.mediaId)
+              }
+              .let { eventData -> emitOnGetItemRequest(eventData) }
+          }
+          is BufferedEvent.GetChildren -> {
+            Arguments.createMap()
+              .apply {
+                putString("requestId", event.requestId)
+                putString("id", event.parentId)
+                putInt("page", event.page)
+                putInt("pageSize", event.pageSize)
+              }
+              .let { eventData -> emitOnGetChildrenRequest(eventData) }
+          }
+          is BufferedEvent.SearchResults -> {
+            Arguments.createMap()
+              .apply {
+                putString("requestId", event.requestId)
+                putString("query", event.query)
+                event.extras?.let { putMap("extras", it) }
+                putInt("page", event.page)
+                putInt("pageSize", event.pageSize)
+              }
+              .let { eventData -> emitOnGetSearchResultRequest(eventData) }
+          }
+        }
+      }
     }
   }
 }

@@ -8,6 +8,7 @@ import type { TrackMetadataBase } from './metadata';
 export type ResourceObject = number;
 
 export interface Track extends TrackMetadataBase {
+  mediaId?: string;
   url: string;
   type?: TrackType;
   /** The user agent HTTP header */
@@ -43,7 +44,7 @@ function resolveImportedAsset(id?: number) {
     : undefined;
 }
 
-function resolveTrackAssets(track: AddTrack) {
+export function resolveTrackAssets(track: AddTrack) {
   return {
     ...track,
     url: resolveImportedAssetOrPath(track.url),

@@ -167,7 +167,7 @@ private constructor(
         }
       }
       return Track(
-        url = if (map.getType("url") == ReadableType.String) map.getString("url") else null,
+        url = if (map.hasKey("url") && map.getType("url") == ReadableType.String) map.getString("url") else null,
         uri = uri,
         resourceId = if (resourceId == 0) null else resourceId,
         type = mediaType,
@@ -203,9 +203,11 @@ private constructor(
               bundle.putDouble(key, value)
             }
           }
+
           ReadableType.String -> bundle.putString(key, map.getString(key))
           ReadableType.Map ->
             map.getMap(key)?.let { bundle.putBundle(key, readableMapToBundle(it)) }
+
           ReadableType.Array -> {
             // Store array as an ArrayList to preserve it in the bundle
             map.getArray(key)?.let { array ->

@@ -42,14 +42,16 @@ import com.doublesymmetry.trackplayer.util.MetadataAdapter
 import com.doublesymmetry.trackplayer.util.PlayerCache
 import com.facebook.react.bridge.WritableMap
 import java.util.concurrent.TimeUnit
+import timber.log.Timber
 
 @UnstableApi
 class TrackPlayer(
   internal val context: Context,
   val options: PlayerOptions = PlayerOptions(),
-  private val callbacks: TrackPlayerCallbacks? = null,
+  callbacks: TrackPlayerCallbacks? = null,
 ) {
 
+  private var callbacks: TrackPlayerCallbacks? = callbacks
   val exoPlayer: ExoPlayer
   val forwardingPlayer: Player
   val player: Player
@@ -70,17 +72,16 @@ class TrackPlayer(
   @UnstableApi
   private inner class InterceptingPlayer(player: ExoPlayer) : ForwardingPlayer(player) {
 
-    // Block all external media item modifications
     override fun setMediaItems(mediaItems: MutableList<MediaItem>, resetPosition: Boolean) {
-      return
+      return super.setMediaItems(mediaItems, resetPosition)
     }
 
     override fun addMediaItems(mediaItems: MutableList<MediaItem>) {
-      return
+      return super.addMediaItems(mediaItems)
     }
 
     override fun addMediaItems(index: Int, mediaItems: MutableList<MediaItem>) {
-      return
+      return super.addMediaItems(index, mediaItems)
     }
 
     override fun setMediaItems(
@@ -88,11 +89,11 @@ class TrackPlayer(
       startIndex: Int,
       startPositionMs: Long,
     ) {
-      return
+      return super.setMediaItems(mediaItems, startIndex, startPositionMs)
     }
 
     override fun setMediaItems(mediaItems: MutableList<MediaItem>) {
-      return
+      return super.setMediaItems(mediaItems)
     }
 
     // Intercept playback controls and dispatch to callbacks or fall back to default behavior
@@ -169,9 +170,7 @@ class TrackPlayer(
   }
 
   internal val playingState: PlayingState by lazy {
-    PlayingState {
-      event -> this.callbacks?.onPlaybackPlayingState(event)
-    }
+    PlayingState { event -> this.callbacks?.onPlaybackPlayingState(event) }
   }
 
   val currentTrack: Track?
@@ -265,7 +264,7 @@ class TrackPlayer(
       RatingType.fromString(rating.toString())?.let { ratingType ->
         val event = RemoteSetRatingEvent(rating = ratingType)
         callbacks?.onRemoteSetRating(event)
-      } ?: timber.log.Timber.w("Failed to convert rating: $rating")
+      } ?: Timber.w("Failed to convert rating: $rating")
     }
   }
 
@@ -414,8 +413,7 @@ class TrackPlayer(
         bufferConfig.playBuffer?.takeIf { it != 0 }
           ?: DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS
       val playAfterRebuffer =
-        bufferConfig.rebufferBuffer?.takeIf { it != 0 }
-          ?: (playBuffer * multiplier).toInt()
+        bufferConfig.rebufferBuffer?.takeIf { it != 0 } ?: (playBuffer * multiplier).toInt()
       val backBuffer =
         bufferConfig.backBuffer?.takeIf { it != 0 }
           ?: DefaultLoadControl.DEFAULT_BACK_BUFFER_DURATION_MS
@@ -694,6 +692,24 @@ class TrackPlayer(
    */
   fun setProgressUpdateInterval(interval: Double?) {
     progressUpdateManager.setUpdateInterval(interval)
+  }
+
+  /**
+   * Sets the callbacks for player events.
+   *
+   * @param callbacks The callbacks to set, or null to clear callbacks
+   */
+  fun setCallbacks(callbacks: TrackPlayerCallbacks?) {
+    this.callbacks = callbacks
+  }
+
+  /**
+   * Gets the current callbacks instance.
+   *
+   * @return The current callbacks, or null if none are set
+   */
+  fun getCallbacks(): TrackPlayerCallbacks? {
+    return this.callbacks
   }
 
   /**

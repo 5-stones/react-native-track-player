@@ -5,11 +5,11 @@ import {
 } from 'react-native/Libraries/Types/CodegenTypes';
 
 export interface Spec extends TurboModule {
-  // init and config
+  // MARK: init and config
   setupPlayer(options: UnsafeObject): Promise<void>;
   updateOptions(options: UnsafeObject): void;
 
-  // events
+  // MARK: events
   readonly onAndroidControllerConnected: EventEmitter<UnsafeObject>;
   readonly onAndroidControllerDisconnected: EventEmitter<UnsafeObject>;
   readonly onMetadataChapterReceived: EventEmitter<UnsafeObject>;
@@ -39,7 +39,7 @@ export interface Spec extends TurboModule {
   readonly onRemoteSkip: EventEmitter<UnsafeObject>;
   readonly onRemoteStop: EventEmitter<UnsafeObject>;
 
-  // player api
+  // MARK: player api
   load(track: UnsafeObject): void;
   reset(): void;
   play(): void;
@@ -59,7 +59,7 @@ export interface Spec extends TurboModule {
   getPlaybackError(): UnsafeObject | null;
   retry(): void;
 
-  // playlist management
+  // MARK: playlist management
   add(tracks: UnsafeObject[], insertBeforeIndex?: number): void;
   move(fromIndex: number, toIndex: number): void;
   remove(indexes: number[]): void;
@@ -77,14 +77,46 @@ export interface Spec extends TurboModule {
   getActiveTrackIndex(): number | undefined;
   getActiveTrack(): UnsafeObject | undefined;
 
-  // event listeners
+  // MARK: event listeners
   addListener(eventName: string): void;
   removeListeners(count: number): void;
 
-  // android methods
+  // MARK: Android methods
   acquireWakeLock(): void;
   abandonWakeLock(): void;
   validateOnStartCommandIntent(): boolean;
+
+  // MARK: Media Browser Methods:
+  readonly onGetItemRequest: EventEmitter<{ requestId: string; id: string }>;
+  resolveGetItemRequest(id: string, item: UnsafeObject): void;
+
+  readonly onGetChildrenRequest: EventEmitter<{
+    requestId: string;
+    id: string,
+    page: number,
+    pageSize: number,
+  }>
+  resolveGetChildrenRequest(
+    requestId: string,
+    items: UnsafeObject[],
+    totalChildrenCount: number
+  ): void;
+
+  readonly onGetSearchResultRequest: EventEmitter<{
+    requestId: string;
+    query: string;
+    extras?: UnsafeObject;
+    page: number;
+    pageSize: number;
+  }>;
+  resolveSearchResultRequest(
+    requestId: string,
+    items: UnsafeObject[],
+    totalMatchesCount: number
+  ): void;
+
+  // Signal that JS side is ready to receive media browser events
+  setMediaBrowserReady(): void;
 }
 
 const module = TurboModuleRegistry.getEnforcing<Spec>('TrackPlayer');
