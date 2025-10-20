@@ -10,6 +10,7 @@ import androidx.media3.common.Metadata
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
 import androidx.media3.session.legacy.RatingCompat
+import com.google.common.util.concurrent.ListenableFuture
 import com.doublesymmetry.trackplayer.event.ControllerConnectedEvent
 import com.doublesymmetry.trackplayer.event.ControllerDisconnectedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
@@ -51,7 +52,8 @@ import timber.log.Timber
 class TrackPlayerModule(reactContext: ReactApplicationContext) :
   NativeTrackPlayerSpec(reactContext), ServiceConnection {
   private lateinit var browser: MediaBrowser
-  public var playerOptions: TrackPlayerOptions = TrackPlayerOptions()
+  private var mediaBrowserFuture: ListenableFuture<MediaBrowser>? = null
+  var playerOptions: TrackPlayerOptions = TrackPlayerOptions()
   private var playerSetUpPromise: Promise? = null
   private val mainScope = MainScope()
   private var connectedService: TrackPlayerService? = null
@@ -128,26 +130,17 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
 
   override fun onServiceConnected(name: ComponentName, serviceBinder: IBinder) {
     launchInScope {
-      // If a binder already exists, don't get a new one
-      if (connectedService == null) {
-        val binder = serviceBinder as TrackPlayerService.LocalBinder
-        connectedService = binder.service
-        Timber.d("TrackPlayerModule ${this@TrackPlayerModule.hashCode()} connected to service")
-
-        // Register THIS module instance with the service for callbacks
-        connectedService?.registerModule(this@TrackPlayerModule)
-        Timber.d("Module registration completed")
-
-        // Service already has player set up, just send our options to update it
-        connectedService?.updateOptions(playerOptions)
-
-        playerSetUpPromise?.resolve(null)
-        playerSetUpPromise = null
-      } else {
-        Timber.d(
-          "TrackPlayerModule ${this@TrackPlayerModule.hashCode()} already connected to service"
-        )
+      connectedService = (serviceBinder as TrackPlayerService.LocalBinder).service.apply {
+        registerModule(this@TrackPlayerModule)
+        updateOptions(playerOptions)
       }
+
+      val sessionToken =
+        SessionToken(context, ComponentName(context, TrackPlayerService::class.java))
+      mediaBrowserFuture = MediaBrowser.Builder(context, sessionToken).buildAsync()
+
+      playerSetUpPromise?.resolve(null)
+      playerSetUpPromise = null
     }
   }
 
@@ -156,6 +149,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     // Cancel all event observation coroutines when service disconnects
     mainScope.coroutineContext.cancelChildren()
 
+    mediaBrowserFuture = null
     connectedService = null
     Timber.d("TrackPlayerModule.onServiceDisconnected() - module ${this.hashCode()} unregistered")
   }
@@ -167,8 +161,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       playerOptions = TrackPlayerOptions.fromBridge(data)
 
       if (connectedService != null) {
-        // Service already connected (from auto-bind or previous setup), just update options
-        Timber.d("Service already connected, updating options")
         connectedService?.updateOptions(playerOptions)
         promise.resolve(null)
         return@launchInScope
@@ -177,21 +169,19 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       // Service not connected yet, store promise for when it connects
       playerSetUpPromise = promise
 
-      val musicModule = this@TrackPlayerModule
-      try {
-        Timber.d("Binding to TrackPlayerService from setupPlayer")
-        Intent(context, TrackPlayerService::class.java).also { intent ->
-          val bound = context.bindService(intent, musicModule, Context.BIND_AUTO_CREATE)
-          Timber.d("SetupPlayer bind result: $bound")
-          val sessionToken =
-            SessionToken(context, ComponentName(context, TrackPlayerService::class.java))
-          val browserFuture = MediaBrowser.Builder(context, sessionToken).buildAsync()
-          // browser = browserFuture.get()
+      Timber.d("Binding to TrackPlayerService")
+      context.bindService(
+        Intent(context, TrackPlayerService::class.java),
+        this@TrackPlayerModule,
+        Context.BIND_AUTO_CREATE
+      ).let {
+        Timber.d("context.bindService result: $it")
+        if (!it) {
+          playerSetUpPromise?.reject("SETUP_FAILED", "Failed to bind to TrackPlayerService")
+          playerSetUpPromise = null
         }
-      } catch (exception: Exception) {
-        Timber.w(exception, "Could not initialize service")
-        throw exception
       }
+
     }
   }
 
@@ -644,6 +634,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
               }
               .let { eventData -> emitOnGetItemRequest(eventData) }
           }
+
           is BufferedEvent.GetChildren -> {
             Arguments.createMap()
               .apply {
@@ -654,6 +645,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
               }
               .let { eventData -> emitOnGetChildrenRequest(eventData) }
           }
+
           is BufferedEvent.SearchResults -> {
             Arguments.createMap()
               .apply {

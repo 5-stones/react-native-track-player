@@ -179,21 +179,6 @@ class TrackPlayerService : MediaLibraryService() {
     player = TrackPlayer(this@TrackPlayerService, options, callbacks)
     oldPlayer?.destroy()
     mediaSession.player = player.forwardingPlayer
-
-    // DEBUG: Log player state after setup
-    Timber.d("Player setup complete - ExoPlayer: ${player.exoPlayer}, ForwardingPlayer: ${player.forwardingPlayer}")
-    Timber.d("Player state: ${player.exoPlayer.playbackState}, playWhenReady: ${player.exoPlayer.playWhenReady}")
-
-    // HACK: Create a dummy MediaController connection to trigger MediaLibraryService notification behavior
-    val sessionToken = SessionToken(this, android.content.ComponentName(this, this::class.java))
-    MediaController.Builder(this, sessionToken).buildAsync()
-
-    // Callbacks will be set when module registers itself via registerModule()
-    if (callbacks == null) {
-      Timber.d("No callbacks provided - waiting for module registration")
-    } else {
-      Timber.d("Callbacks provided directly")
-    }
   }
 
   /**
