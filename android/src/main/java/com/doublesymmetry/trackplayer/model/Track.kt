@@ -167,7 +167,9 @@ private constructor(
         }
       }
       return Track(
-        url = if (map.hasKey("url") && map.getType("url") == ReadableType.String) map.getString("url") else null,
+        url =
+          if (map.hasKey("url") && map.getType("url") == ReadableType.String) map.getString("url")
+          else null,
         uri = uri,
         resourceId = if (resourceId == 0) null else resourceId,
         type = mediaType,

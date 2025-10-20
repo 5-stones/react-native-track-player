@@ -106,22 +106,27 @@ class TrackPlayer(
     }
 
     override fun seekToNext() {
+      Timber.d("InterceptingPlayer.seekToNext() called")
       callbacks?.onRemoteNext() ?: super.seekToNext()
     }
 
     override fun seekToNextMediaItem() {
+      Timber.d("InterceptingPlayer.seekToNextMediaItem() called")
       callbacks?.onRemoteNext() ?: super.seekToNextMediaItem()
     }
 
     override fun seekToPrevious() {
+      Timber.d("InterceptingPlayer.seekToPrevious() called")
       callbacks?.onRemotePrevious() ?: super.seekToPrevious()
     }
 
     override fun seekToPreviousMediaItem() {
+      Timber.d("InterceptingPlayer.seekToPreviousMediaItem() called")
       callbacks?.onRemotePrevious() ?: super.seekToPreviousMediaItem()
     }
 
     override fun seekForward() {
+      Timber.d("InterceptingPlayer.seekForward() called")
       callbacks?.let {
         it.onRemoteJumpForward(
           RemoteJumpForwardEvent(interval = options.forwardJumpInterval.toDouble())
@@ -130,6 +135,7 @@ class TrackPlayer(
     }
 
     override fun seekBack() {
+      Timber.d("InterceptingPlayer.seekBack() called")
       callbacks?.let {
         it.onRemoteJumpBackward(
           RemoteJumpBackwardEvent(interval = options.backwardJumpInterval.toDouble())

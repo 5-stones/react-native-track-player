@@ -19,23 +19,16 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.Rating
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.CommandButton
 import androidx.media3.session.LibraryResult
-import androidx.media3.session.MediaController
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionCommands
 import androidx.media3.session.SessionResult
-import androidx.media3.session.SessionToken
 import com.doublesymmetry.trackplayer.model.AppKilledPlaybackBehavior
-import com.doublesymmetry.trackplayer.model.CustomCommandButton
 import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
 import com.doublesymmetry.trackplayer.option.PlayerCapability
-import com.facebook.react.ReactApplication
-import com.facebook.react.ReactInstanceManager
 import com.facebook.react.bridge.Arguments
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
@@ -70,6 +63,7 @@ class TrackPlayerService : MediaLibraryService() {
   private val headlessConnection: ServiceConnection =
     object : ServiceConnection {
       override fun onServiceConnected(className: ComponentName, service: IBinder) {}
+
       override fun onServiceDisconnected(className: ComponentName) {}
     }
 
@@ -82,13 +76,13 @@ class TrackPlayerService : MediaLibraryService() {
   @SuppressLint("WakelockTimeout")
   fun acquireWakeLock() {
     if (wakeLock?.isHeld == true) return
-    wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager).newWakeLock(
-      PowerManager.PARTIAL_WAKE_LOCK,
-      TrackPlayerService::class.java.canonicalName,
-    ).apply {
-      setReferenceCounted(false)
-      acquire()
-    }
+    wakeLock =
+      (getSystemService(Context.POWER_SERVICE) as PowerManager)
+        .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, TrackPlayerService::class.java.canonicalName)
+        .apply {
+          setReferenceCounted(false)
+          acquire()
+        }
   }
 
   fun abandonWakeLock() {
@@ -132,7 +126,7 @@ class TrackPlayerService : MediaLibraryService() {
         action = Intent.ACTION_VIEW
       }
     mediaSession =
-      MediaLibrarySession.Builder(this, player.exoPlayer, InnerMediaSessionCallback())
+      MediaLibrarySession.Builder(this, player.player, InnerMediaSessionCallback())
         // https://github.com/androidx/media/issues/1218
         .setSessionActivity(
           PendingIntent.getActivity(
@@ -143,12 +137,6 @@ class TrackPlayerService : MediaLibraryService() {
           )
         )
         .build()
-        .also { session ->
-          session.sessionExtras = androidx.core.os.bundleOf(
-            androidx.media3.session.MediaConstants.EXTRAS_KEY_SLOT_RESERVATION_SEEK_TO_PREV to true,
-            androidx.media3.session.MediaConstants.EXTRAS_KEY_SLOT_RESERVATION_SEEK_TO_NEXT to true,
-          )
-        }
 
     // Now set up player properly with default options
     setupPlayer(TrackPlayerOptions())
@@ -215,60 +203,94 @@ class TrackPlayerService : MediaLibraryService() {
     val notificationCapabilities =
       options.notificationCapabilities?.takeIf { it.isNotEmpty() } ?: capabilities
 
-    val playerCommandsBuilder =
-      Player.Commands.Builder()
-        .addAll(
-          // HACK: without COMMAND_GET_CURRENT_MEDIA_ITEM, notification cannot be created
-          Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
-          Player.COMMAND_GET_TRACKS,
-          Player.COMMAND_GET_TIMELINE,
-          Player.COMMAND_GET_METADATA,
-          Player.COMMAND_GET_AUDIO_ATTRIBUTES,
-          Player.COMMAND_GET_VOLUME,
-          Player.COMMAND_GET_DEVICE_VOLUME,
-          Player.COMMAND_GET_TEXT,
-          Player.COMMAND_SEEK_TO_MEDIA_ITEM,
-          Player.COMMAND_SET_MEDIA_ITEM,
-          Player.COMMAND_CHANGE_MEDIA_ITEMS,
-          Player.COMMAND_PREPARE,
-          Player.COMMAND_RELEASE,
-        )
-    notificationCapabilities.forEach {
-      when (it) {
-        PlayerCapability.PLAY,
-        PlayerCapability.PAUSE -> {
-          playerCommandsBuilder.add(Player.COMMAND_PLAY_PAUSE)
-        }
+    // Start with default player commands and filter based on capabilities
+    val playerCommandsBuilder = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
 
-        PlayerCapability.STOP -> {
-          playerCommandsBuilder.add(Player.COMMAND_STOP)
-        }
+    // Commands to remove - start with always-disabled commands
+    val disabledCommands =
+      mutableSetOf<@Player.Command Int>(
+        // Always filter out direct media item commands to avoid dual-command confusion
+        // This forces MediaSession to only use the "smart" commands we can control via capabilities
+        Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+        Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+        // Jump commands need custom buttons to be visible in notifications
+        Player.COMMAND_SEEK_FORWARD,
+        Player.COMMAND_SEEK_BACK,
+      )
 
-        PlayerCapability.SEEK_TO -> {
-          playerCommandsBuilder.add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
-        }
-
-        else -> {}
-      }
+    // Check each capability and add commands to remove if not enabled
+    val hasPlayPause =
+      notificationCapabilities.any { it == PlayerCapability.PLAY || it == PlayerCapability.PAUSE }
+    if (!hasPlayPause) {
+      disabledCommands.add(Player.COMMAND_PLAY_PAUSE)
     }
-    customLayout =
-      CustomCommandButton.entries
-        .filter { notificationCapabilities.contains(it.capability) }
-        .map { c -> c.commandButton }
+
+    if (!notificationCapabilities.contains(PlayerCapability.STOP)) {
+      disabledCommands.add(Player.COMMAND_STOP)
+    }
+
+    if (!notificationCapabilities.contains(PlayerCapability.SEEK_TO)) {
+      disabledCommands.add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
+    }
+
+    if (!notificationCapabilities.contains(PlayerCapability.SKIP_TO_NEXT)) {
+      disabledCommands.add(Player.COMMAND_SEEK_TO_NEXT)
+    }
+
+    if (!notificationCapabilities.contains(PlayerCapability.SKIP_TO_PREVIOUS)) {
+      disabledCommands.add(Player.COMMAND_SEEK_TO_PREVIOUS)
+    }
+
+    // Remove disabled commands from the builder
+    disabledCommands.forEach { command ->
+      playerCommandsBuilder.remove(command)
+      Timber.d("Removed command: $command")
+    }
+
+    // Create custom command buttons for jump commands (required for notification visibility)
+    val customLayoutButtons = mutableListOf<CommandButton>()
     val sessionCommandsBuilder =
       MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
-    customLayout.forEach { v -> v.sessionCommand?.let { sessionCommandsBuilder.add(it) } }
+
+    if (notificationCapabilities.contains(PlayerCapability.JUMP_BACKWARD)) {
+      val jumpBackCommand = SessionCommand("JUMP_BACKWARD", Bundle())
+      customLayoutButtons.add(
+        CommandButton.Builder()
+          .setDisplayName("Jump Backward")
+          .setSessionCommand(jumpBackCommand)
+          .setIconResId(androidx.media3.session.R.drawable.media3_icon_skip_back)
+          .build()
+      )
+      sessionCommandsBuilder.add(jumpBackCommand)
+    }
+
+    if (notificationCapabilities.contains(PlayerCapability.JUMP_FORWARD)) {
+      val jumpForwardCommand = SessionCommand("JUMP_FORWARD", Bundle())
+      customLayoutButtons.add(
+        CommandButton.Builder()
+          .setDisplayName("Jump Forward")
+          .setSessionCommand(jumpForwardCommand)
+          .setIconResId(androidx.media3.session.R.drawable.media3_icon_skip_forward)
+          .build()
+      )
+      sessionCommandsBuilder.add(jumpForwardCommand)
+    }
+
+    customLayout = customLayoutButtons
 
     sessionCommands = sessionCommandsBuilder.build()
     playerCommands = playerCommandsBuilder.build()
+
+    // Use all configured player commands - no filtering needed with standard MediaSession flow
+    val configuredPlayerCommands = playerCommands ?: Player.Commands.Builder().build()
 
     if (mediaSession.mediaNotificationControllerInfo != null) {
       // https://github.com/androidx/media/blob/c35a9d62baec57118ea898e271ac66819399649b/demos/session_service/src/main/java/androidx/media3/demo/session/DemoMediaLibrarySessionCallback.kt#L107
       mediaSession.setCustomLayout(mediaSession.mediaNotificationControllerInfo!!, customLayout)
       mediaSession.setAvailableCommands(
         mediaSession.mediaNotificationControllerInfo!!,
-        sessionCommandsBuilder.build(),
-        playerCommands!!,
+        sessionCommands ?: MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS,
+        configuredPlayerCommands,
       )
     }
   }
@@ -283,7 +305,6 @@ class TrackPlayerService : MediaLibraryService() {
       binder
     }
   }
-
 
   override fun onTaskRemoved(rootIntent: Intent?) {
     onUnbind(rootIntent)
@@ -436,14 +457,18 @@ class TrackPlayerService : MediaLibraryService() {
     ): MediaSession.ConnectionResult {
       Timber.d(controller.packageName)
 
+      // Use configured player commands
+      val controllerCommands =
+        playerCommands ?: MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
+
+      Timber.d("Providing standard player commands to controller: ${controller.packageName}")
+
       return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
         .setCustomLayout(customLayout)
         .setAvailableSessionCommands(
           sessionCommands ?: MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
         )
-        .setAvailablePlayerCommands(
-          playerCommands ?: MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
-        )
+        .setAvailablePlayerCommands(controllerCommands)
         .build()
     }
 
@@ -453,21 +478,19 @@ class TrackPlayerService : MediaLibraryService() {
       command: SessionCommand,
       args: Bundle,
     ): ListenableFuture<SessionResult> {
+      Timber.d("onCustomCommand: action=${command.customAction}")
+
       when (command.customAction) {
-        CustomCommandButton.JUMP_BACKWARD.customAction -> {
-          player.forwardingPlayer.seekBack()
+        "JUMP_BACKWARD" -> {
+          Timber.d("Executing jump backward command")
+          player.player.seekBack()
         }
-
-        CustomCommandButton.JUMP_FORWARD.customAction -> {
-          player.forwardingPlayer.seekForward()
+        "JUMP_FORWARD" -> {
+          Timber.d("Executing jump forward command")
+          player.player.seekForward()
         }
-
-        CustomCommandButton.NEXT.customAction -> {
-          player.forwardingPlayer.seekToNext()
-        }
-
-        CustomCommandButton.PREVIOUS.customAction -> {
-          player.forwardingPlayer.seekToPrevious()
+        else -> {
+          Timber.w("Received unexpected custom command: ${command.customAction}")
         }
       }
       return super.onCustomCommand(session, controller, command, args)
@@ -627,7 +650,7 @@ class TrackPlayerService : MediaLibraryService() {
                     is Int -> putInt(key, value)
                     is Double -> putDouble(key, value)
                     is Boolean -> putBoolean(key, value)
-                    // Add other types as needed
+                  // Add other types as needed
                   }
                 }
               }
@@ -695,7 +718,6 @@ class TrackPlayerService : MediaLibraryService() {
 
   companion object {
     // Wake lock management
-    @Volatile
-    private var wakeLock: PowerManager.WakeLock? = null
+    @Volatile private var wakeLock: PowerManager.WakeLock? = null
   }
 }

@@ -10,7 +10,6 @@ import androidx.media3.common.Metadata
 import androidx.media3.session.MediaBrowser
 import androidx.media3.session.SessionToken
 import androidx.media3.session.legacy.RatingCompat
-import com.google.common.util.concurrent.ListenableFuture
 import com.doublesymmetry.trackplayer.event.ControllerConnectedEvent
 import com.doublesymmetry.trackplayer.event.ControllerDisconnectedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
@@ -39,6 +38,7 @@ import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableArray
 import com.facebook.react.bridge.WritableMap
 import com.facebook.react.module.annotations.ReactModule
+import com.google.common.util.concurrent.ListenableFuture
 import java.util.concurrent.TimeUnit
 import javax.annotation.Nonnull
 import kotlinx.coroutines.MainScope
@@ -130,10 +130,11 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
 
   override fun onServiceConnected(name: ComponentName, serviceBinder: IBinder) {
     launchInScope {
-      connectedService = (serviceBinder as TrackPlayerService.LocalBinder).service.apply {
-        registerModule(this@TrackPlayerModule)
-        updateOptions(playerOptions)
-      }
+      connectedService =
+        (serviceBinder as TrackPlayerService.LocalBinder).service.apply {
+          registerModule(this@TrackPlayerModule)
+          updateOptions(playerOptions)
+        }
 
       val sessionToken =
         SessionToken(context, ComponentName(context, TrackPlayerService::class.java))
@@ -170,18 +171,19 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       playerSetUpPromise = promise
 
       Timber.d("Binding to TrackPlayerService")
-      context.bindService(
-        Intent(context, TrackPlayerService::class.java),
-        this@TrackPlayerModule,
-        Context.BIND_AUTO_CREATE
-      ).let {
-        Timber.d("context.bindService result: $it")
-        if (!it) {
-          playerSetUpPromise?.reject("SETUP_FAILED", "Failed to bind to TrackPlayerService")
-          playerSetUpPromise = null
+      context
+        .bindService(
+          Intent(context, TrackPlayerService::class.java),
+          this@TrackPlayerModule,
+          Context.BIND_AUTO_CREATE,
+        )
+        .let {
+          Timber.d("context.bindService result: $it")
+          if (!it) {
+            playerSetUpPromise?.reject("SETUP_FAILED", "Failed to bind to TrackPlayerService")
+            playerSetUpPromise = null
+          }
         }
-      }
-
     }
   }
 
@@ -472,18 +474,22 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       }
 
       override fun onRemoteNext() {
+        Timber.d("onRemoteNext called - emitting event to JavaScript")
         emitOnRemoteNext(Arguments.createMap())
       }
 
       override fun onRemotePrevious() {
+        Timber.d("onRemotePrevious called - emitting event to JavaScript")
         emitOnRemotePrevious(Arguments.createMap())
       }
 
       override fun onRemoteJumpForward(event: RemoteJumpForwardEvent) {
+        Timber.d("onRemoteJumpForward called - emitting event to JavaScript")
         emitOnRemoteJumpForward(event.toBridge())
       }
 
       override fun onRemoteJumpBackward(event: RemoteJumpBackwardEvent) {
+        Timber.d("onRemoteJumpBackward called - emitting event to JavaScript")
         emitOnRemoteJumpBackward(event.toBridge())
       }
 
