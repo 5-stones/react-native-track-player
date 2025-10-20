@@ -10832,9 +10832,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"react-native-track-player-example@workspace:example":
+"react-native-track-player-example@workspace:apps/example":
   version: 0.0.0-use.local
-  resolution: "react-native-track-player-example@workspace:example"
+  resolution: "react-native-track-player-example@workspace:apps/example"
   dependencies:
     "@babel/core": "npm:^7.25.2"
     "@babel/preset-env": "npm:^7.25.3"

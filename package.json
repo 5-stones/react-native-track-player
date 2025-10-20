@@ -50,16 +50,17 @@
     }
   ],
   "scripts": {
-    "android:format": "cd example/android && ./gradlew :react-native-track-player:format",
-    "android:ide": "cd example/android && open -a 'Android Studio' .",
+    "android:format": "cd apps/example/android && ./gradlew :react-native-track-player:format",
+    "android:ide": "cd apps/example/android && open -a 'Android Studio' .",
     "android:logs": "react-native log-android",
     "build": "yarn prepare",
-    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
+    "clean": "del-cli android/build apps/example/android/build apps/example/android/app/build apps/example/ios/build lib",
     "example": "yarn workspace react-native-track-player-example",
-    "format": "prettier --write src web",
-    "ios:rebuild": "cd example/ios && pod install && cd .. && yarn ios",
+    "format": "prettier --check src web",
+    "format:fix": "prettier --write src web",
+    "ios:rebuild": "cd apps/example/ios && pod install && cd ../.. && yarn example ios",
     "ios:format": "swiftformat ios --swiftversion 5.9",
-    "ios:ide": "cd example/ios && open TrackPlayerExample.xcworkspace",
+    "ios:ide": "cd apps/example/ios && open TrackPlayerExample.xcworkspace",
     "lint": "eslint src web --max-warnings=0",
     "prepare": "bob build",
     "release": "release-it --only-version",
@@ -131,7 +132,7 @@
   },
   "funding": "https://github.com/doublesymmetry/react-native-track-player?sponsor=1",
   "workspaces": [
-    "example"
+    "apps/*"
   ],
   "packageManager": "yarn@4.10.3",
   "engines": {
@@ -140,7 +141,7 @@
   "jest": {
     "preset": "react-native",
     "modulePathIgnorePatterns": [
-      "<rootDir>/example/node_modules",
+      "<rootDir>/apps/*/node_modules",
       "<rootDir>/lib/"
     ]
   },
