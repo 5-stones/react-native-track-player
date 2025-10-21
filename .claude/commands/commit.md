@@ -72,4 +72,14 @@ Additional types are not mandated by the Conventional Commits specification, and
 - Keep description concise and descriptive
 - For larger commits use a markdown list to lay out the changes, but keep the description simple
 - NEVER use emojis
-- NEVER use words that create unproven expectations like 'comprehensive'.
+- NEVER use promotional or "boasty" language
+- Avoid superlatives like "comprehensive", "robust", "powerful", "enhanced", "improved"
+- Focus on what was actually done, not selling benefits
+- Use factual verbs: "add", "remove", "move", "fix", "update", "extract"
+- Avoid marketing language: "enhance", "optimize", "streamline", "leverage"
+
+**Examples:**
+- Good: "move MediaSession logic to dedicated manager"
+- Bad: "enhance MediaSession architecture with comprehensive manager"
+- Good: "fix null pointer in playback service"
+- Bad: "improve reliability by addressing critical null pointer issue"
