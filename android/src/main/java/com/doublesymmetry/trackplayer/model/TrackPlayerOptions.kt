@@ -9,29 +9,29 @@ import com.doublesymmetry.trackplayer.option.PlayerWakeMode
 import com.facebook.react.bridge.ReadableMap
 
 data class TrackPlayerOptions(
-  val forwardJumpInterval: Double = 15.0,
-  val backwardJumpInterval: Double = 15.0,
-  val progressUpdateEventInterval: Double = -1.0,
-  val ratingType: RatingType? = null,
-  val capabilities: List<PlayerCapability>? = null,
-  val notificationCapabilities: List<PlayerCapability>? = null,
+  var forwardJumpInterval: Double = 15.0,
+  var backwardJumpInterval: Double = 15.0,
+  var progressUpdateEventInterval: Double = -1.0,
+  var ratingType: RatingType? = null,
+  var capabilities: List<PlayerCapability>? = null,
+  var notificationCapabilities: List<PlayerCapability>? = null,
 
   // Audio engine options
-  val minBuffer: Double? = null,
-  val maxBuffer: Double? = null,
-  val playBuffer: Double? = null,
-  val rebufferBuffer: Double? = null,
-  val backBuffer: Double? = null,
-  val maxCacheSize: Double = 0.0,
-  val audioContentType: AudioContentType = AudioContentType.MUSIC,
-  val handleAudioBecomingNoisy: Boolean = true,
-  val wakeMode: PlayerWakeMode = PlayerWakeMode.NONE,
+  var minBuffer: Double? = null,
+  var maxBuffer: Double? = null,
+  var playBuffer: Double? = null,
+  var rebufferBuffer: Double? = null,
+  var backBuffer: Double? = null,
+  var maxCacheSize: Double = 0.0,
+  var audioContentType: AudioContentType = AudioContentType.MUSIC,
+  var handleAudioBecomingNoisy: Boolean = true,
+  var wakeMode: PlayerWakeMode = PlayerWakeMode.NONE,
 
   // Android-specific options
-  val audioOffload: Boolean? = null,
-  val skipSilence: Boolean? = null,
-  val appKilledPlaybackBehavior: String? = null,
-  val shuffle: Boolean? = null,
+  var audioOffload: Boolean? = null,
+  var skipSilence: Boolean? = null,
+  var appKilledPlaybackBehavior: String? = null,
+  var shuffle: Boolean? = null,
 ) {
   companion object {
     fun fromBridge(map: ReadableMap?): TrackPlayerOptions {
@@ -106,6 +106,91 @@ data class TrackPlayerOptions(
         shuffle =
           if (androidMap?.hasKey("shuffle") == true) androidMap.getBoolean("shuffle") else null,
       )
+    }
+  }
+
+  fun updateFromBridge(map: ReadableMap?) {
+    if (map == null) return
+
+    if (map.hasKey("forwardJumpInterval")) {
+      forwardJumpInterval = map.getDouble("forwardJumpInterval")
+    }
+    if (map.hasKey("backwardJumpInterval")) {
+      backwardJumpInterval = map.getDouble("backwardJumpInterval")
+    }
+    if (map.hasKey("progressUpdateEventInterval")) {
+      progressUpdateEventInterval = map.getDouble("progressUpdateEventInterval")
+    }
+
+    map.getString("ratingType")?.let { ratingType = RatingType.fromString(it) }
+
+    map.getArray("capabilities")?.let { arr ->
+      capabilities = (0 until arr.size()).mapNotNull { index ->
+        val value = arr.getString(index) ?: return@mapNotNull null
+        PlayerCapability.fromString(value)
+          ?: throw IllegalArgumentException("Invalid capability value: $value")
+      }
+    }
+
+    map.getArray("notificationCapabilities")?.let { arr ->
+      notificationCapabilities = (0 until arr.size()).mapNotNull { index ->
+        val value = arr.getString(index) ?: return@mapNotNull null
+        PlayerCapability.fromString(value)
+          ?: throw IllegalArgumentException("Invalid notificationCapability value: $value")
+      }
+    }
+
+    // Audio engine options
+    if (map.hasKey("minBuffer")) {
+      minBuffer = map.getDouble("minBuffer")
+    }
+    if (map.hasKey("maxBuffer")) {
+      maxBuffer = map.getDouble("maxBuffer")
+    }
+    if (map.hasKey("playBuffer")) {
+      playBuffer = map.getDouble("playBuffer")
+    }
+    if (map.hasKey("rebufferBuffer")) {
+      rebufferBuffer = map.getDouble("rebufferBuffer")
+    }
+    if (map.hasKey("backBuffer")) {
+      backBuffer = map.getDouble("backBuffer")
+    }
+    if (map.hasKey("maxCacheSize")) {
+      maxCacheSize = map.getDouble("maxCacheSize")
+    }
+
+    map.getString("audioContentType")?.let {
+      audioContentType = AudioContentType.fromString(it)
+    }
+
+    if (map.hasKey("handleAudioBecomingNoisy")) {
+      handleAudioBecomingNoisy = map.getBoolean("handleAudioBecomingNoisy")
+    }
+
+    if (map.hasKey("wakeMode")) {
+      val value = map.getInt("wakeMode")
+      wakeMode = PlayerWakeMode.entries.getOrNull(value)
+        ?: throw IllegalArgumentException(
+          "Invalid wakeMode value: $value (valid range: 0-${PlayerWakeMode.entries.size - 1})"
+        )
+    }
+
+    // Android-specific options
+    val androidMap = if (map.hasKey("android")) map.getMap("android") else null
+    androidMap?.let { android ->
+      if (android.hasKey("audioOffload")) {
+        audioOffload = android.getBoolean("audioOffload")
+      }
+      if (android.hasKey("skipSilence")) {
+        skipSilence = android.getBoolean("skipSilence")
+      }
+      if (android.hasKey("appKilledPlaybackBehavior")) {
+        appKilledPlaybackBehavior = android.getString("appKilledPlaybackBehavior")
+      }
+      if (android.hasKey("shuffle")) {
+        shuffle = android.getBoolean("shuffle")
+      }
     }
   }
 

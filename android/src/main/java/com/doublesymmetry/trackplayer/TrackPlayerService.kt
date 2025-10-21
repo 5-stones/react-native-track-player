@@ -180,7 +180,7 @@ class TrackPlayerService : MediaLibraryService() {
     Timber.d("Reset module for future registrations")
   }
 
-  fun updateOptions(options: TrackPlayerOptions) {
+  fun applyOptions(options: TrackPlayerOptions) {
     options.audioOffload?.let { audioOffload -> player.setAudioOffload(audioOffload) }
 
     options.skipSilence?.let { skipSilence -> player.skipSilence = skipSilence }
@@ -192,6 +192,11 @@ class TrackPlayerService : MediaLibraryService() {
         ?: AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
 
     player.shuffleMode = options.shuffle ?: false
+
+    // Update progress interval on the player
+    player.setProgressUpdateInterval(
+      if (options.progressUpdateEventInterval > 0) options.progressUpdateEventInterval else null
+    )
 
     // Configure MediaSession commands based on capabilities
     commandManager.updateMediaSession(mediaSession, options.capabilities, options.notificationCapabilities)

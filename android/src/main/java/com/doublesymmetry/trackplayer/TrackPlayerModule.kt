@@ -53,7 +53,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   NativeTrackPlayerSpec(reactContext), ServiceConnection {
   private lateinit var browser: MediaBrowser
   private var mediaBrowserFuture: ListenableFuture<MediaBrowser>? = null
-  var playerOptions: TrackPlayerOptions = TrackPlayerOptions()
+  private var options = TrackPlayerOptions()
   private var playerSetUpPromise: Promise? = null
   private val mainScope = MainScope()
   private var connectedService: TrackPlayerService? = null
@@ -133,7 +133,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       connectedService =
         (serviceBinder as TrackPlayerService.LocalBinder).service.apply {
           registerModule(this@TrackPlayerModule)
-          updateOptions(playerOptions)
+          applyOptions(options)
         }
 
       val sessionToken =
@@ -159,10 +159,10 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   @SuppressLint("UnspecifiedRegisterReceiverFlag")
   override fun setupPlayer(data: ReadableMap?, promise: Promise) {
     launchInScope {
-      playerOptions = TrackPlayerOptions.fromBridge(data)
+      options = TrackPlayerOptions.fromBridge(data)
 
       if (connectedService != null) {
-        connectedService?.updateOptions(playerOptions)
+        connectedService?.applyOptions(options)
         promise.resolve(null)
         return@launchInScope
       }
@@ -188,14 +188,8 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   override fun updateOptions(data: ReadableMap?): Unit = runBlockingOnMain {
-    val options = TrackPlayerOptions.fromBridge(data)
-
-    // Store progress update interval for use during playback
-    player.setProgressUpdateInterval(
-      if (options.progressUpdateEventInterval > 0) options.progressUpdateEventInterval else null
-    )
-
-    service.updateOptions(options)
+    options.updateFromBridge(data)
+    service.applyOptions(options)
   }
 
   override fun add(data: ReadableArray, insertBeforeIndex: Double?): Unit = runBlockingOnMain {
