@@ -16,19 +16,16 @@ import androidx.annotation.OptIn
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
-import androidx.media3.common.Player
 import androidx.media3.common.Rating
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.session.CommandButton
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
 import androidx.media3.session.SessionCommand
-import androidx.media3.session.SessionCommands
 import androidx.media3.session.SessionResult
 import com.doublesymmetry.trackplayer.model.AppKilledPlaybackBehavior
 import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
-import com.doublesymmetry.trackplayer.option.PlayerCapability
+import com.doublesymmetry.trackplayer.util.MediaSessionManager
 import com.facebook.react.bridge.Arguments
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
@@ -54,10 +51,8 @@ class TrackPlayerService : MediaLibraryService() {
   private val binder = LocalBinder()
   private val scope = MainScope()
   private var module = CompletableDeferred<TrackPlayerModule>()
+  private val commandManager = MediaSessionManager()
   private lateinit var mediaSession: MediaLibrarySession
-  private var sessionCommands: SessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
-  private var playerCommands: Player.Commands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
-  private var customLayout: List<CommandButton> = listOf()
 
   // Headless service binding
   private val headlessConnection: ServiceConnection =
@@ -198,98 +193,8 @@ class TrackPlayerService : MediaLibraryService() {
 
     player.shuffleMode = options.shuffle ?: false
 
-    // Progress update events now handled by MusicModule
-    val capabilities = options.capabilities ?: emptyList()
-    val notificationCapabilities =
-      options.notificationCapabilities?.takeIf { it.isNotEmpty() } ?: capabilities
-
-    // Start with default player commands and filter based on capabilities
-    val playerCommandsBuilder = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
-
-    // Commands to remove - start with always-disabled commands
-    val disabledCommands =
-      mutableSetOf<@Player.Command Int>(
-        // Always filter out direct media item commands to avoid dual-command confusion
-        // This forces MediaSession to only use the "smart" commands we can control via capabilities
-        Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
-        Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
-        // Jump commands need custom buttons to be visible in notifications
-        Player.COMMAND_SEEK_FORWARD,
-        Player.COMMAND_SEEK_BACK,
-      )
-
-    // Check each capability and add commands to remove if not enabled
-    val hasPlayPause =
-      notificationCapabilities.any { it == PlayerCapability.PLAY || it == PlayerCapability.PAUSE }
-    if (!hasPlayPause) {
-      disabledCommands.add(Player.COMMAND_PLAY_PAUSE)
-    }
-
-    if (!notificationCapabilities.contains(PlayerCapability.STOP)) {
-      disabledCommands.add(Player.COMMAND_STOP)
-    }
-
-    if (!notificationCapabilities.contains(PlayerCapability.SEEK_TO)) {
-      disabledCommands.add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
-    }
-
-    if (!notificationCapabilities.contains(PlayerCapability.SKIP_TO_NEXT)) {
-      disabledCommands.add(Player.COMMAND_SEEK_TO_NEXT)
-    }
-
-    if (!notificationCapabilities.contains(PlayerCapability.SKIP_TO_PREVIOUS)) {
-      disabledCommands.add(Player.COMMAND_SEEK_TO_PREVIOUS)
-    }
-
-    // Remove disabled commands from the builder
-    disabledCommands.forEach { command ->
-      playerCommandsBuilder.remove(command)
-      Timber.d("Removed command: $command")
-    }
-
-    // Create custom command buttons for jump commands (required for notification visibility)
-    val customLayoutButtons = mutableListOf<CommandButton>()
-    val sessionCommandsBuilder =
-      MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
-
-    if (notificationCapabilities.contains(PlayerCapability.JUMP_BACKWARD)) {
-      val jumpBackCommand = SessionCommand("JUMP_BACKWARD", Bundle())
-      customLayoutButtons.add(
-        CommandButton.Builder()
-          .setDisplayName("Jump Backward")
-          .setSessionCommand(jumpBackCommand)
-          .setIconResId(androidx.media3.session.R.drawable.media3_icon_skip_back)
-          .build()
-      )
-      sessionCommandsBuilder.add(jumpBackCommand)
-    }
-
-    if (notificationCapabilities.contains(PlayerCapability.JUMP_FORWARD)) {
-      val jumpForwardCommand = SessionCommand("JUMP_FORWARD", Bundle())
-      customLayoutButtons.add(
-        CommandButton.Builder()
-          .setDisplayName("Jump Forward")
-          .setSessionCommand(jumpForwardCommand)
-          .setIconResId(androidx.media3.session.R.drawable.media3_icon_skip_forward)
-          .build()
-      )
-      sessionCommandsBuilder.add(jumpForwardCommand)
-    }
-
-    customLayout = customLayoutButtons
-
-    sessionCommands = sessionCommandsBuilder.build()
-    playerCommands = playerCommandsBuilder.build()
-
-    mediaSession.mediaNotificationControllerInfo?.let { controllerInfo ->
-      // https://github.com/androidx/media/blob/c35a9d62baec57118ea898e271ac66819399649b/demos/session_service/src/main/java/androidx/media3/demo/session/DemoMediaLibrarySessionCallback.kt#L107
-      mediaSession.setCustomLayout(controllerInfo, customLayout)
-      mediaSession.setAvailableCommands(
-        controllerInfo,
-        sessionCommands,
-        playerCommands,
-      )
-    }
+    // Configure MediaSession commands based on capabilities
+    commandManager.updateMediaSession(mediaSession, options.capabilities, options.notificationCapabilities)
   }
 
   override fun onBind(intent: Intent?): IBinder? {
@@ -456,11 +361,7 @@ class TrackPlayerService : MediaLibraryService() {
 
       Timber.d("Providing standard player commands to controller: ${controller.packageName}")
 
-      return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
-        .setCustomLayout(customLayout)
-        .setAvailableSessionCommands(sessionCommands)
-        .setAvailablePlayerCommands(playerCommands)
-        .build()
+      return commandManager.buildConnectionResult(session)
     }
 
     override fun onCustomCommand(
@@ -469,21 +370,7 @@ class TrackPlayerService : MediaLibraryService() {
       command: SessionCommand,
       args: Bundle,
     ): ListenableFuture<SessionResult> {
-      Timber.d("onCustomCommand: action=${command.customAction}")
-
-      when (command.customAction) {
-        "JUMP_BACKWARD" -> {
-          Timber.d("Executing jump backward command")
-          player.player.seekBack()
-        }
-        "JUMP_FORWARD" -> {
-          Timber.d("Executing jump forward command")
-          player.player.seekForward()
-        }
-        else -> {
-          Timber.w("Received unexpected custom command: ${command.customAction}")
-        }
-      }
+      commandManager.handleCustomCommand(command, player)
       return super.onCustomCommand(session, controller, command, args)
     }
 
