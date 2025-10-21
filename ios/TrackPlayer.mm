@@ -301,9 +301,6 @@ RCT_EXPORT_MODULE()
 /*****************************************
  * Android Only Methods (Stubs)
  *****************************************/
-- (NSNumber *)validateOnStartCommandIntent {
-  return @(YES);
-}
 - (void)abandonWakeLock {
   // iOS doesn't need wake lock management
 }
