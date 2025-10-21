@@ -127,8 +127,7 @@ export interface PlayerOptions {
    * (Android only) The audio content type indicates to the android system how
    * you intend to use audio in your app.
    *
-   * With `autoHandleInterruptions: true` and
-   * `androidAudioContentType: AndroidAudioContentType.Speech`, the audio will be
+   * With `androidAudioContentType: AndroidAudioContentType.Speech`, the audio will be
    * paused during short interruptions, such as when a message arrives.
    * Otherwise the playback volume is reduced while the notification is playing.
    *
@@ -156,7 +155,16 @@ export interface UpdateOptions {
 
   capabilities?: Capability[];
 
-  // android
+  /**
+   * Android-specific capabilities that control which buttons appear in
+   * notifications only. This does NOT affect other controllers like
+   * Bluetooth, Android Auto, or lock screen.
+   *
+   * When null/undefined, defaults to the global capabilities.
+   * Use an empty array to show no notification buttons.
+   *
+   * @platform android
+   */
   notificationCapabilities?: Capability[];
 }
 
