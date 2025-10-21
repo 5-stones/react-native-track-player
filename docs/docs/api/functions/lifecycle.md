@@ -24,7 +24,6 @@ Note that on Android this method must only be called while the app is in the for
 | options.iosCategory  | `IOSCategory` | [AVAudioSession.Category](https://developer.apple.com/documentation/avfoundation/avaudiosession/1616615-category) for iOS. Sets on `play()` | `IOSCategory.Playback` | ❌ | ✅ | ❌ |
 | options.iosCategoryOptions | `IOSCategoryOptions[]` | [AVAudioSession.CategoryOptions](https://developer.apple.com/documentation/avfoundation/avaudiosession/1616503-categoryoptions) for iOS. Sets on `play()` | `[]` | ❌ | ✅ | ❌ |
 | options.iosCategoryMode  | `IOSCategoryMode` | [AVAudioSession.Mode](https://developer.apple.com/documentation/avfoundation/avaudiosession/1616508-mode) for iOS. Sets on `play()` | `default` | ❌ | ✅ | ❌ |
-| options.autoHandleInterruptions   | `boolean` | Indicates whether the player should automatically handle audio interruptions. | false | ✅ | ✅  | ❌ |
 | options.autoUpdateMetadata   | `boolean` | Indicates whether the player should automatically update now playing metadata data in control center / notification. | true | ✅ | ✅ | ❌ |
 
 ## `registerPlaybackService(serviceProvider)`

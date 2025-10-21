@@ -25,7 +25,6 @@ data class TrackPlayerOptions(
   val maxCacheSize: Double = 0.0,
   val audioContentType: AudioContentType = AudioContentType.MUSIC,
   val handleAudioBecomingNoisy: Boolean = true,
-  val autoHandleInterruptions: Boolean = true,
   val wakeMode: PlayerWakeMode = PlayerWakeMode.NONE,
 
   // Android-specific options
@@ -83,9 +82,6 @@ data class TrackPlayerOptions(
           AudioContentType.fromString(map.getString("audioContentType") ?: "music"),
         handleAudioBecomingNoisy =
           if (map.hasKey("handleAudioBecomingNoisy")) map.getBoolean("handleAudioBecomingNoisy")
-          else true,
-        autoHandleInterruptions =
-          if (map.hasKey("autoHandleInterruptions")) map.getBoolean("autoHandleInterruptions")
           else true,
         wakeMode =
           if (map.hasKey("wakeMode")) {

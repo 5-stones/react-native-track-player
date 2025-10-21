@@ -170,28 +170,6 @@ Fired when the user presses the dislike button in the now playing center. Only f
 ### `RemoteBookmark` (iOS only)
 Fired when the user presses the bookmark button in the now playing center. Only fired if the `bookmarkOptions` is set in `updateOptions`.
 
-### `RemoteDuck`
-Fired when the audio is interrupted. For example when a phone call arrives,
-a clock or calender sounds, or another app starts playing audio.
-
-We recommend to set `autoHandleInterruptions: true` in
-`TrackPlayer.setupPlayer`. This way toggling playback is handled automatically.
-
-By default `autoHandleInterruptions` is set to `false` (default) in
-`TrackPlayer.setupPlayer`, which means your app is expected to respond to this
-event in the following situations:
-- When the event is triggered with `paused` set to `true`, on Android playback
-  should be paused. When `permanent` is also set to `true`, on Android the
-  player should stop playback.
-- When the event is triggered and `paused` is set to `false`, the player may
-  resume playback.
-
-| Param     | Type      | Description                                  |
-| --------- | --------- | -------------------------------------------- |
-| paused    | `boolean` | On Android when `true` the player should pause playback, when `false` the player may resume playback. On iOS when `true` the playback was paused and when `false` the player may resume playback. |
-| permanent | `boolean` | Whether the interruption is permanent. On Android the player should stop playback.  |
-
-
 ## Metadata
 
 ### `AudioCommonMetadataReceived`

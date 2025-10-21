@@ -8,9 +8,7 @@ export function useSetupPlayer() {
     let unmounted = false;
     (async () => {
       try {
-        await TrackPlayer.setupPlayer({
-          autoHandleInterruptions: true,
-        });
+        await TrackPlayer.setupPlayer();
       } catch (error) {
         console.error('Error setting up player:', error);
         throw error;
