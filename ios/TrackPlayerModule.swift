@@ -15,7 +15,6 @@ public class NativeTrackPlayerImpl: NSObject {
 
   private let audioSession = AVAudioSession.sharedInstance()
   private var audioSessionIsActive = false
-  private var shouldResumePlaybackAfterInterruptionEnds: Bool = false
   private var forwardJumpInterval: NSNumber?
   private var backwardJumpInterval: NSNumber?
   private var sessionCategory: AVAudioSession.Category = .playback
@@ -67,7 +66,7 @@ public class NativeTrackPlayerImpl: NSObject {
       let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
       let shouldResume = options.contains(.shouldResume)
 
-      if shouldResume, shouldResumePlaybackAfterInterruptionEnds {
+      if shouldResume {
         player.play()
       }
     @unknown default:
@@ -123,10 +122,6 @@ public class NativeTrackPlayerImpl: NSObject {
       // configure buffer size
       if let bufferDuration = config["minBuffer"] as? TimeInterval {
         self.player.bufferDuration = bufferDuration
-      }
-
-      if let autoHandleInterruptions = config["autoHandleInterruptions"] as? Bool {
-        self.shouldResumePlaybackAfterInterruptionEnds = autoHandleInterruptions
       }
 
       // configure wether control center metdata should auto update
