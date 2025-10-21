@@ -55,8 +55,8 @@ class TrackPlayerService : MediaLibraryService() {
   private val scope = MainScope()
   private var module = CompletableDeferred<TrackPlayerModule>()
   private lateinit var mediaSession: MediaLibrarySession
-  private var sessionCommands: SessionCommands? = null
-  private var playerCommands: Player.Commands? = null
+  private var sessionCommands: SessionCommands = MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
+  private var playerCommands: Player.Commands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
   private var customLayout: List<CommandButton> = listOf()
 
   // Headless service binding
@@ -281,16 +281,13 @@ class TrackPlayerService : MediaLibraryService() {
     sessionCommands = sessionCommandsBuilder.build()
     playerCommands = playerCommandsBuilder.build()
 
-    // Use all configured player commands - no filtering needed with standard MediaSession flow
-    val configuredPlayerCommands = playerCommands ?: Player.Commands.Builder().build()
-
-    if (mediaSession.mediaNotificationControllerInfo != null) {
+    mediaSession.mediaNotificationControllerInfo?.let { controllerInfo ->
       // https://github.com/androidx/media/blob/c35a9d62baec57118ea898e271ac66819399649b/demos/session_service/src/main/java/androidx/media3/demo/session/DemoMediaLibrarySessionCallback.kt#L107
-      mediaSession.setCustomLayout(mediaSession.mediaNotificationControllerInfo!!, customLayout)
+      mediaSession.setCustomLayout(controllerInfo, customLayout)
       mediaSession.setAvailableCommands(
-        mediaSession.mediaNotificationControllerInfo!!,
-        sessionCommands ?: MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS,
-        configuredPlayerCommands,
+        controllerInfo,
+        sessionCommands,
+        playerCommands,
       )
     }
   }
@@ -457,18 +454,12 @@ class TrackPlayerService : MediaLibraryService() {
     ): MediaSession.ConnectionResult {
       Timber.d(controller.packageName)
 
-      // Use configured player commands
-      val controllerCommands =
-        playerCommands ?: MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
-
       Timber.d("Providing standard player commands to controller: ${controller.packageName}")
 
       return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
         .setCustomLayout(customLayout)
-        .setAvailableSessionCommands(
-          sessionCommands ?: MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS
-        )
-        .setAvailablePlayerCommands(controllerCommands)
+        .setAvailableSessionCommands(sessionCommands)
+        .setAvailablePlayerCommands(playerCommands)
         .build()
     }
 
