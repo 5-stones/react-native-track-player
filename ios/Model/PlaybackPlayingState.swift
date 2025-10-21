@@ -15,8 +15,8 @@ public struct PlaybackPlayingState {
   }
 
   public init(fromPlayingState playingState: [String: Bool]) {
-    self.playing = playingState["playing"] ?? false
-    self.buffering = playingState["buffering"] ?? false
+    playing = playingState["playing"] ?? false
+    buffering = playingState["buffering"] ?? false
   }
 
   public func toBridge() -> [String: Bool] {
