@@ -2348,7 +2348,7 @@ DEPENDENCIES:
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - "react-native-slider (from `../node_modules/@react-native-community/slider`)"
-  - react-native-track-player (from `../..`)
+  - react-native-track-player (from `../../..`)
   - "react-native-vector-icons-fontawesome6 (from `../node_modules/@react-native-vector-icons/fontawesome6`)"
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-oscompat (from `../node_modules/react-native/ReactCommon/oscompat`)
@@ -2475,7 +2475,7 @@ EXTERNAL SOURCES:
   react-native-slider:
     :path: "../node_modules/@react-native-community/slider"
   react-native-track-player:
-    :path: "../.."
+    :path: "../../.."
   react-native-vector-icons-fontawesome6:
     :path: "../node_modules/@react-native-vector-icons/fontawesome6"
   React-NativeModulesApple:

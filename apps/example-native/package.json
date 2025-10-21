@@ -1,8 +1,9 @@
 {
-  "name": "react-native-track-player-example",
+  "name": "example-native",
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "clean": "del-cli android/build android/app/build ios/build",
     "android:adb-reverse": "adb reverse tcp:8081 tcp:8081 && adb forward tcp:5277 tcp:5277",
     "android:adb-stop": "adb shell am force-stop trackplayer.example",
     "android:dhu": "pkill -f 'desktop-head-unit' || true && $ANDROID_SDK_ROOT/extras/google/auto/desktop-head-unit --usb",
@@ -19,6 +20,7 @@
     "ios:build": "react-native build-ios --mode Debug",
     "ios:ide": "open ios/*.xcworkspace",
     "ios:sim": "react-native run-ios --simulator=\"iPhone\"",
+    "ios:rebuild": "cd ios && pod install && cd ../.. && yarn ios",
     "ios": "react-native run-ios",
     "lint:fix": "eslint src --fix",
     "lint": "eslint src --max-warnings=0",

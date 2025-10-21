@@ -23,7 +23,7 @@ yarn install
 yarn prepare
 
 # Start the Next.js dev server
-cd apps/nextjs
+cd apps/example-nextjs
 yarn dev
 ```
 
@@ -61,7 +61,7 @@ yarn build:disable-minification
 ## Project Structure
 
 ```
-apps/nextjs/
+apps/example-nextjs/
 ├── components/
 │   ├── AudioPlayer.js           # Main player UI component
 │   └── TrackPlayerProvider.js   # Player setup and initialization
@@ -151,7 +151,7 @@ yarn install
 yarn prepare
 
 # Clear Next.js cache
-cd apps/nextjs
+cd apps/example-nextjs
 rm -rf .next
 yarn dev
 ```
