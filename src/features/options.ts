@@ -158,8 +158,6 @@ export interface UpdateOptions {
 
   // android
   notificationCapabilities?: Capability[];
-
-  color?: number;
 }
 
 // MARK: - Functions

@@ -23,7 +23,6 @@ All parameters are optional. You also only need to specify the ones you want to 
 | `nextIcon` | [Resource Object](../objects/resource.md) | The next icon¹ | ✅ | ❌ | ❌ |
 | `rewindIcon` | [Resource Object](../objects/resource.md) | The jump backward icon¹ | ✅ | ❌ | ❌ |
 | `forwardIcon` | [Resource Object](../objects/resource.md) | The jump forward icon¹ | ✅ | ❌ | ❌ |
-| `color` | `number` | The notification color in an ARGB hex | ✅ | ❌ | ❌ |
 | `progressUpdateEventInterval` | `number` | The interval (in seconds) that the [`Event.PlaybackProgressUpdated`](../events.md#playbackprogressupdated) will be fired. `undefined` by default. | ✅ | ✅ | ✅ |
 
 *¹ - The custom icons will only work in release builds*
