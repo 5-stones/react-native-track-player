@@ -28,9 +28,9 @@ import com.doublesymmetry.trackplayer.event.RemoteSeekEvent
 import com.doublesymmetry.trackplayer.event.RemoteSetRatingEvent
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toMilliseconds
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
+import com.doublesymmetry.trackplayer.model.AudioOffloadOptions
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import com.doublesymmetry.trackplayer.model.PlaybackState
-import com.doublesymmetry.trackplayer.model.AudioOffloadOptions
 import com.doublesymmetry.trackplayer.model.PlayerSetupOptions
 import com.doublesymmetry.trackplayer.model.RatingType
 import com.doublesymmetry.trackplayer.model.State
@@ -378,7 +378,9 @@ class TrackPlayer(
   fun setAudioOffload(options: AudioOffloadOptions) {
     val audioOffloadPreferences =
       TrackSelectionParameters.AudioOffloadPreferences.Builder()
-        .setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
+        .setAudioOffloadMode(
+          TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
+        )
         .setIsGaplessSupportRequired(options.gaplessSupportRequired)
         .setIsSpeedChangeSupportRequired(options.rateChangeSupportRequired)
         .build()
