@@ -43,6 +43,49 @@ export interface AndroidOptions {
    * @default false
    */
   shuffle?: boolean;
+
+  /**
+   * Maximum duration of media that the player will attempt to buffer in seconds.
+   * Max buffer may not be lower than min buffer.
+   *
+   * @throws Will throw if max buffer is lower than min buffer.
+   * @default 50
+   */
+  maxBuffer?: number;
+
+  /**
+   * Duration in seconds that should be kept in the buffer behind the current
+   * playhead time.
+   *
+   * @default 0
+   */
+  backBuffer?: number;
+
+  /**
+   * Duration of media in seconds that must be buffered for playback to start or
+   * resume following a user action such as a seek.
+   *
+   * @default 2.5
+   */
+  playBuffer?: number;
+
+  /**
+   * Duration of media in seconds that must be buffered for playback to resume
+   * after a rebuffer (when the buffer runs empty during playback).
+   *
+   * When not specified, defaults to playBuffer * 1.6 (maintaining ExoPlayer's
+   * default ratio). Should be >= playBuffer for optimal behavior.
+   *
+   * @default playBuffer * 1.6
+   */
+  rebufferBuffer?: number;
+
+  /**
+   * Maximum cache size in kilobytes.
+   *
+   * @default 0
+   */
+  maxCacheSize?: number;
 }
 
 export interface PlayerOptions {
@@ -55,54 +98,9 @@ export interface PlayerOptions {
    * @default 50
    */
   minBuffer?: number;
-  /**
-   * Maximum duration of media that the player will attempt to buffer in seconds.
-   * Max buffer may not be lower than min buffer.
-   *
-   * Supported on Android only.
-   *
-   * @throws Will throw if max buffer is lower than min buffer.
-   * @default 50
-   */
-  maxBuffer?: number;
-  /**
-   * Duration in seconds that should be kept in the buffer behind the current
-   * playhead time.
-   *
-   * Supported on Android only.
-   *
-   * @default 0
-   */
-  backBuffer?: number;
-  /**
-   * Duration of media in seconds that must be buffered for playback to start or
-   * resume following a user action such as a seek.
-   *
-   * Supported on Android only.
-   *
-   * @default 2.5
-   */
-  playBuffer?: number;
-  /**
-   * Duration of media in seconds that must be buffered for playback to resume
-   * after a rebuffer (when the buffer runs empty during playback).
-   *
-   * When not specified, defaults to playBuffer * 1.6 (maintaining ExoPlayer's
-   * default ratio). Should be >= playBuffer for optimal behavior.
-   *
-   * Supported on Android only.
-   *
-   * @default playBuffer * 1.6
-   */
-  rebufferBuffer?: number;
-  /**
-   * Maximum cache size in kilobytes.
-   *
-   * Supported on Android only.
-   *
-   * @default 0
-   */
-  maxCacheSize?: number;
+
+  /** Android-specific configuration options for setup */
+  android?: AndroidOptions;
   /**
    * [AVAudioSession.Category](https://developer.apple.com/documentation/avfoundation/avaudiosession/1616615-category)
    * for iOS. Sets on `play()`.
@@ -142,13 +140,33 @@ export interface PlayerOptions {
 }
 
 export interface UpdateOptions {
+  /** Android-specific configuration options */
   android?: AndroidOptions;
-  ratingType?: RatingType;
-  forwardJumpInterval?: number;
-  backwardJumpInterval?: number;
-  progressUpdateEventInterval?: number; // in seconds
 
-  // ios
+  /**
+   * The rating type to use for ratings.
+   * Determines how star ratings and thumbs up/down are handled.
+   */
+  ratingType?: RatingType;
+
+  /**
+   * Jump forward interval in seconds when using jump forward controls.
+   * @default 15
+   */
+  forwardJumpInterval?: number;
+
+  /**
+   * Jump backward interval in seconds when using jump backward controls.
+   * @default 15
+   */
+  backwardJumpInterval?: number;
+
+  /**
+   * How often progress events are emitted in seconds.
+   * @default 1
+   */
+  progressUpdateEventInterval?: number;
+
   likeOptions?: FeedbackOptions;
   dislikeOptions?: FeedbackOptions;
   bookmarkOptions?: FeedbackOptions;

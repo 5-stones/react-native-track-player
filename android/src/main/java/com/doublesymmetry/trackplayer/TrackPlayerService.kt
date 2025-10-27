@@ -24,7 +24,8 @@ import androidx.media3.session.MediaSession
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import com.doublesymmetry.trackplayer.model.AppKilledPlaybackBehavior
-import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
+import com.doublesymmetry.trackplayer.model.PlayerSetupOptions
+import com.doublesymmetry.trackplayer.model.PlayerUpdateOptions
 import com.doublesymmetry.trackplayer.util.MediaSessionManager
 import com.facebook.react.bridge.Arguments
 import com.google.common.collect.ImmutableList
@@ -121,7 +122,7 @@ class TrackPlayerService : MediaLibraryService() {
         action = Intent.ACTION_VIEW
       }
     mediaSession =
-      MediaLibrarySession.Builder(this, player.player, InnerMediaSessionCallback())
+      MediaLibrarySession.Builder(this, player.forwardingPlayer, InnerMediaSessionCallback())
         // https://github.com/androidx/media/issues/1218
         .setSessionActivity(
           PendingIntent.getActivity(
@@ -134,7 +135,7 @@ class TrackPlayerService : MediaLibraryService() {
         .build()
 
     // Now set up player properly with default options
-    setupPlayer(TrackPlayerOptions())
+    setupPlayer(PlayerSetupOptions())
 
     // Bind headless service once at startup for JS task execution
     val headlessIntent = Intent(applicationContext, TrackPlayerHeadlessTaskService::class.java)
@@ -144,14 +145,12 @@ class TrackPlayerService : MediaLibraryService() {
   private var appKilledPlaybackBehavior =
     AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
 
-  fun setupPlayer(playerOptionsData: TrackPlayerOptions, callbacks: TrackPlayerCallbacks? = null) {
+  fun setupPlayer(setupOptions: PlayerSetupOptions, callbacks: TrackPlayerCallbacks? = null) {
     Timber.d("Setting up player")
-
-    val options = playerOptionsData.toPlayerOptions()
 
     // Always create a new player instance
     val oldPlayer = if (::player.isInitialized) player else null
-    player = TrackPlayer(this@TrackPlayerService, options, callbacks)
+    player = TrackPlayer(this@TrackPlayerService, setupOptions, callbacks)
     oldPlayer?.destroy()
     mediaSession.player = player.forwardingPlayer
   }
@@ -180,9 +179,8 @@ class TrackPlayerService : MediaLibraryService() {
     Timber.d("Reset module for future registrations")
   }
 
-  fun applyOptions(options: TrackPlayerOptions) {
-    options.audioOffload?.let { audioOffload -> player.setAudioOffload(audioOffload) }
-
+  fun applyUpdateOptions(options: PlayerUpdateOptions) {
+    // Android-specific runtime options
     options.skipSilence?.let { skipSilence -> player.skipSilence = skipSilence }
 
     options.ratingType?.let { ratingType -> player.ratingType = ratingType.compat }
@@ -198,8 +196,16 @@ class TrackPlayerService : MediaLibraryService() {
       if (options.progressUpdateEventInterval > 0) options.progressUpdateEventInterval else null
     )
 
+    // Update jump intervals
+    player.forwardJumpInterval = options.forwardJumpInterval
+    player.backwardJumpInterval = options.backwardJumpInterval
+
     // Configure MediaSession commands based on capabilities
-    commandManager.updateMediaSession(mediaSession, options.capabilities, options.notificationCapabilities)
+    commandManager.updateMediaSession(
+      mediaSession,
+      options.capabilities,
+      options.notificationCapabilities,
+    )
   }
 
   override fun onBind(intent: Intent?): IBinder? {
@@ -275,7 +281,7 @@ class TrackPlayerService : MediaLibraryService() {
     if (!::player.isInitialized) {
       Timber.w("Player not initialized - recreating with default options")
       player = TrackPlayer(this)
-      setupPlayer(TrackPlayerOptions())
+      setupPlayer(PlayerSetupOptions())
     }
     return mediaSession
   }

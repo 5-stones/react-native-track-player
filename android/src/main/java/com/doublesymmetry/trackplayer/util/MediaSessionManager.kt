@@ -6,8 +6,8 @@ import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionCommands
-import com.doublesymmetry.trackplayer.option.PlayerCapability
 import com.doublesymmetry.trackplayer.TrackPlayer
+import com.doublesymmetry.trackplayer.option.PlayerCapability
 import timber.log.Timber
 
 /**
@@ -20,7 +20,8 @@ import timber.log.Timber
  * - Handles execution of custom MediaSession commands (jump actions)
  * - Maintains proper separation between global capabilities and notification-specific controls
  *
- * Initializes with sensible defaults: all global capabilities enabled, essential notification controls only.
+ * Initializes with sensible defaults: all global capabilities enabled, essential notification
+ * controls only.
  */
 class MediaSessionManager {
 
@@ -29,21 +30,15 @@ class MediaSessionManager {
     private const val CUSTOM_ACTION_JUMP_FORWARD = "JUMP_FORWARD"
   }
 
-  /**
-   * Current player commands configuration
-   */
+  /** Current player commands configuration */
   var playerCommands: Player.Commands = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS
     private set
 
-  /**
-   * Current session commands configuration
-   */
+  /** Current session commands configuration */
   lateinit var sessionCommands: SessionCommands
     private set
 
-  /**
-   * Current custom layout configuration
-   */
+  /** Current custom layout configuration */
   lateinit var customLayout: List<CommandButton>
     private set
 
@@ -51,29 +46,26 @@ class MediaSessionManager {
     // Initialize with defaults:
     // - Allow all capabilities globally (for full external controller support)
     // - Limit notification capabilities to essential controls
-    update(null, listOf(
-      PlayerCapability.PLAY,
-      PlayerCapability.PAUSE,
-      PlayerCapability.SKIP_TO_NEXT,
-      PlayerCapability.SKIP_TO_PREVIOUS,
-      PlayerCapability.SEEK_TO
-    ))
+    update(
+      null,
+      listOf(
+        PlayerCapability.PLAY,
+        PlayerCapability.PAUSE,
+        PlayerCapability.SKIP_TO_NEXT,
+        PlayerCapability.SKIP_TO_PREVIOUS,
+        PlayerCapability.SEEK_TO,
+      ),
+    )
   }
 
-  /**
-   * Updates internal command configuration based on capabilities
-   */
+  /** Updates internal command configuration based on capabilities */
   private fun update(
     capabilities: List<PlayerCapability>?,
-    notificationCapabilities: List<PlayerCapability>?
+    notificationCapabilities: List<PlayerCapability>?,
   ) {
-    capabilities?.let {
-      updatePlayerCommands(it)
-    }
+    capabilities?.let { updatePlayerCommands(it) }
 
-    (notificationCapabilities ?: capabilities)?.let {
-      updateSessionCommandsAndLayout(it)
-    }
+    (notificationCapabilities ?: capabilities)?.let { updateSessionCommandsAndLayout(it) }
   }
 
   /**
@@ -81,19 +73,18 @@ class MediaSessionManager {
    *
    * @param mediaSession The MediaSession to configure
    * @param capabilities Global capabilities that enable commands for ALL MediaSession controllers
-   *                    (Bluetooth, Android Auto, lock screen, notification, etc.).
-   *                    If null, keeps existing player commands unchanged.
-   * @param notificationCapabilities Capabilities that control which buttons appear in
-   *                                 notifications only. Defaults to capabilities if null.
-   *                                 Empty list disables all notification buttons.
+   *   (Bluetooth, Android Auto, lock screen, notification, etc.). If null, keeps existing player
+   *   commands unchanged.
+   * @param notificationCapabilities Capabilities that control which buttons appear in notifications
+   *   only. Defaults to capabilities if null. Empty list disables all notification buttons.
    *
-   * If both parameters are null, keeps existing configuration unchanged.
-   * Manager initializes with defaults: all global capabilities, limited notification capabilities.
+   * If both parameters are null, keeps existing configuration unchanged. Manager initializes with
+   * defaults: all global capabilities, limited notification capabilities.
    */
   fun updateMediaSession(
     mediaSession: MediaSession,
     capabilities: List<PlayerCapability>?,
-    notificationCapabilities: List<PlayerCapability>?
+    notificationCapabilities: List<PlayerCapability>?,
   ) {
     // Update internal configuration
     update(capabilities, notificationCapabilities)
@@ -101,11 +92,7 @@ class MediaSessionManager {
     // Apply configuration to MediaSession notification controller
     mediaSession.mediaNotificationControllerInfo?.let { controllerInfo ->
       mediaSession.setCustomLayout(controllerInfo, customLayout)
-      mediaSession.setAvailableCommands(
-        controllerInfo,
-        sessionCommands,
-        playerCommands,
-      )
+      mediaSession.setAvailableCommands(controllerInfo, sessionCommands, playerCommands)
     }
   }
 
@@ -136,12 +123,12 @@ class MediaSessionManager {
     return when (command.customAction) {
       CUSTOM_ACTION_JUMP_BACKWARD -> {
         Timber.d("Executing jump backward command")
-        player.player.seekBack()
+        player.forwardingPlayer.seekBack()
         true
       }
       CUSTOM_ACTION_JUMP_FORWARD -> {
         Timber.d("Executing jump forward command")
-        player.player.seekForward()
+        player.forwardingPlayer.seekForward()
         true
       }
       else -> {
@@ -155,12 +142,13 @@ class MediaSessionManager {
     val playerCommandsBuilder = MediaSession.ConnectionResult.DEFAULT_PLAYER_COMMANDS.buildUpon()
 
     // Commands to remove - start with always-disabled commands
-    val disabledCommands = mutableSetOf<@Player.Command Int>(
-      // Always filter out direct media item commands to avoid dual-command confusion
-      // This forces MediaSession to only use the "smart" commands we can control via capabilities
-      Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
-      Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
-    )
+    val disabledCommands =
+      mutableSetOf<@Player.Command Int>(
+        // Always filter out direct media item commands to avoid dual-command confusion
+        // This forces MediaSession to only use the "smart" commands we can control via capabilities
+        Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+        Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+      )
 
     // Only disable jump commands if global capabilities are not present
     // This preserves them for external controllers (Bluetooth, Android Auto, etc.)
@@ -172,9 +160,8 @@ class MediaSessionManager {
     }
 
     // Check each capability and add commands to remove if not enabled
-    val hasPlayPause = capabilities.any {
-      it == PlayerCapability.PLAY || it == PlayerCapability.PAUSE
-    }
+    val hasPlayPause =
+      capabilities.any { it == PlayerCapability.PLAY || it == PlayerCapability.PAUSE }
     if (!hasPlayPause) {
       disabledCommands.add(Player.COMMAND_PLAY_PAUSE)
     }
@@ -204,9 +191,7 @@ class MediaSessionManager {
     playerCommands = playerCommandsBuilder.build()
   }
 
-  private fun updateSessionCommandsAndLayout(
-    notificationCapabilities: List<PlayerCapability>
-  ) {
+  private fun updateSessionCommandsAndLayout(notificationCapabilities: List<PlayerCapability>) {
     val customLayoutButtons = mutableListOf<CommandButton>()
     val sessionCommandsBuilder =
       MediaSession.ConnectionResult.DEFAULT_SESSION_AND_LIBRARY_COMMANDS.buildUpon()
@@ -239,5 +224,4 @@ class MediaSessionManager {
     sessionCommands = sessionCommandsBuilder.build()
     customLayout = customLayoutButtons
   }
-
 }

@@ -26,13 +26,14 @@ import com.doublesymmetry.trackplayer.event.RemoteJumpBackwardEvent
 import com.doublesymmetry.trackplayer.event.RemoteJumpForwardEvent
 import com.doublesymmetry.trackplayer.event.RemoteSeekEvent
 import com.doublesymmetry.trackplayer.event.RemoteSetRatingEvent
+import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toMilliseconds
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import com.doublesymmetry.trackplayer.model.PlaybackState
+import com.doublesymmetry.trackplayer.model.PlayerSetupOptions
 import com.doublesymmetry.trackplayer.model.RatingType
 import com.doublesymmetry.trackplayer.model.State
 import com.doublesymmetry.trackplayer.model.Track
-import com.doublesymmetry.trackplayer.option.PlayerOptions
 import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
 import com.doublesymmetry.trackplayer.player.MediaFactory
 import com.doublesymmetry.trackplayer.player.PlaybackProgressUpdateManager
@@ -47,19 +48,17 @@ import timber.log.Timber
 @UnstableApi
 class TrackPlayer(
   internal val context: Context,
-  val options: PlayerOptions = PlayerOptions(),
+  private val setupOptions: PlayerSetupOptions = PlayerSetupOptions(),
   callbacks: TrackPlayerCallbacks? = null,
 ) {
+
+  // Runtime options that can be updated
+  var forwardJumpInterval: Double = 15.0
+  var backwardJumpInterval: Double = 15.0
 
   private var callbacks: TrackPlayerCallbacks? = callbacks
   val exoPlayer: ExoPlayer
   val forwardingPlayer: Player
-  val player: Player
-    get() {
-      return options.interceptPlayerActionsTriggeredExternally
-        .takeIf { it }
-        ?.let { forwardingPlayer } ?: exoPlayer
-    }
 
   /**
    * ForwardingPlayer that intercepts external player actions and dispatches them to callbacks.
@@ -128,18 +127,14 @@ class TrackPlayer(
     override fun seekForward() {
       Timber.d("InterceptingPlayer.seekForward() called")
       callbacks?.let {
-        it.onRemoteJumpForward(
-          RemoteJumpForwardEvent(interval = options.forwardJumpInterval.toDouble())
-        )
+        it.onRemoteJumpForward(RemoteJumpForwardEvent(interval = forwardJumpInterval))
       } ?: super.seekForward()
     }
 
     override fun seekBack() {
       Timber.d("InterceptingPlayer.seekBack() called")
       callbacks?.let {
-        it.onRemoteJumpBackward(
-          RemoteJumpBackwardEvent(interval = options.backwardJumpInterval.toDouble())
-        )
+        it.onRemoteJumpBackward(RemoteJumpBackwardEvent(interval = backwardJumpInterval))
       } ?: super.seekBack()
     }
 
@@ -398,8 +393,8 @@ class TrackPlayer(
   }
 
   init {
-    if (options.cacheSizeKb > 0) {
-      cache = PlayerCache.initCache(context, options.cacheSizeKb)
+    if (setupOptions.maxCacheSize > 0) {
+      cache = PlayerCache.initCache(context, setupOptions.maxCacheSize.toLong())
     }
     callbacks?.onPlaybackState(PlaybackState(State.NONE))
 
@@ -407,21 +402,23 @@ class TrackPlayer(
     renderer.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
     val loadControl = run {
-      val bufferConfig = options.bufferOptions
       val multiplier =
         DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS.toDouble() /
           DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS.toDouble()
       val minBuffer =
-        bufferConfig.minBuffer?.takeIf { it != 0 } ?: DefaultLoadControl.DEFAULT_MIN_BUFFER_MS
+        setupOptions.minBuffer?.toMilliseconds()?.toInt()?.takeIf { it != 0 }
+          ?: DefaultLoadControl.DEFAULT_MIN_BUFFER_MS
       val maxBuffer =
-        bufferConfig.maxBuffer?.takeIf { it != 0 } ?: DefaultLoadControl.DEFAULT_MAX_BUFFER_MS
+        setupOptions.maxBuffer?.toMilliseconds()?.toInt()?.takeIf { it != 0 }
+          ?: DefaultLoadControl.DEFAULT_MAX_BUFFER_MS
       val playBuffer =
-        bufferConfig.playBuffer?.takeIf { it != 0 }
+        setupOptions.playBuffer?.toMilliseconds()?.toInt()?.takeIf { it != 0 }
           ?: DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS
       val playAfterRebuffer =
-        bufferConfig.rebufferBuffer?.takeIf { it != 0 } ?: (playBuffer * multiplier).toInt()
+        setupOptions.rebufferBuffer?.toMilliseconds()?.toInt()?.takeIf { it != 0 }
+          ?: (playBuffer * multiplier).toInt()
       val backBuffer =
-        bufferConfig.backBuffer?.takeIf { it != 0 }
+        setupOptions.backBuffer?.toMilliseconds()?.toInt()?.takeIf { it != 0 }
           ?: DefaultLoadControl.DEFAULT_BACK_BUFFER_DURATION_MS
       DefaultLoadControl.Builder()
         .setBufferDurationsMs(minBuffer, maxBuffer, playBuffer, playAfterRebuffer)
@@ -432,23 +429,26 @@ class TrackPlayer(
     exoPlayer =
       ExoPlayer.Builder(context)
         .setRenderersFactory(renderer)
-        .setHandleAudioBecomingNoisy(options.handleAudioBecomingNoisy)
+        .setHandleAudioBecomingNoisy(setupOptions.handleAudioBecomingNoisy)
         .setMediaSourceFactory(MediaFactory(context, cache))
-        .setWakeMode(options.wakeMode.toExoPlayer())
+        .setWakeMode(setupOptions.wakeMode.toExoPlayer())
         .setLoadControl(loadControl)
-        .setSkipSilenceEnabled(options.skipSilence)
-        .setName("kotlin-audio-player")
+        .setName("rntp")
         .build()
 
     val audioAttributes =
       AudioAttributes.Builder()
         .setUsage(C.USAGE_MEDIA)
-        .setContentType(options.audioContentType.toExoPlayer())
+        .setContentType(setupOptions.audioContentType.toExoPlayer())
         .build()
     exoPlayer.setAudioAttributes(audioAttributes, true)
+
+    // Apply setup-specific options
+    setupOptions.audioOffload?.let { setAudioOffload(it) }
+
     forwardingPlayer = InterceptingPlayer(exoPlayer)
     playerListener = PlayerListener(this)
-    player.addListener(playerListener)
+    forwardingPlayer.addListener(playerListener)
   }
 
   /**
@@ -636,7 +636,7 @@ class TrackPlayer(
    */
   fun destroy() {
     stop()
-    player.removeListener(playerListener)
+    forwardingPlayer.removeListener(playerListener)
     exoPlayer.release()
     cache?.release()
     cache = null

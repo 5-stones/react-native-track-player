@@ -25,8 +25,9 @@ import com.doublesymmetry.trackplayer.event.RemoteSetRatingEvent
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import com.doublesymmetry.trackplayer.model.PlaybackState
+import com.doublesymmetry.trackplayer.model.PlayerSetupOptions
+import com.doublesymmetry.trackplayer.model.PlayerUpdateOptions
 import com.doublesymmetry.trackplayer.model.TrackFactory
-import com.doublesymmetry.trackplayer.model.TrackPlayerOptions
 import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
 import com.doublesymmetry.trackplayer.util.BundleUtils
 import com.doublesymmetry.trackplayer.util.MetadataAdapter
@@ -53,7 +54,8 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   NativeTrackPlayerSpec(reactContext), ServiceConnection {
   private lateinit var browser: MediaBrowser
   private var mediaBrowserFuture: ListenableFuture<MediaBrowser>? = null
-  private var options = TrackPlayerOptions()
+  private var setupOptions = PlayerSetupOptions()
+  private var updateOptions = PlayerUpdateOptions()
   private var playerSetUpPromise: Promise? = null
   private val mainScope = MainScope()
   private var connectedService: TrackPlayerService? = null
@@ -133,7 +135,8 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       connectedService =
         (serviceBinder as TrackPlayerService.LocalBinder).service.apply {
           registerModule(this@TrackPlayerModule)
-          applyOptions(options)
+          setupPlayer(setupOptions)
+          applyUpdateOptions(updateOptions)
         }
 
       val sessionToken =
@@ -159,10 +162,10 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   @SuppressLint("UnspecifiedRegisterReceiverFlag")
   override fun setupPlayer(data: ReadableMap?, promise: Promise) {
     launchInScope {
-      options = TrackPlayerOptions.fromBridge(data)
+      setupOptions.updateFromBridge(data)
 
       if (connectedService != null) {
-        connectedService?.applyOptions(options)
+        connectedService?.setupPlayer(setupOptions)
         promise.resolve(null)
         return@launchInScope
       }
@@ -188,8 +191,8 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   override fun updateOptions(data: ReadableMap?): Unit = runBlockingOnMain {
-    options.updateFromBridge(data)
-    service.applyOptions(options)
+    updateOptions.updateFromBridge(data)
+    service.applyUpdateOptions(updateOptions)
   }
 
   override fun add(data: ReadableArray, insertBeforeIndex: Double?): Unit = runBlockingOnMain {

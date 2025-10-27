@@ -10,6 +10,37 @@ sidebar_position: 9
 
 - `androidAudioContentType` behavior: With the removal of `autoHandleInterruptions`, the `androidAudioContentType` option now directly controls Android's audio focus behavior. When set to `AndroidAudioContentType.Speech`, audio will be paused during short interruptions (like message notifications). When set to `AndroidAudioContentType.Music` (default), the playback volume is reduced while notifications play.
 
+- **Buffer options moved to `android.*` namespace**: Android-specific buffer configuration options have been moved under the `android.*` namespace for better organization and platform consistency. The following options must now be specified under `android.*` instead of at the top level:
+  - `maxBuffer` → `android.maxBuffer`
+  - `playBuffer` → `android.playBuffer`
+  - `rebufferBuffer` → `android.rebufferBuffer`
+  - `backBuffer` → `android.backBuffer`
+  - `maxCacheSize` → `android.maxCacheSize`
+
+  **Before (v4):**
+  ```javascript
+  await TrackPlayer.setupPlayer({
+    maxBuffer: 50,
+    playBuffer: 2.5,
+    backBuffer: 0,
+    android: {
+      // other Android options
+    }
+  });
+  ```
+
+  **After (v5):**
+  ```javascript
+  await TrackPlayer.setupPlayer({
+    android: {
+      maxBuffer: 50,
+      playBuffer: 2.5,
+      backBuffer: 0,
+      // other Android options
+    }
+  });
+  ```
+
 ### Hook Behavior Updates
 
 ### Player Method Updates
