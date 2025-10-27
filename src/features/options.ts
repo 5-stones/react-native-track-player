@@ -127,6 +127,14 @@ export interface AndroidOptions {
    * @default AndroidAudioContentType.Music
    */
   audioContentType?: AndroidAudioContentType;
+
+  /**
+   * Whether the player should automatically pause when audio becomes noisy
+   * (e.g., when headphones are unplugged).
+   *
+   * @default true
+   */
+  handleAudioBecomingNoisy?: boolean;
 }
 
 export interface IOSOptions {
