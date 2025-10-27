@@ -5,6 +5,7 @@ export * from './Event';
 export * from './IOSCategory';
 export * from './IOSCategoryMode';
 export * from './IOSCategoryOptions';
+export * from './IOSCategoryPolicy';
 export * from './PitchAlgorithm';
 export * from './RatingType';
 export * from './RepeatMode';

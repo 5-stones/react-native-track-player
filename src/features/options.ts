@@ -5,6 +5,7 @@ import type {
   IOSCategory,
   IOSCategoryMode,
   IOSCategoryOptions,
+  IOSCategoryPolicy,
   RatingType,
 } from '../constants';
 import TrackPlayer from '../NativeTrackPlayer';
@@ -100,6 +101,37 @@ export interface AndroidOptions {
   audioContentType?: AndroidAudioContentType;
 }
 
+export interface IOSOptions {
+  /**
+   * [AVAudioSession.Category](https://developer.apple.com/documentation/avfoundation/avaudiosession/1616615-category)
+   * for iOS. Sets on `play()`.
+   */
+  category?: IOSCategory;
+
+  /**
+   * The audio session mode, together with the audio session category,
+   * indicates to the system how you intend to use audio in your app. You can use
+   * a mode to configure the audio system for specific use cases such as video
+   * recording, voice or video chat, or audio analysis.
+   * Sets on `play()`.
+   *
+   * See https://developer.apple.com/documentation/avfoundation/avaudiosession/1616508-mode
+   */
+  categoryMode?: IOSCategoryMode;
+
+  /**
+   * [AVAudioSession.CategoryOptions](https://developer.apple.com/documentation/avfoundation/avaudiosession/1616503-categoryoptions) for iOS.
+   * Sets on `play()`.
+   */
+  categoryOptions?: IOSCategoryOptions[];
+
+  /**
+   * [AVAudioSession.RouteSharingPolicy](https://developer.apple.com/documentation/AVFAudio/AVAudioSession/RouteSharingPolicy-swift.enum) for iOS.
+   * Sets on `play()`.
+   */
+  categoryPolicy?: IOSCategoryPolicy;
+}
+
 export interface PlayerOptions {
   /**
    * Minimum duration of media that the player will attempt to buffer in seconds.
@@ -113,26 +145,8 @@ export interface PlayerOptions {
 
   /** Android-specific configuration options for setup */
   android?: AndroidOptions;
-  /**
-   * [AVAudioSession.Category](https://developer.apple.com/documentation/avfoundation/avaudiosession/1616615-category)
-   * for iOS. Sets on `play()`.
-   */
-  iosCategory?: IOSCategory;
-  /**
-   * (iOS only) The audio session mode, together with the audio session category,
-   * indicates to the system how you intend to use audio in your app. You can use
-   * a mode to configure the audio system for specific use cases such as video
-   * recording, voice or video chat, or audio analysis.
-   * Sets on `play()`.
-   *
-   * See https://developer.apple.com/documentation/avfoundation/avaudiosession/1616508-mode
-   */
-  iosCategoryMode?: IOSCategoryMode;
-  /**
-   * [AVAudioSession.CategoryOptions](https://developer.apple.com/documentation/avfoundation/avaudiosession/1616503-categoryoptions) for iOS.
-   * Sets on `play()`.
-   */
-  iosCategoryOptions?: IOSCategoryOptions[];
+  /** iOS-specific configuration options for setup */
+  ios?: IOSOptions;
   /**
    * Indicates whether the player should automatically update now playing metadata data in control center / notification.
    * Defaults to `true`.
@@ -140,9 +154,31 @@ export interface PlayerOptions {
   autoUpdateMetadata?: boolean;
 }
 
+export interface IOSUpdateOptions {
+  /**
+   * Configuration for the like/heart button in iOS control center.
+   * Only available on iOS.
+   */
+  likeOptions?: FeedbackOptions;
+
+  /**
+   * Configuration for the dislike button in iOS control center.
+   * Only available on iOS.
+   */
+  dislikeOptions?: FeedbackOptions;
+
+  /**
+   * Configuration for the bookmark button in iOS control center.
+   * Only available on iOS.
+   */
+  bookmarkOptions?: FeedbackOptions;
+}
+
 export interface UpdateOptions {
   /** Android-specific configuration options */
   android?: AndroidOptions;
+  /** iOS-specific configuration options */
+  ios?: IOSUpdateOptions;
 
   /**
    * The rating type to use for ratings.
@@ -167,10 +203,6 @@ export interface UpdateOptions {
    * @default 1
    */
   progressUpdateEventInterval?: number;
-
-  likeOptions?: FeedbackOptions;
-  dislikeOptions?: FeedbackOptions;
-  bookmarkOptions?: FeedbackOptions;
 
   capabilities?: Capability[];
 

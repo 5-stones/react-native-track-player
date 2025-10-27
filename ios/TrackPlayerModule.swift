@@ -128,28 +128,30 @@ public class NativeTrackPlayerImpl: NSObject {
       self.player.automaticallyUpdateNowPlayingInfo = config["autoUpdateMetadata"] as? Bool ?? true
 
       // configure audio session - category, options & mode
+      let iosConfig = config["ios"] as? [String: Any]
+
       if
-        let sessionCategoryStr = config["iosCategory"] as? String,
+        let sessionCategoryStr = iosConfig?["category"] as? String,
         let mappedCategory = SessionCategory(rawValue: sessionCategoryStr)
       {
         self.sessionCategory = mappedCategory.mapConfigToAVAudioSessionCategory()
       }
 
       if
-        let sessionCategoryModeStr = config["iosCategoryMode"] as? String,
+        let sessionCategoryModeStr = iosConfig?["categoryMode"] as? String,
         let mappedCategoryMode = SessionCategoryMode(rawValue: sessionCategoryModeStr)
       {
         self.sessionCategoryMode = mappedCategoryMode.mapConfigToAVAudioSessionCategoryMode()
       }
 
       if
-        let sessionCategoryPolicyStr = config["iosCategoryPolicy"] as? String,
+        let sessionCategoryPolicyStr = iosConfig?["categoryPolicy"] as? String,
         let mappedCategoryPolicy = SessionCategoryPolicy(rawValue: sessionCategoryPolicyStr)
       {
-        self.sessionCategoryPolicy = mappedCategoryPolicy.mapConfigToAVAudioSessionCategoryPolicy()
+        self.sessionCategoryPolicy = mappedCategoryPolicy.toRouteSharingPolicy()
       }
 
-      let sessionCategoryOptsStr = config["iosCategoryOptions"] as? [String]
+      let sessionCategoryOptsStr = iosConfig?["categoryOptions"] as? [String]
       let mappedCategoryOpts = sessionCategoryOptsStr?
         .compactMap {
           SessionCategoryOptions(rawValue: $0)?.mapConfigToAVAudioSessionCategoryOptions()
@@ -218,15 +220,17 @@ public class NativeTrackPlayerImpl: NSObject {
       self.backwardJumpInterval = options["backwardJumpInterval"] as? NSNumber ?? self
         .backwardJumpInterval
 
+      let iosOptions = options["ios"] as? [String: Any]
+
       self.player.remoteCommands = capabilitiesStr
         .compactMap { Capability(rawValue: $0) }
         .map { capability in
           capability.mapToPlayerCommand(
             forwardJumpInterval: self.forwardJumpInterval,
             backwardJumpInterval: self.backwardJumpInterval,
-            likeOptions: options["likeOptions"] as? [String: Any],
-            dislikeOptions: options["dislikeOptions"] as? [String: Any],
-            bookmarkOptions: options["bookmarkOptions"] as? [String: Any]
+            likeOptions: iosOptions?["likeOptions"] as? [String: Any],
+            dislikeOptions: iosOptions?["dislikeOptions"] as? [String: Any],
+            bookmarkOptions: iosOptions?["bookmarkOptions"] as? [String: Any]
           )
         }
 

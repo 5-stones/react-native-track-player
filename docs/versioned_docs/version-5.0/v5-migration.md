@@ -10,7 +10,11 @@ sidebar_position: 9
 
 - `androidAudioContentType` behavior: With the removal of `autoHandleInterruptions`, the `androidAudioContentType` option now directly controls Android's audio focus behavior. When set to `AndroidAudioContentType.Speech`, audio will be paused during short interruptions (like message notifications). When set to `AndroidAudioContentType.Music` (default), the playback volume is reduced while notifications play.
 
-- **Android options moved to `android.*` namespace**: Android-specific configuration options have been moved under the `android.*` namespace for better organization and platform consistency. The following options must now be specified under `android.*` instead of at the top level:
+- **iOS category policy restriction**: The `IOSCategoryPolicy.Independent` option has been removed as Apple's documentation states "Apps shouldn't try to set this value directly" - it's intended for system use only. Use `IOSCategoryPolicy.Default` or `IOSCategoryPolicy.LongFormAudio` instead.
+
+- **Platform options moved to namespaces**: Platform-specific configuration options have been moved under their respective namespaces for better organization and consistency.
+
+  **Android options moved to `android.*` namespace:**
   - `maxBuffer` → `android.maxBuffer`
   - `playBuffer` → `android.playBuffer`
   - `rebufferBuffer` → `android.rebufferBuffer`
@@ -18,21 +22,42 @@ sidebar_position: 9
   - `maxCacheSize` → `android.maxCacheSize`
   - `androidAudioContentType` → `android.audioContentType`
 
+  **iOS options moved to `ios.*` namespace:**
+  - `iosCategory` → `ios.category`
+  - `iosCategoryMode` → `ios.categoryMode`
+  - `iosCategoryOptions` → `ios.categoryOptions`
+  - `likeOptions` → `ios.likeOptions`
+  - `dislikeOptions` → `ios.dislikeOptions`
+  - `bookmarkOptions` → `ios.bookmarkOptions`
+
   **Before (v4):**
   ```javascript
+  // setupPlayer
   await TrackPlayer.setupPlayer({
     maxBuffer: 50,
     playBuffer: 2.5,
     backBuffer: 0,
     androidAudioContentType: AndroidAudioContentType.Music,
+    iosCategory: IOSCategory.Playback,
+    iosCategoryMode: IOSCategoryMode.Default,
+    iosCategoryOptions: [IOSCategoryOptions.AllowBluetooth],
     android: {
       // other Android options
     }
+  });
+
+  // updateOptions
+  TrackPlayer.updateOptions({
+    capabilities: [Capability.Play, Capability.Pause],
+    likeOptions: { isActive: false, title: 'Like' },
+    dislikeOptions: { isActive: false, title: 'Dislike' },
+    bookmarkOptions: { isActive: false, title: 'Bookmark' }
   });
   ```
 
   **After (v5):**
   ```javascript
+  // setupPlayer
   await TrackPlayer.setupPlayer({
     android: {
       maxBuffer: 50,
@@ -40,6 +65,22 @@ sidebar_position: 9
       backBuffer: 0,
       audioContentType: AndroidAudioContentType.Music,
       // other Android options
+    },
+    ios: {
+      category: IOSCategory.Playback,
+      categoryMode: IOSCategoryMode.Default,
+      categoryOptions: [IOSCategoryOptions.AllowBluetooth],
+      // other iOS options
+    }
+  });
+
+  // updateOptions
+  TrackPlayer.updateOptions({
+    capabilities: [Capability.Play, Capability.Pause],
+    ios: {
+      likeOptions: { isActive: false, title: 'Like' },
+      dislikeOptions: { isActive: false, title: 'Dislike' },
+      bookmarkOptions: { isActive: false, title: 'Bookmark' }
     }
   });
   ```

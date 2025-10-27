@@ -22,16 +22,14 @@ enum SessionCategory: String {
 }
 
 enum SessionCategoryPolicy: String {
-  case `default`, longFormAudio, independent, longFormVideo
+  case `default`, longFormAudio, longFormVideo
 
-  func mapConfigToAVAudioSessionCategoryPolicy() -> AVAudioSession.RouteSharingPolicy {
+  func toRouteSharingPolicy() -> AVAudioSession.RouteSharingPolicy {
     switch self {
     case .default:
       return .default
     case .longFormAudio:
       return .longFormAudio
-    case .independent:
-      return .independent
     case .longFormVideo:
       if #available(iOS 13.0, *) {
         return .longFormVideo
