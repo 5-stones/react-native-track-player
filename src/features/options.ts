@@ -8,6 +8,7 @@ import type {
   IOSCategoryPolicy,
   RatingType,
 } from '../constants';
+import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
 import TrackPlayer from '../NativeTrackPlayer';
 
 // MARK: - Types
@@ -269,4 +270,37 @@ export function updateOptions(options: UpdateOptions = {}): void {
       ...options.android,
     },
   });
+}
+
+// MARK: - Getters
+
+/**
+ * Gets the current player options.
+ * @returns The current player options
+ */
+export function getOptions(): UpdateOptions {
+  return TrackPlayer.getOptions() as UpdateOptions;
+}
+
+// MARK: - Event Callbacks
+
+/**
+ * Subscribes to player options changes.
+ * @param callback - Called when the player options change
+ * @returns Cleanup function to unsubscribe
+ */
+export function onOptionsChanged(
+  callback: (options: UpdateOptions) => void
+): () => void {
+  return TrackPlayer.onOptionsChanged(callback as () => void).remove;
+}
+
+// MARK: - Hooks
+
+/**
+ * Hook that returns the current player options and updates when they change.
+ * @returns The current player options
+ */
+export function useOptions(): UpdateOptions {
+  return useUpdatedNativeValue(getOptions, onOptionsChanged);
 }
