@@ -31,13 +31,12 @@ data class PlayerSetupOptions(
       minBuffer = map.getDouble("minBuffer")
     }
 
-    map.getString("audioContentType")?.let {
-      audioContentType = AudioContentType.fromString(it)
-    }
-
     // Android-specific options (all under android.*)
     val androidMap = if (map.hasKey("android")) map.getMap("android") else null
     androidMap?.let { android ->
+      android.getString("audioContentType")?.let {
+        audioContentType = AudioContentType.fromString(it)
+      }
       if (android.hasKey("maxBuffer")) {
         maxBuffer = android.getDouble("maxBuffer")
       }

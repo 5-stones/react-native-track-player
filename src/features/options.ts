@@ -86,6 +86,18 @@ export interface AndroidOptions {
    * @default 0
    */
   maxCacheSize?: number;
+
+  /**
+   * The audio content type indicates to the android system how
+   * you intend to use audio in your app.
+   *
+   * With `audioContentType: AndroidAudioContentType.Speech`, the audio will be
+   * paused during short interruptions, such as when a message arrives.
+   * Otherwise the playback volume is reduced while the notification is playing.
+   *
+   * @default AndroidAudioContentType.Music
+   */
+  audioContentType?: AndroidAudioContentType;
 }
 
 export interface PlayerOptions {
@@ -121,17 +133,6 @@ export interface PlayerOptions {
    * Sets on `play()`.
    */
   iosCategoryOptions?: IOSCategoryOptions[];
-  /**
-   * (Android only) The audio content type indicates to the android system how
-   * you intend to use audio in your app.
-   *
-   * With `androidAudioContentType: AndroidAudioContentType.Speech`, the audio will be
-   * paused during short interruptions, such as when a message arrives.
-   * Otherwise the playback volume is reduced while the notification is playing.
-   *
-   * @default AndroidAudioContentType.Music
-   */
-  androidAudioContentType?: AndroidAudioContentType;
   /**
    * Indicates whether the player should automatically update now playing metadata data in control center / notification.
    * Defaults to `true`.
