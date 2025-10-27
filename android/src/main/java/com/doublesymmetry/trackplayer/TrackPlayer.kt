@@ -30,6 +30,7 @@ import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toMillisecon
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import com.doublesymmetry.trackplayer.model.PlaybackState
+import com.doublesymmetry.trackplayer.model.AudioOffloadOptions
 import com.doublesymmetry.trackplayer.model.PlayerSetupOptions
 import com.doublesymmetry.trackplayer.model.RatingType
 import com.doublesymmetry.trackplayer.model.State
@@ -374,16 +375,12 @@ class TrackPlayer(
       exoPlayer.skipSilenceEnabled = value
     }
 
-  fun setAudioOffload(offload: Boolean = true) {
+  fun setAudioOffload(options: AudioOffloadOptions) {
     val audioOffloadPreferences =
       TrackSelectionParameters.AudioOffloadPreferences.Builder()
-        .setAudioOffloadMode(
-          if (offload) TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
-          else TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED
-        )
-        // Add additional options as needed
-        .setIsGaplessSupportRequired(true)
-        .setIsSpeedChangeSupportRequired(true)
+        .setAudioOffloadMode(TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED)
+        .setIsGaplessSupportRequired(options.gaplessSupportRequired)
+        .setIsSpeedChangeSupportRequired(options.rateChangeSupportRequired)
         .build()
     exoPlayer.trackSelectionParameters =
       exoPlayer.trackSelectionParameters

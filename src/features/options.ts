@@ -20,6 +20,22 @@ export interface FeedbackOptions {
   title: string;
 }
 
+export interface AndroidAudioOffloadSettings {
+  /**
+   * Whether gapless playback support is required for offload.
+   * Enables smooth transitions between tracks without silence gaps.
+   * @default true
+   */
+  gaplessSupportRequired?: boolean;
+
+  /**
+   * Whether playback rate change support is required for offload.
+   * Enables variable playback speeds (0.5x, 1.25x, 2x, etc.) during offload.
+   * @default true
+   */
+  rateChangeSupportRequired?: boolean;
+}
+
 export interface AndroidOptions {
   /**
    * Whether the audio playback notification is also removed when the playback
@@ -29,9 +45,21 @@ export interface AndroidOptions {
   appKilledPlaybackBehavior?: AppKilledPlaybackBehavior;
 
   /**
-   * https://developer.android.com/media/media3/exoplayer/track-selection#audioOffload
+   * Audio offload configuration for power-efficient playback.
+   *
+   * - `true`: Enable with default settings (gapless and rate change support required)
+   * - `false`: Disable audio offload
+   * - `{ gaplessSupportRequired?, rateChangeSupportRequired? }`: Enable with custom requirements
+   *
+   * Audio offload moves audio processing to dedicated hardware when available, saving battery
+   * during longer playbacks, especially with screen off. Requirements determine which features
+   * must be supported for offload to activate:
+   * - `gaplessSupportRequired`: Smooth track transitions without silence
+   * - `rateChangeSupportRequired`: Variable playback speeds (0.5x, 1.25x, 2x, etc.)
+   *
+   * @see https://developer.android.com/media/media3/exoplayer/track-selection#audioOffload
    */
-  audioOffload?: boolean;
+  audioOffload?: boolean | AndroidAudioOffloadSettings;
 
   /**
    * enables exoplayer's skipSilence parser
