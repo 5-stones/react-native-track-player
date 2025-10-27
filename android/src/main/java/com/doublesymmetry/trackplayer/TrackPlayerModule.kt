@@ -193,7 +193,12 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   override fun updateOptions(data: ReadableMap?): Unit = runBlockingOnMain {
     updateOptions.updateFromBridge(data)
     service.applyUpdateOptions(updateOptions)
+
+    // Emit options changed event
+    onOptionsChanged(updateOptions)
   }
+
+  override fun getOptions(): WritableMap = runBlockingOnMain { updateOptions.toBridge() }
 
   override fun add(data: ReadableArray, insertBeforeIndex: Double?): Unit = runBlockingOnMain {
     val inputIndex = insertBeforeIndex?.toInt() ?: -1
@@ -504,6 +509,10 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
 
       override fun onControllerDisconnected(event: ControllerDisconnectedEvent) {
         emitOnAndroidControllerDisconnected(event.toBridge())
+      }
+
+      override fun onOptionsChanged(options: PlayerUpdateOptions) {
+        emitOnOptionsChanged(options.toBridge())
       }
     }
 

@@ -15,8 +15,7 @@ public class NativeTrackPlayerImpl: NSObject {
 
   private let audioSession = AVAudioSession.sharedInstance()
   private var audioSessionIsActive = false
-  private var forwardJumpInterval: NSNumber?
-  private var backwardJumpInterval: NSNumber?
+  private var updateOptions = PlayerUpdateOptions()
   private var sessionCategory: AVAudioSession.Category = .playback
   private var sessionCategoryMode: AVAudioSession.Mode = .default
   private var sessionCategoryPolicy: AVAudioSession.RouteSharingPolicy = .default
@@ -210,32 +209,27 @@ public class NativeTrackPlayerImpl: NSObject {
   public func updateOptions(options: [String: Any]) {
     ensureMainThread {
       guard self.hasInitialized else { return }
-      var capabilitiesStr = options["capabilities"] as? [String] ?? []
-      if capabilitiesStr.contains("play"), capabilitiesStr.contains("pause") {
-        capabilitiesStr.append("toggle-play-pause")
-      }
 
-      self.forwardJumpInterval = options["forwardJumpInterval"] as? NSNumber ?? self
-        .forwardJumpInterval
-      self.backwardJumpInterval = options["backwardJumpInterval"] as? NSNumber ?? self
-        .backwardJumpInterval
+      // Update the options object
+      self.updateOptions.updateFromBridge(options)
 
-      let iosOptions = options["ios"] as? [String: Any]
-
-      self.player.remoteCommands = capabilitiesStr
-        .compactMap { Capability(rawValue: $0) }
+      // Apply remote commands
+      self.player.remoteCommands = self.updateOptions.mappedCapabilities
         .map { capability in
           capability.mapToPlayerCommand(
-            forwardJumpInterval: self.forwardJumpInterval,
-            backwardJumpInterval: self.backwardJumpInterval,
-            likeOptions: iosOptions?["likeOptions"] as? [String: Any],
-            dislikeOptions: iosOptions?["dislikeOptions"] as? [String: Any],
-            bookmarkOptions: iosOptions?["bookmarkOptions"] as? [String: Any]
+            forwardJumpInterval: self.updateOptions.forwardJumpIntervalNumber,
+            backwardJumpInterval: self.updateOptions.backwardJumpIntervalNumber,
+            likeOptions: self.updateOptions.likeOptions,
+            dislikeOptions: self.updateOptions.dislikeOptions,
+            bookmarkOptions: self.updateOptions.bookmarkOptions
           )
         }
 
-      let interval = ((options["progressUpdateEventInterval"] as? NSNumber) ?? 0).doubleValue
-      self.player.setProgressUpdateInterval(interval > 0 ? interval : nil)
+      // Apply progress update interval
+      self.player.setProgressUpdateInterval(self.updateOptions.progressUpdateEventInterval)
+
+      // Emit options changed event
+      self.onOptionsChanged(self.updateOptions)
     }
   }
 
@@ -570,6 +564,14 @@ public class NativeTrackPlayerImpl: NSObject {
   }
 
   @objc
+  public func getOptions() -> [String: Any] {
+    return onMainThread {
+      guard self.hasInitialized else { return [:] }
+      return self.updateOptions.toBridge()
+    }
+  }
+
+  @objc
   public func updateMetadata(for trackIndex: Int, metadata: [String: Any]) {
     ensureMainThread {
       guard self.hasInitialized else { return }
@@ -741,6 +743,7 @@ public class NativeTrackPlayerImpl: NSObject {
   func emitMetadataCommonReceived(_ body: [String: Any])
   func emitMetadataChapterReceived(_ body: [String: Any])
   func emitPlaybackMetadata(_ body: [String: Any])
+  func emitOptionsChanged(_ body: [String: Any])
 }
 
 public extension NativeTrackPlayerImpl {
@@ -880,5 +883,11 @@ extension NativeTrackPlayerImpl: TrackPlayerCallbacks {
 
   public func onRemoteBookmark() {
     delegate?.emitRemoteBookmark()
+  }
+
+  // MARK: - Configuration Callbacks
+
+  public func onOptionsChanged(_ options: PlayerUpdateOptions) {
+    delegate?.emitOptionsChanged(options.toBridge())
   }
 }

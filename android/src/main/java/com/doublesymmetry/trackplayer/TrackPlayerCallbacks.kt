@@ -13,6 +13,7 @@ import com.doublesymmetry.trackplayer.event.RemoteJumpBackwardEvent
 import com.doublesymmetry.trackplayer.event.RemoteJumpForwardEvent
 import com.doublesymmetry.trackplayer.event.RemoteSeekEvent
 import com.doublesymmetry.trackplayer.event.RemoteSetRatingEvent
+import com.doublesymmetry.trackplayer.model.PlayerUpdateOptions
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import com.doublesymmetry.trackplayer.model.PlaybackState
 import com.facebook.react.bridge.WritableMap
@@ -64,4 +65,7 @@ interface TrackPlayerCallbacks {
   fun onControllerConnected(event: ControllerConnectedEvent)
 
   fun onControllerDisconnected(event: ControllerDisconnectedEvent)
+
+  // Configuration events
+  fun onOptionsChanged(options: PlayerUpdateOptions)
 }

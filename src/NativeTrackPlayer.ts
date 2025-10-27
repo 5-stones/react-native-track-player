@@ -8,6 +8,7 @@ export interface Spec extends TurboModule {
   // MARK: init and config
   setupPlayer(options: UnsafeObject): Promise<void>;
   updateOptions(options: UnsafeObject): void;
+  getOptions(): UnsafeObject;
 
   // MARK: events
   readonly onAndroidControllerConnected: EventEmitter<UnsafeObject>;
@@ -38,6 +39,7 @@ export interface Spec extends TurboModule {
   readonly onRemoteSetRating: EventEmitter<UnsafeObject>;
   readonly onRemoteSkip: EventEmitter<UnsafeObject>;
   readonly onRemoteStop: EventEmitter<UnsafeObject>;
+  readonly onOptionsChanged: EventEmitter<UnsafeObject>;
 
   // MARK: player api
   load(track: UnsafeObject): void;

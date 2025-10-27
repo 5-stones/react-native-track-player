@@ -98,4 +98,9 @@ public protocol TrackPlayerCallbacks: AnyObject {
 
   /// Called when bookmark is triggered remotely.
   func onRemoteBookmark()
+
+  // MARK: - Configuration Events
+
+  /// Called when options are changed.
+  func onOptionsChanged(_ options: PlayerUpdateOptions)
 }

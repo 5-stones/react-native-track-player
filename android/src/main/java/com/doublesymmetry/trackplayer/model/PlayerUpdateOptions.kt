@@ -1,7 +1,9 @@
 package com.doublesymmetry.trackplayer.model
 
 import com.doublesymmetry.trackplayer.option.PlayerCapability
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.bridge.WritableMap
 
 /**
  * Update options for the TrackPlayer that can be changed at runtime. These options control player
@@ -70,5 +72,50 @@ data class PlayerUpdateOptions(
         shuffle = android.getBoolean("shuffle")
       }
     }
+  }
+
+  fun toBridge(): WritableMap {
+    val result = Arguments.createMap()
+
+    // Add jump intervals (always include these core values)
+    result.putDouble("forwardJumpInterval", forwardJumpInterval)
+    result.putDouble("backwardJumpInterval", backwardJumpInterval)
+
+    // Add progress update interval if set (don't include if disabled)
+    if (progressUpdateEventInterval > 0) {
+      result.putDouble("progressUpdateEventInterval", progressUpdateEventInterval)
+    }
+
+    // Add rating type if set
+    ratingType?.let { result.putString("ratingType", it.string) }
+
+    // Add capabilities if set
+    capabilities?.let { caps ->
+      val capabilitiesArray = Arguments.createArray()
+      caps.forEach { cap -> capabilitiesArray.pushString(cap.string) }
+      result.putArray("capabilities", capabilitiesArray)
+    }
+
+    // Add notification capabilities if set
+    notificationCapabilities?.let { caps ->
+      val notificationCapsArray = Arguments.createArray()
+      caps.forEach { cap -> notificationCapsArray.pushString(cap.string) }
+      result.putArray("notificationCapabilities", notificationCapsArray)
+    }
+
+    // Add Android-specific options if any are set
+    val hasAndroidOptions =
+      appKilledPlaybackBehavior != null || skipSilence != null || shuffle != null
+    if (hasAndroidOptions) {
+      val androidOptions = Arguments.createMap()
+
+      appKilledPlaybackBehavior?.let { androidOptions.putString("appKilledPlaybackBehavior", it) }
+      skipSilence?.let { androidOptions.putBoolean("skipSilence", it) }
+      shuffle?.let { androidOptions.putBoolean("shuffle", it) }
+
+      result.putMap("android", androidOptions)
+    }
+
+    return result
   }
 }
