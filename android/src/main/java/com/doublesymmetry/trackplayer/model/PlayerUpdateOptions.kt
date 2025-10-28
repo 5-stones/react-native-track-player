@@ -1,7 +1,7 @@
 package com.doublesymmetry.trackplayer.model
 
 import com.doublesymmetry.trackplayer.option.PlayerCapability
-import com.doublesymmetry.trackplayer.option.RepeatMode
+import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableMap
@@ -28,7 +28,7 @@ data class PlayerUpdateOptions(
   var notificationCapabilities: List<PlayerCapability>? = null,
 
   // Repeat mode
-  var repeatMode: RepeatMode = RepeatMode.OFF,
+  var repeatMode: PlayerRepeatMode = PlayerRepeatMode.OFF,
 
   // Android-specific runtime options (all under android.* in JS)
   var ratingType: RatingType? = null,
@@ -80,7 +80,7 @@ data class PlayerUpdateOptions(
     }
 
     if (map.hasKey("repeatMode")) {
-      repeatMode = map.getString("repeatMode")?.let { RepeatMode.fromString(it) } ?: RepeatMode.OFF
+      repeatMode = map.getString("repeatMode")?.let { PlayerRepeatMode.fromString(it) } ?: PlayerRepeatMode.OFF
     }
 
     // Android-specific runtime options (all under android.*)
