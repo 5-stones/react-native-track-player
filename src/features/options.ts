@@ -51,7 +51,7 @@ export interface Options {
 
   /**
    * The capabilities that the player has.
-   * @default [Capability.Play, Capability.Pause, Capability.SkipToNext, Capability.SkipToPrevious]
+   * @default [Capability.Play, Capability.Pause, Capability.SkipToNext, Capability.SkipToPrevious, Capability.SeekTo]
    */
   capabilities: Capability[];
 

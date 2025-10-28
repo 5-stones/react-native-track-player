@@ -23,6 +23,7 @@ data class PlayerUpdateOptions(
       PlayerCapability.PAUSE,
       PlayerCapability.SKIP_TO_NEXT,
       PlayerCapability.SKIP_TO_PREVIOUS,
+      PlayerCapability.SEEK_TO,
     ),
   var notificationCapabilities: List<PlayerCapability>? = null,
 

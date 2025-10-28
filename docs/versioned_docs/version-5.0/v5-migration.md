@@ -85,6 +85,91 @@ sidebar_position: 9
   });
   ```
 
+### Options API Updates
+
+**Default capabilities changed**: The default `capabilities` array has changed from empty (`[]`) to include basic playback controls. This provides a better out-of-the-box experience.
+
+**Before (v4):**
+```typescript
+// Default capabilities were empty - no controls visible
+const options = TrackPlayer.getOptions();
+// options.capabilities === []
+```
+
+**After (v5):**
+```typescript
+// Default capabilities include basic playback controls
+const options = TrackPlayer.getOptions();
+// options.capabilities === [Capability.Play, Capability.Pause, Capability.SkipToNext, Capability.SkipToPrevious, Capability.SeekTo]
+```
+
+**Migration**: If you specifically want no capabilities (unusual), explicitly set an empty array:
+```typescript
+TrackPlayer.updateOptions({ capabilities: [] });
+```
+
+**Repeat mode integrated into options system**: The separate repeat mode functions have been removed. Repeat mode is now part of the unified options API.
+
+**Before (v4):**
+```typescript
+// Separate repeat mode functions
+import TrackPlayer, { setRepeatMode, getRepeatMode } from 'react-native-track-player';
+
+setRepeatMode(RepeatMode.Track);
+const mode = getRepeatMode();
+```
+
+**After (v5):**
+```typescript
+// Repeat mode is part of unified options API
+import TrackPlayer, { updateOptions, getOptions, useOptions } from 'react-native-track-player';
+
+// Update repeat mode
+updateOptions({ repeatMode: RepeatMode.Track });
+
+// Get current repeat mode (synchronous)
+const options = getOptions();
+const currentMode = options.repeatMode; // Always has a resolved value
+
+// Use in React components (reactive)
+function MyComponent() {
+  const options = useOptions();
+
+  if (options.repeatMode === RepeatMode.Track) {
+    // Handle track repeat mode
+  }
+
+  return (
+    <Button
+      title={`Repeat: ${options.repeatMode}`}
+      onPress={() => updateOptions({
+        repeatMode: RepeatMode.Queue
+      })}
+    />
+  );
+}
+```
+
+**`notificationCapabilities` moved to Android namespace**: The `notificationCapabilities` option has been moved from the top-level `updateOptions()` to the Android-specific namespace where it belongs.
+
+**Before (v4):**
+```typescript
+TrackPlayer.updateOptions({
+  capabilities: [Capability.Play, Capability.Pause],
+  notificationCapabilities: [Capability.Play, Capability.Pause, Capability.SkipToNext], // top-level
+});
+```
+
+**After (v5):**
+```typescript
+TrackPlayer.updateOptions({
+  capabilities: [Capability.Play, Capability.Pause],
+  android: {
+    notificationCapabilities: [Capability.Play, Capability.Pause, Capability.SkipToNext], // moved to android.*
+  }
+});
+```
+
 ### Hook Behavior Updates
 
 ### Player Method Updates
@@ -106,3 +191,5 @@ sidebar_position: 9
 9. `color` update option - This option has been removed from `UpdateOptions`. If you were previously using this option to customize notification colors, you will need to use alternative styling approaches.
 10. `compactCapabilities` update option - This option has been removed from `UpdateOptions`. Use the `notificationCapabilities` option instead to configure Android notification controls.
 11. Custom icon update options - The following custom icon options have been removed from `UpdateOptions`: `playIcon`, `pauseIcon`, `stopIcon`, `previousIcon`, `nextIcon`, `rewindIcon`, `forwardIcon`. Custom notification icons are no longer supported.
+12. `setRepeatMode()` - This function has been removed. Use [`updateOptions({ repeatMode })`](./api/functions/player.md#updateoptions) instead.
+13. `getRepeatMode()` - This function has been removed. Use [`getOptions().repeatMode`](./api/functions/player.md#getoptions) or the [`useOptions()`](./api/hooks.md#useoptions) hook instead.

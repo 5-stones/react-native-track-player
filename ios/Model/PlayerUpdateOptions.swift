@@ -17,7 +17,8 @@ public class PlayerUpdateOptions {
     .play,
     .pause,
     .next,
-    .previous
+    .previous,
+    .seek
   ]
 
   /// Repeat mode

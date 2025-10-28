@@ -14,7 +14,6 @@ export function useSetupPlayer() {
         throw error;
       }
       TrackPlayer.updateOptions(playerOptions);
-      TrackPlayer.setRepeatMode(playerOptions.repeatMode);
       if (unmounted) return;
       setPlayerReady(true);
       if (TrackPlayer.getQueue().length <= 0) {
