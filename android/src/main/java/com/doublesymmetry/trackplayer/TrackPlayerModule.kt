@@ -503,6 +503,32 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
       override fun onOptionsChanged(options: PlayerUpdateOptions) {
         emitOnOptionsChanged(options.toBridge())
       }
+
+      // Media browser callbacks
+      override fun onGetChildrenRequest(requestId: String, parentId: String, page: Int, pageSize: Int) {
+        emitGetChildrenRequest(requestId, parentId, page, pageSize)
+      }
+
+      override fun onGetItemRequest(requestId: String, mediaId: String) {
+        emitGetItemRequest(requestId, mediaId)
+      }
+
+      override fun onSearchRequest(requestId: String, query: String, extras: Map<String, Any>?) {
+        val extrasMap = extras?.let { map ->
+          Arguments.createMap().apply {
+            map.forEach { (key, value) ->
+              when (value) {
+                is String -> putString(key, value)
+                is Int -> putInt(key, value)
+                is Double -> putDouble(key, value)
+                is Boolean -> putBoolean(key, value)
+                // Add other types as needed
+              }
+            }
+          }
+        }
+        emitSearchResultRequest(requestId, query, extrasMap, 0, 100)
+      }
     }
 
   // Android Auto callback resolution methods

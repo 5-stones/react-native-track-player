@@ -12,7 +12,26 @@ import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.session.LibraryResult
+import androidx.media3.session.MediaLibraryService.LibraryParams
+import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import androidx.media3.session.legacy.RatingCompat
+import android.os.Bundle
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.Rating
+import androidx.media3.session.MediaLibraryService
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.MoreExecutors
+import com.google.common.util.concurrent.SettableFuture
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.doublesymmetry.trackplayer.event.ControllerConnectedEvent
 import com.doublesymmetry.trackplayer.event.ControllerDisconnectedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
@@ -32,6 +51,7 @@ import com.doublesymmetry.trackplayer.model.AudioOffloadOptions
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import com.doublesymmetry.trackplayer.model.PlaybackState
 import com.doublesymmetry.trackplayer.model.PlayerSetupOptions
+import com.doublesymmetry.trackplayer.model.PlayerUpdateOptions
 import com.doublesymmetry.trackplayer.model.RatingType
 import com.doublesymmetry.trackplayer.model.State
 import com.doublesymmetry.trackplayer.model.Track
@@ -40,6 +60,7 @@ import com.doublesymmetry.trackplayer.player.MediaFactory
 import com.doublesymmetry.trackplayer.player.PlaybackProgressUpdateManager
 import com.doublesymmetry.trackplayer.player.PlayerListener
 import com.doublesymmetry.trackplayer.player.PlayingState
+import com.doublesymmetry.trackplayer.util.MediaSessionManager
 import com.doublesymmetry.trackplayer.util.MetadataAdapter
 import com.doublesymmetry.trackplayer.util.PlayerCache
 import com.facebook.react.bridge.WritableMap
@@ -50,14 +71,21 @@ import timber.log.Timber
 class TrackPlayer(
   internal val context: Context,
   private val setupOptions: PlayerSetupOptions = PlayerSetupOptions(),
-  callbacks: TrackPlayerCallbacks? = null,
+  private var callbacks: TrackPlayerCallbacks? = null,
 ) {
 
   // Runtime options that can be updated
   var forwardJumpInterval: Double = 15.0
   var backwardJumpInterval: Double = 15.0
+  private var currentUpdateOptions = PlayerUpdateOptions()
+  private val commandManager = MediaSessionManager()
 
-  private var callbacks: TrackPlayerCallbacks? = callbacks
+  // Media browser functionality
+  private val pendingGetItemRequests = ConcurrentHashMap<String, SettableFuture<MediaItem?>>()
+  private val pendingGetChildrenRequests = ConcurrentHashMap<String, SettableFuture<List<MediaItem>>>()
+  private val pendingSearchRequests = ConcurrentHashMap<String, SettableFuture<List<MediaItem>>>()
+  private var mediaItemById: MutableMap<String, MediaItem> = mutableMapOf()
+
   val exoPlayer: ExoPlayer
   val forwardingPlayer: Player
 
@@ -700,6 +728,93 @@ class TrackPlayer(
   }
 
   /**
+   * Applies update options with change detection.
+   * Only updates properties that have actually changed and emits events accordingly.
+   *
+   * @param options The new options to apply
+   * @param mediaSession The MediaSession to update when capabilities change
+   */
+  fun applyUpdateOptions(
+    options: PlayerUpdateOptions,
+    mediaSession: androidx.media3.session.MediaSession? = null
+  ) {
+    // Store previous values for change detection
+    val previousOptions = currentUpdateOptions
+
+    // Update current options
+    currentUpdateOptions = options
+
+    // Check what changed
+    val skipSilenceChanged = previousOptions.skipSilence != options.skipSilence
+    val ratingTypeChanged = previousOptions.ratingType != options.ratingType
+    val shuffleChanged = previousOptions.shuffle != options.shuffle
+    val repeatModeChanged = previousOptions.repeatMode != options.repeatMode
+    val progressUpdateEventIntervalChanged =
+      previousOptions.progressUpdateEventInterval != options.progressUpdateEventInterval
+    val forwardJumpIntervalChanged =
+      previousOptions.forwardJumpInterval != options.forwardJumpInterval
+    val backwardJumpIntervalChanged =
+      previousOptions.backwardJumpInterval != options.backwardJumpInterval
+    val capabilitiesChanged = previousOptions.capabilities != options.capabilities
+    val notificationCapabilitiesChanged =
+      previousOptions.notificationCapabilities != options.notificationCapabilities
+
+    val hasChanged =
+      skipSilenceChanged ||
+        ratingTypeChanged ||
+        shuffleChanged ||
+        repeatModeChanged ||
+        progressUpdateEventIntervalChanged ||
+        forwardJumpIntervalChanged ||
+        backwardJumpIntervalChanged ||
+        capabilitiesChanged ||
+        notificationCapabilitiesChanged
+
+    // Apply only changed properties
+    if (skipSilenceChanged) {
+      options.skipSilence?.let { skipSilence = it }
+    }
+
+    if (ratingTypeChanged) {
+      options.ratingType?.let { ratingType = it.compat }
+    }
+
+    if (shuffleChanged) {
+      shuffleMode = options.shuffle ?: false
+    }
+
+    if (repeatModeChanged) {
+      repeatMode = options.repeatMode
+    }
+
+    if (progressUpdateEventIntervalChanged) {
+      setProgressUpdateInterval(options.progressUpdateEventInterval)
+    }
+
+    if (forwardJumpIntervalChanged) {
+      forwardJumpInterval = options.forwardJumpInterval
+    }
+
+    if (backwardJumpIntervalChanged) {
+      backwardJumpInterval = options.backwardJumpInterval
+    }
+
+    if (capabilitiesChanged || notificationCapabilitiesChanged) {
+      mediaSession?.let { session ->
+        commandManager.updateMediaSession(
+          session,
+          options.capabilities,
+          options.notificationCapabilities,
+        )
+      }
+    }
+
+    if (hasChanged) {
+      callbacks?.onOptionsChanged(options)
+    }
+  }
+
+  /**
    * Sets the callbacks for player events.
    *
    * @param callbacks The callbacks to set, or null to clear callbacks
@@ -743,5 +858,243 @@ class TrackPlayer(
         "Insert index $index is out of bounds (size: ${exoPlayer.mediaItemCount}, use -1 to append)"
       )
     }
+  }
+
+  /**
+   * Gets the MediaSessionCallback for this TrackPlayer.
+   *
+   * @return MediaLibrarySession.Callback instance
+   */
+  fun getMediaSessionCallback(): MediaLibraryService.MediaLibrarySession.Callback {
+    return MediaSessionCallback()
+  }
+
+  /**
+   * MediaLibrarySession callback that handles all media session interactions.
+   * All logic is handled directly by the TrackPlayer.
+   */
+  private inner class MediaSessionCallback : MediaLibraryService.MediaLibrarySession.Callback {
+    override fun onConnect(
+      session: MediaSession,
+      controller: MediaSession.ControllerInfo,
+    ): MediaSession.ConnectionResult {
+      Timber.d("MediaSession connect: ${controller.packageName}")
+      return commandManager.buildConnectionResult(session)
+    }
+
+    override fun onCustomCommand(
+      session: MediaSession,
+      controller: MediaSession.ControllerInfo,
+      command: SessionCommand,
+      args: Bundle,
+    ): ListenableFuture<SessionResult> {
+      commandManager.handleCustomCommand(command, this@TrackPlayer)
+      return super.onCustomCommand(session, controller, command, args)
+    }
+
+    override fun onSetRating(
+      session: MediaSession,
+      controller: MediaSession.ControllerInfo,
+      rating: Rating,
+    ): ListenableFuture<SessionResult> {
+      onRatingChanged(rating)
+      return super.onSetRating(session, controller, rating)
+    }
+
+    override fun onGetLibraryRoot(
+      session: MediaLibraryService.MediaLibrarySession,
+      browser: MediaSession.ControllerInfo,
+      params: LibraryParams?,
+    ): ListenableFuture<LibraryResult<MediaItem>> {
+      Timber.d("onGetLibraryRoot: { package: ${browser.packageName} }")
+      return Futures.immediateFuture(
+        LibraryResult.ofItem(
+          MediaItem.Builder()
+            .setMediaId("__ROOT__")
+            .setMediaMetadata(
+              MediaMetadata.Builder()
+                .setTitle("Root")
+                .setIsBrowsable(true)
+                .setIsPlayable(false)
+                .build()
+            )
+            .build(),
+          null
+        )
+      )
+    }
+
+    override fun onGetChildren(
+      session: MediaLibraryService.MediaLibrarySession,
+      browser: MediaSession.ControllerInfo,
+      parentId: String,
+      page: Int,
+      pageSize: Int,
+      params: LibraryParams?,
+    ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
+      Timber.d("onGetChildren: {parentId: $parentId, page: $page, pageSize: $pageSize }")
+      val requestId = UUID.randomUUID().toString()
+      val future = SettableFuture.create<List<MediaItem>>()
+      // Store the future for later resolution
+      pendingGetChildrenRequests[requestId] = future
+      // Emit event to JavaScript via callbacks
+      callbacks?.onGetChildrenRequest(requestId, parentId, page, pageSize)
+      return Futures.transform(
+        future,
+        { items -> LibraryResult.ofItemList(ImmutableList.copyOf(items), null) },
+        MoreExecutors.directExecutor(),
+      )
+    }
+
+    override fun onGetItem(
+      session: MediaLibraryService.MediaLibrarySession,
+      browser: MediaSession.ControllerInfo,
+      mediaId: String,
+    ): ListenableFuture<LibraryResult<MediaItem>> {
+      Timber.d("onGetItem: ${browser.packageName}, mediaId = $mediaId")
+      val requestId = UUID.randomUUID().toString()
+      val future = SettableFuture.create<MediaItem?>()
+      // Store the future for later resolution
+      pendingGetItemRequests[requestId] = future
+      // Emit event to JavaScript via callbacks
+      callbacks?.onGetItemRequest(requestId, mediaId)
+      return Futures.transform(
+        future,
+        { item ->
+          if (item != null) {
+            LibraryResult.ofItem(item, null)
+          } else {
+            LibraryResult.ofError(LibraryResult.RESULT_ERROR_BAD_VALUE)
+          }
+        },
+        MoreExecutors.directExecutor(),
+      )
+    }
+
+    override fun onSearch(
+      session: MediaLibraryService.MediaLibrarySession,
+      browser: MediaSession.ControllerInfo,
+      query: String,
+      params: LibraryParams?,
+    ): ListenableFuture<LibraryResult<Void>> {
+      Timber.d("onSearch: ${browser.packageName}, query = $query")
+      // Emit event to JavaScript via callbacks for search initiation
+      val requestId = UUID.randomUUID().toString()
+      val extrasMap = params?.extras?.let { bundle ->
+        mutableMapOf<String, Any>().apply {
+          for (key in bundle.keySet()) {
+            when (val value = bundle.get(key)) {
+              is String -> put(key, value)
+              is Int -> put(key, value)
+              is Double -> put(key, value)
+              is Boolean -> put(key, value)
+              // Add other types as needed
+            }
+          }
+        }
+      }
+      callbacks?.onSearchRequest(requestId, query, extrasMap)
+      return super.onSearch(session, browser, query, params)
+    }
+
+    override fun onSetMediaItems(
+      mediaSession: MediaSession,
+      controller: MediaSession.ControllerInfo,
+      mediaItems: MutableList<MediaItem>,
+      startIndex: Int,
+      startPositionMs: Long,
+    ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
+      Timber.d(
+        "onSetMediaItems: ${controller.packageName}, mediaId=${mediaItems[0].mediaId}, uri=${mediaItems[0].localConfiguration?.uri}, title=${mediaItems[0].mediaMetadata.title}"
+      )
+
+      val resolvedItems = mediaItems.map { mediaItem ->
+        val mediaId = mediaItem.mediaId
+        val fullMediaItem = mediaItemById[mediaId]
+        if (fullMediaItem != null) {
+          Timber.d("Found full MediaItem for mediaId: $mediaId")
+          fullMediaItem
+        } else {
+          Timber.d("No full MediaItem found for mediaId: $mediaId, using original")
+          mediaItem
+        }
+      }
+
+      try {
+        clear()
+        add(resolvedItems.map { Track.fromMediaItem(it) })
+        skipTo(startIndex)
+        seekTo(startPositionMs, TimeUnit.MILLISECONDS)
+        play()
+      } catch (e: Exception) {
+        Timber.e(e, "Error in onSetMediaItems")
+      }
+
+      return Futures.immediateFuture(
+        MediaSession.MediaItemsWithStartPosition(
+          resolvedItems,
+          startIndex,
+          startPositionMs,
+        )
+      )
+    }
+
+  }
+
+  /**
+   * Resolves a pending GetItem request with the provided MediaItem.
+   *
+   * @param requestId The request ID to resolve
+   * @param mediaItem The MediaItem to resolve with
+   */
+  fun resolveGetItemRequest(requestId: String, mediaItem: MediaItem) {
+    // Store MediaItem in lookup map for later use in onAddMediaItems/onSetMediaItems
+    mediaItem.mediaId.let { mediaId ->
+      mediaItemById[mediaId] = mediaItem
+      Timber.d("Stored single MediaItem: mediaId=$mediaId, title=${mediaItem.mediaMetadata.title}")
+    }
+    pendingGetItemRequests.remove(requestId)?.set(mediaItem)
+  }
+
+  /**
+   * Resolves a pending GetChildren request with the provided list of MediaItems.
+   *
+   * @param requestId The request ID to resolve
+   * @param items The list of MediaItems to resolve with
+   * @param totalChildrenCount The total number of children (unused but maintained for compatibility)
+   */
+  fun resolveGetChildrenRequest(
+    requestId: String,
+    items: List<MediaItem>,
+    totalChildrenCount: Int,
+  ) {
+    Timber.d(
+      "resolveGetChildrenRequest: requestId=$requestId, itemCount=${items.size}"
+    )
+    // Store MediaItems in lookup map for later use in onAddMediaItems/onSetMediaItems
+    items.forEach { mediaItem ->
+      mediaItem.mediaId?.let { mediaId ->
+        mediaItemById[mediaId] = mediaItem
+        Timber.d("Stored MediaItem: mediaId=$mediaId, title=${mediaItem.mediaMetadata.title}")
+      }
+    }
+    val future = pendingGetChildrenRequests.remove(requestId)
+    if (future != null) {
+      future.set(items)
+      Timber.d("Resolved future for requestId=$requestId with ${items.size} items")
+    } else {
+      Timber.w("No pending future found for requestId=$requestId")
+    }
+  }
+
+  /**
+   * Resolves a pending Search request with the provided list of MediaItems.
+   *
+   * @param requestId The request ID to resolve
+   * @param items The list of MediaItems to resolve with
+   * @param totalMatchesCount The total number of matches (unused but maintained for compatibility)
+   */
+  fun resolveSearchRequest(requestId: String, items: List<MediaItem>, totalMatchesCount: Int) {
+    pendingSearchRequests.remove(requestId)?.set(items)
   }
 }

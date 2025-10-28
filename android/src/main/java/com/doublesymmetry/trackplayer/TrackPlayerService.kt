@@ -26,7 +26,6 @@ import androidx.media3.session.SessionResult
 import com.doublesymmetry.trackplayer.model.AppKilledPlaybackBehavior
 import com.doublesymmetry.trackplayer.model.PlayerSetupOptions
 import com.doublesymmetry.trackplayer.model.PlayerUpdateOptions
-import com.doublesymmetry.trackplayer.util.MediaSessionManager
 import com.facebook.react.bridge.Arguments
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
@@ -52,7 +51,6 @@ class TrackPlayerService : MediaLibraryService() {
   private val binder = LocalBinder()
   private val scope = MainScope()
   private var module = CompletableDeferred<TrackPlayerModule>()
-  private val commandManager = MediaSessionManager()
   private lateinit var mediaSession: MediaLibrarySession
   private var currentUpdateOptions = PlayerUpdateOptions()
 
@@ -64,11 +62,6 @@ class TrackPlayerService : MediaLibraryService() {
       override fun onServiceDisconnected(className: ComponentName) {}
     }
 
-  private val pendingGetItemRequests = ConcurrentHashMap<String, SettableFuture<MediaItem?>>()
-  private val pendingGetChildrenRequests =
-    ConcurrentHashMap<String, SettableFuture<List<MediaItem>>>()
-  private val pendingSearchRequests = ConcurrentHashMap<String, SettableFuture<List<MediaItem>>>()
-  private var mediaItemById: MutableMap<String, MediaItem> = mutableMapOf()
 
   @SuppressLint("WakelockTimeout")
   fun acquireWakeLock() {
@@ -123,7 +116,7 @@ class TrackPlayerService : MediaLibraryService() {
         action = Intent.ACTION_VIEW
       }
     mediaSession =
-      MediaLibrarySession.Builder(this, player.forwardingPlayer, InnerMediaSessionCallback())
+      MediaLibrarySession.Builder(this, player.forwardingPlayer, player.getMediaSessionCallback())
         // https://github.com/androidx/media/issues/1218
         .setSessionActivity(
           PendingIntent.getActivity(
@@ -181,86 +174,21 @@ class TrackPlayerService : MediaLibraryService() {
   }
 
   fun applyUpdateOptions(options: PlayerUpdateOptions) {
-    // Store previous values for change detection
-    val previousOptions = currentUpdateOptions
+    // Store previous appKilledPlaybackBehavior for change detection
+    val previousAppKilledPlaybackBehavior = currentUpdateOptions.appKilledPlaybackBehavior
 
-    // Update current options
+    // Update current options for service-specific tracking
     currentUpdateOptions = options
 
-    // Check what changed
-    val skipSilenceChanged = previousOptions.skipSilence != options.skipSilence
-    val ratingTypeChanged = previousOptions.ratingType != options.ratingType
-    val appKilledPlaybackBehaviorChanged =
-      previousOptions.appKilledPlaybackBehavior != options.appKilledPlaybackBehavior
-    val shuffleChanged = previousOptions.shuffle != options.shuffle
-    val repeatModeChanged = previousOptions.repeatMode != options.repeatMode
-    val progressUpdateEventIntervalChanged =
-      previousOptions.progressUpdateEventInterval != options.progressUpdateEventInterval
-    val forwardJumpIntervalChanged =
-      previousOptions.forwardJumpInterval != options.forwardJumpInterval
-    val backwardJumpIntervalChanged =
-      previousOptions.backwardJumpInterval != options.backwardJumpInterval
-    val capabilitiesChanged = previousOptions.capabilities != options.capabilities
-    val notificationCapabilitiesChanged =
-      previousOptions.notificationCapabilities != options.notificationCapabilities
-
-    val hasChanged =
-      skipSilenceChanged ||
-        ratingTypeChanged ||
-        appKilledPlaybackBehaviorChanged ||
-        shuffleChanged ||
-        repeatModeChanged ||
-        progressUpdateEventIntervalChanged ||
-        forwardJumpIntervalChanged ||
-        backwardJumpIntervalChanged ||
-        capabilitiesChanged ||
-        notificationCapabilitiesChanged
-
-    if (skipSilenceChanged) {
-      options.skipSilence?.let { skipSilence -> player.skipSilence = skipSilence }
-    }
-
-    if (ratingTypeChanged) {
-      options.ratingType?.let { ratingType -> player.ratingType = ratingType.compat }
-    }
-
-    if (appKilledPlaybackBehaviorChanged) {
+    // Handle service-specific option: appKilledPlaybackBehavior
+    if (previousAppKilledPlaybackBehavior != options.appKilledPlaybackBehavior) {
       appKilledPlaybackBehavior =
         AppKilledPlaybackBehavior.values().find { it.string == options.appKilledPlaybackBehavior }
           ?: AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
     }
 
-    if (shuffleChanged) {
-      player.shuffleMode = options.shuffle ?: false
-    }
-
-    if (repeatModeChanged) {
-      player.repeatMode = options.repeatMode
-    }
-
-    if (progressUpdateEventIntervalChanged) {
-      player.setProgressUpdateInterval(options.progressUpdateEventInterval)
-    }
-
-    if (forwardJumpIntervalChanged) {
-      player.forwardJumpInterval = options.forwardJumpInterval
-    }
-
-    if (backwardJumpIntervalChanged) {
-      player.backwardJumpInterval = options.backwardJumpInterval
-    }
-
-    if (capabilitiesChanged || notificationCapabilitiesChanged) {
-      commandManager.updateMediaSession(
-        mediaSession,
-        options.capabilities,
-        options.notificationCapabilities,
-      )
-    }
-
-    if (hasChanged) {
-      player.callbacks?.onOptionsChanged(options)
-    }
+    // Delegate player-specific options to TrackPlayer with MediaSession reference
+    player.applyUpdateOptions(options, mediaSession)
   }
 
   override fun onBind(intent: Intent?): IBinder? {
@@ -369,13 +297,7 @@ class TrackPlayerService : MediaLibraryService() {
 
   // Android Auto request resolution methods
   fun resolveGetItemRequest(requestId: String, mediaItem: MediaItem) {
-    // Store MediaItem in lookup map for later use in onAddMediaItems/onSetMediaItems
-    mediaItem.mediaId.let { mediaId ->
-      mediaItemById[mediaId] = mediaItem
-      Timber.d("Stored single MediaItem: mediaId=$mediaId, title=${mediaItem.mediaMetadata.title}")
-    }
-
-    pendingGetItemRequests.remove(requestId)?.set(mediaItem)
+    player.resolveGetItemRequest(requestId, mediaItem)
   }
 
   fun resolveGetChildrenRequest(
@@ -383,281 +305,15 @@ class TrackPlayerService : MediaLibraryService() {
     items: List<MediaItem>,
     totalChildrenCount: Int,
   ) {
-    Timber.d(
-      "resolveGetChildrenRequest service method called: requestId=$requestId, itemCount=${items.size}"
-    )
-
-    // Store MediaItems in lookup map for later use in onAddMediaItems/onSetMediaItems
-    items.forEach { mediaItem ->
-      mediaItem.mediaId?.let { mediaId ->
-        mediaItemById[mediaId] = mediaItem
-        Timber.d("Stored MediaItem: mediaId=$mediaId, title=${mediaItem.mediaMetadata.title}")
-      }
-    }
-
-    val future = pendingGetChildrenRequests.remove(requestId)
-    if (future != null) {
-      future.set(items)
-      Timber.d("Resolved future for requestId=$requestId with ${items.size} items")
-    } else {
-      Timber.w("No pending future found for requestId=$requestId")
-    }
+    player.resolveGetChildrenRequest(requestId, items, totalChildrenCount)
   }
 
   fun resolveSearchRequest(requestId: String, items: List<MediaItem>, totalMatchesCount: Int) {
-    pendingSearchRequests.remove(requestId)?.set(items)
+    player.resolveSearchRequest(requestId, items, totalMatchesCount)
   }
 
   inner class LocalBinder : Binder() {
     val service = this@TrackPlayerService
-  }
-
-  private val rootItem =
-    MediaItem.Builder()
-      .setMediaId("/")
-      .setMediaMetadata(MediaMetadata.Builder().setIsBrowsable(true).setIsPlayable(false).build())
-      .build()
-
-  private inner class InnerMediaSessionCallback : MediaLibrarySession.Callback {
-    override fun onConnect(
-      session: MediaSession,
-      controller: MediaSession.ControllerInfo,
-    ): MediaSession.ConnectionResult {
-      Timber.d(controller.packageName)
-
-      Timber.d("Providing standard player commands to controller: ${controller.packageName}")
-
-      return commandManager.buildConnectionResult(session)
-    }
-
-    override fun onCustomCommand(
-      session: MediaSession,
-      controller: MediaSession.ControllerInfo,
-      command: SessionCommand,
-      args: Bundle,
-    ): ListenableFuture<SessionResult> {
-      commandManager.handleCustomCommand(command, player)
-      return super.onCustomCommand(session, controller, command, args)
-    }
-
-    override fun onSetRating(
-      session: MediaSession,
-      controller: MediaSession.ControllerInfo,
-      rating: Rating,
-    ): ListenableFuture<SessionResult> {
-      player.onRatingChanged(rating)
-      return super.onSetRating(session, controller, rating)
-    }
-
-    override fun onGetLibraryRoot(
-      session: MediaLibrarySession,
-      browser: MediaSession.ControllerInfo,
-      params: LibraryParams?,
-    ): ListenableFuture<LibraryResult<MediaItem>> {
-      Timber.d("onGetLibraryRoot: { package: ${browser.packageName} }")
-      val rootExtras =
-        Bundle().apply {
-          putBoolean("android.media.browse.CONTENT_STYLE_SUPPORTED", true)
-          //        putInt(
-          //          "android.media.browse.CONTENT_STYLE_BROWSABLE_HINT",
-          //          MediaConstants.DESCRIPTION_EXTRAS_VALUE_CONTENT_STYLE_LIST_ITEM
-          //        )
-          //        putInt(
-          //          "android.media.browse.CONTENT_STYLE_PLAYABLE_HINT",
-          //          MediaConstants.DESCRIPTION_EXTRAS_VALUE_CONTENT_STYLE_LIST_ITEM
-          //        )
-        }
-      val libraryParams = LibraryParams.Builder().setExtras(rootExtras).build()
-      // https://github.com/androidx/media/issues/1731#issuecomment-2411109462
-      val mRootItem =
-        when (browser.packageName) {
-          "com.google.android.googlequicksearchbox" -> {
-            // TODO: make "For You" work
-            // if (mediaTree[AA_FOR_YOU_KEY] == null) rootItem else forYouItem
-            rootItem
-          }
-
-          else -> rootItem
-        }
-      return Futures.immediateFuture(LibraryResult.ofItem(rootItem, libraryParams))
-    }
-
-    override fun onGetChildren(
-      session: MediaLibrarySession,
-      browser: MediaSession.ControllerInfo,
-      parentId: String,
-      page: Int,
-      pageSize: Int,
-      params: LibraryParams?,
-    ): ListenableFuture<LibraryResult<ImmutableList<MediaItem>>> {
-      Timber.d("onGetChildren: {parentId: $parentId, page: $page, pageSize: $pageSize }")
-
-      val requestId = UUID.randomUUID().toString()
-      val future = SettableFuture.create<List<MediaItem>>()
-
-      // Store the future for later resolution
-      pendingGetChildrenRequests[requestId] = future
-
-      // Emit event to JavaScript via module
-      CoroutineScope(Dispatchers.Main).launch {
-        try {
-          Timber.d("Getting module: requestId=$requestId, parentId=$parentId")
-          // Wait for module to be registered
-          val moduleInstance = module.await()
-
-          Timber.d("Emitting onGetChildrenRequest to JS: requestId=$requestId, parentId=$parentId")
-          moduleInstance.emitGetChildrenRequest(requestId, parentId, page, pageSize)
-          Timber.d("Emitted onGetChildrenRequest to JS: requestId=$requestId, parentId=$parentId")
-        } catch (e: Exception) {
-          Timber.e(e, "Failed to emit onGetChildrenRequest to JS")
-          // Fallback: resolve with empty list
-          pendingGetChildrenRequests.remove(requestId)?.set(emptyList())
-        }
-      }
-
-      return Futures.transform(
-        future,
-        { items -> LibraryResult.ofItemList(ImmutableList.copyOf(items), null) },
-        MoreExecutors.directExecutor(),
-      )
-    }
-
-    override fun onGetItem(
-      session: MediaLibrarySession,
-      browser: MediaSession.ControllerInfo,
-      mediaId: String,
-    ): ListenableFuture<LibraryResult<MediaItem>> {
-      Timber.d("onGetItem: ${browser.packageName}, mediaId = $mediaId")
-
-      val requestId = UUID.randomUUID().toString()
-      val future = SettableFuture.create<MediaItem>()
-
-      // Store the future for later resolution
-      pendingGetItemRequests[requestId] = future
-
-      // Emit event to JavaScript via module
-      CoroutineScope(Dispatchers.Main).launch {
-        try {
-          Timber.d("Getting module for onGetItem: requestId=$requestId, mediaId=$mediaId")
-          // Wait for module to be registered
-          val moduleInstance = module.await()
-
-          Timber.d("Emitting onGetItemRequest to JS: requestId=$requestId, mediaId=$mediaId")
-          moduleInstance.emitGetItemRequest(requestId, mediaId)
-          Timber.d("Emitted onGetItemRequest to JS: requestId=$requestId, mediaId=$mediaId")
-        } catch (e: Exception) {
-          Timber.e(e, "Failed to emit onGetItemRequest to JS")
-          // Fallback: resolve with default item
-          pendingGetItemRequests
-            .remove(requestId)
-            ?.set(
-              MediaItem.Builder()
-                .setMediaId(mediaId)
-                .setMediaMetadata(
-                  MediaMetadata.Builder()
-                    .setTitle("Error")
-                    .setIsBrowsable(false)
-                    .setIsPlayable(false)
-                    .build()
-                )
-                .build()
-            )
-        }
-      }
-
-      return Futures.transform(
-        future,
-        { item -> LibraryResult.ofItem(item, null) },
-        MoreExecutors.directExecutor(),
-      )
-    }
-
-    override fun onSearch(
-      session: MediaLibrarySession,
-      browser: MediaSession.ControllerInfo,
-      query: String,
-      params: LibraryParams?,
-    ): ListenableFuture<LibraryResult<Void>> {
-      Timber.d("onSearch: ${browser.packageName}, query = $query")
-
-      // Emit event to JavaScript via module for search initiation
-      try {
-        val requestId = UUID.randomUUID().toString()
-        if (module.isCompleted) {
-          val moduleInstance = module.getCompleted()
-          val extrasMap =
-            params?.extras?.let { bundle ->
-              Arguments.createMap().apply {
-                for (key in bundle.keySet()) {
-                  when (val value = bundle.get(key)) {
-                    is String -> putString(key, value)
-                    is Int -> putInt(key, value)
-                    is Double -> putDouble(key, value)
-                    is Boolean -> putBoolean(key, value)
-                  // Add other types as needed
-                  }
-                }
-              }
-            }
-          moduleInstance.emitSearchResultRequest(
-            requestId,
-            query,
-            extrasMap,
-            0,
-            50,
-          ) // Default page parameters
-          Timber.d("Emitted onGetSearchResultRequest to JS: requestId=$requestId, query=$query")
-        } else {
-          Timber.w("No module registered - cannot emit onGetSearchResultRequest")
-        }
-      } catch (e: Exception) {
-        Timber.e(e, "Failed to emit onGetSearchResultRequest to JS")
-      }
-
-      // Return standard void result - search completion is handled separately
-      return super.onSearch(session, browser, query, params)
-    }
-
-    override fun onSetMediaItems(
-      mediaSession: MediaSession,
-      controller: MediaSession.ControllerInfo,
-      mediaItems: MutableList<MediaItem>,
-      startIndex: Int,
-      startPositionMs: Long,
-    ): ListenableFuture<MediaSession.MediaItemsWithStartPosition> {
-      Timber.d(
-        "onSetMediaItems: ${controller.packageName}, mediaId=${mediaItems[0].mediaId}, uri=${mediaItems[0].localConfiguration?.uri}, title=${mediaItems[0].mediaMetadata.title}"
-      )
-
-      return CoroutineScope(Dispatchers.Main).future {
-        val resolvedItems =
-          mediaItems.map { mediaItem ->
-            val mediaId = mediaItem.mediaId
-            val fullMediaItem = mediaItemById[mediaId]
-            if (fullMediaItem != null) {
-              Timber.d(
-                "Resolved stub MediaItem in onSetMediaItems: mediaId=$mediaId -> title=${fullMediaItem.mediaMetadata.title}"
-              )
-              fullMediaItem
-            } else {
-              Timber.w("No stored MediaItem found for mediaId=$mediaId")
-              mediaItem // Return original if no lookup found
-            }
-          }
-
-        Timber.d(
-          "Returning ${resolvedItems.size} resolved MediaItems to MediaSession for onSetMediaItems"
-        )
-
-        // Return resolved items with original start position - MediaSession will handle queue
-        // management
-        MediaSession.MediaItemsWithStartPosition(
-          resolvedItems.toMutableList(),
-          startIndex,
-          startPositionMs,
-        )
-      }
-    }
   }
 
   companion object {
