@@ -109,8 +109,9 @@ data class PlayerUpdateOptions(
     result.putDouble("backwardJumpInterval", backwardJumpInterval)
 
     // Add progress update interval (always include, null means disabled)
-    if (progressUpdateEventInterval != null) {
-      result.putDouble("progressUpdateEventInterval", progressUpdateEventInterval)
+    val interval = progressUpdateEventInterval
+    if (interval != null) {
+      result.putDouble("progressUpdateEventInterval", interval)
     } else {
       result.putNull("progressUpdateEventInterval")
     }
