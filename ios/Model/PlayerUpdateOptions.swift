@@ -10,17 +10,23 @@ public class PlayerUpdateOptions {
   /// Jump intervals
   public var forwardJumpInterval: Double = 15.0
   public var backwardJumpInterval: Double = 15.0
-  public var progressUpdateEventInterval: Double?
+  public var progressUpdateEventInterval: Double? = nil
 
   /// Rating and capabilities
-  public var ratingType: String?
-  public var capabilities: [String] = []
-  public var notificationCapabilities: [String] = []
+  public var capabilities: [Capability] = [
+    .play,
+    .pause,
+    .next,
+    .previous
+  ]
+
+  /// Repeat mode
+  public var repeatMode: RepeatMode = .off
 
   /// iOS-specific options
-  public var likeOptions: [String: Any]?
-  public var dislikeOptions: [String: Any]?
-  public var bookmarkOptions: [String: Any]?
+  public var likeOptions: FeedbackOptions = FeedbackOptions(title: "Like")
+  public var dislikeOptions: FeedbackOptions = FeedbackOptions(title: "Dislike")
+  public var bookmarkOptions: FeedbackOptions = FeedbackOptions(title: "Bookmark")
 
   // MARK: - Initialization
 
@@ -36,35 +42,49 @@ public class PlayerUpdateOptions {
     if let interval = options["backwardJumpInterval"] as? NSNumber {
       backwardJumpInterval = interval.doubleValue
     }
-    if let interval = options["progressUpdateEventInterval"] as? NSNumber {
-      progressUpdateEventInterval = interval.doubleValue > 0 ? interval.doubleValue : nil
+    if options.keys.contains("progressUpdateEventInterval") {
+      if options["progressUpdateEventInterval"] is NSNull {
+        progressUpdateEventInterval = nil
+      } else if let interval = options["progressUpdateEventInterval"] as? NSNumber {
+        progressUpdateEventInterval = interval.doubleValue
+      }
     }
 
-    // Update rating type
-    if let rating = options["ratingType"] as? String {
-      ratingType = rating
-    }
 
     // Update capabilities
     if let caps = options["capabilities"] as? [String] {
-      var updatedCapabilities = caps
+      var updatedCapabilities = caps.compactMap { Capability(rawValue: $0) }
       // Add toggle-play-pause if both play and pause are present
-      if caps.contains("play"), caps.contains("pause") {
-        updatedCapabilities.append("toggle-play-pause")
+      if updatedCapabilities.contains(.play), updatedCapabilities.contains(.pause) {
+        updatedCapabilities.append(.togglePlayPause)
       }
       capabilities = updatedCapabilities
     }
 
-    // Update notification capabilities
-    if let notificationCaps = options["notificationCapabilities"] as? [String] {
-      notificationCapabilities = notificationCaps
+
+    // Update repeat mode
+    if options.keys.contains("repeatMode") {
+      if options["repeatMode"] is NSNull {
+        repeatMode = .off // Reset to default when explicitly set to null
+      } else if let modeString = options["repeatMode"] as? String {
+        repeatMode = RepeatMode(rawValue: modeString) ?? .off
+      }
     }
 
     // Update iOS-specific options
     if let iosOptions = options["ios"] as? [String: Any] {
-      likeOptions = iosOptions["likeOptions"] as? [String: Any]
-      dislikeOptions = iosOptions["dislikeOptions"] as? [String: Any]
-      bookmarkOptions = iosOptions["bookmarkOptions"] as? [String: Any]
+      if let likeDict = iosOptions["likeOptions"] as? [String: Any],
+         let like = FeedbackOptions.fromBridge(likeDict) {
+        likeOptions = like
+      }
+      if let dislikeDict = iosOptions["dislikeOptions"] as? [String: Any],
+         let dislike = FeedbackOptions.fromBridge(dislikeDict) {
+        dislikeOptions = dislike
+      }
+      if let bookmarkDict = iosOptions["bookmarkOptions"] as? [String: Any],
+         let bookmark = FeedbackOptions.fromBridge(bookmarkDict) {
+        bookmarkOptions = bookmark
+      }
     }
   }
 
@@ -75,58 +95,33 @@ public class PlayerUpdateOptions {
     result["forwardJumpInterval"] = NSNumber(value: forwardJumpInterval)
     result["backwardJumpInterval"] = NSNumber(value: backwardJumpInterval)
 
-    // Add progress update interval if set
+    // Add progress update interval (always include, nil means disabled)
     if let interval = progressUpdateEventInterval {
       result["progressUpdateEventInterval"] = NSNumber(value: interval)
+    } else {
+      result["progressUpdateEventInterval"] = NSNull()
     }
 
-    // Add rating type if set
-    if let rating = ratingType {
-      result["ratingType"] = rating
-    }
 
-    // Add capabilities if set (filter out auto-added toggle-play-pause)
-    if !capabilities.isEmpty {
-      let filteredCapabilities = capabilities.filter { $0 != "toggle-play-pause" }
-      if !filteredCapabilities.isEmpty {
-        result["capabilities"] = filteredCapabilities
-      }
-    }
+    // Add capabilities (always include, filter out auto-added toggle-play-pause)
+    let filteredCapabilities = capabilities.filter { $0 != .togglePlayPause }.map { $0.rawValue }
+    result["capabilities"] = filteredCapabilities
 
-    // Add notification capabilities if set
-    if !notificationCapabilities.isEmpty {
-      result["notificationCapabilities"] = notificationCapabilities
-    }
 
-    // Add iOS-specific options if any are set
-    let hasIOSOptions = likeOptions != nil || dislikeOptions != nil || bookmarkOptions != nil
-    if hasIOSOptions {
-      var iosOptions: [String: Any] = [:]
+    // Add repeat mode (always include)
+    result["repeatMode"] = repeatMode.rawValue
 
-      if let like = likeOptions { iosOptions["likeOptions"] = like }
-      if let dislike = dislikeOptions { iosOptions["dislikeOptions"] = dislike }
-      if let bookmark = bookmarkOptions { iosOptions["bookmarkOptions"] = bookmark }
-
-      result["ios"] = iosOptions
-    }
+    // Add iOS-specific options (always include with defaults)
+    result["ios"] = [
+      "likeOptions": likeOptions.toBridge(),
+      "dislikeOptions": dislikeOptions.toBridge(),
+      "bookmarkOptions": bookmarkOptions.toBridge()
+    ]
 
     return result
   }
 
   // MARK: - Convenience Methods
 
-  /// Get forward jump interval as NSNumber for compatibility
-  public var forwardJumpIntervalNumber: NSNumber {
-    return NSNumber(value: forwardJumpInterval)
-  }
 
-  /// Get backward jump interval as NSNumber for compatibility
-  public var backwardJumpIntervalNumber: NSNumber {
-    return NSNumber(value: backwardJumpInterval)
-  }
-
-  /// Get the mapped capabilities as Capability enums
-  public var mappedCapabilities: [Capability] {
-    return capabilities.compactMap { Capability(rawValue: $0) }
-  }
 }

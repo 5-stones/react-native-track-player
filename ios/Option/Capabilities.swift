@@ -17,9 +17,9 @@ enum Capability: String {
   func mapToPlayerCommand(
     forwardJumpInterval: NSNumber?,
     backwardJumpInterval: NSNumber?,
-    likeOptions: [String: Any]?,
-    dislikeOptions: [String: Any]?,
-    bookmarkOptions: [String: Any]?
+    likeOptions: FeedbackOptions,
+    dislikeOptions: FeedbackOptions,
+    bookmarkOptions: FeedbackOptions
   ) -> RemoteCommand {
     switch self {
     case .stop:
@@ -45,21 +45,21 @@ enum Capability: String {
       ])
     case .like:
       return .like(
-        isActive: likeOptions?["isActive"] as? Bool ?? false,
-        localizedTitle: likeOptions?["title"] as? String ?? "Like",
-        localizedShortTitle: likeOptions?["title"] as? String ?? "Like"
+        isActive: likeOptions.isActive,
+        localizedTitle: likeOptions.title,
+        localizedShortTitle: likeOptions.title
       )
     case .dislike:
       return .dislike(
-        isActive: dislikeOptions?["isActive"] as? Bool ?? false,
-        localizedTitle: dislikeOptions?["title"] as? String ?? "Dislike",
-        localizedShortTitle: dislikeOptions?["title"] as? String ?? "Dislike"
+        isActive: dislikeOptions.isActive,
+        localizedTitle: dislikeOptions.title,
+        localizedShortTitle: dislikeOptions.title
       )
     case .bookmark:
       return .bookmark(
-        isActive: bookmarkOptions?["isActive"] as? Bool ?? false,
-        localizedTitle: bookmarkOptions?["title"] as? String ?? "Bookmark",
-        localizedShortTitle: bookmarkOptions?["title"] as? String ?? "Bookmark"
+        isActive: bookmarkOptions.isActive,
+        localizedTitle: bookmarkOptions.title,
+        localizedShortTitle: bookmarkOptions.title
       )
     }
   }

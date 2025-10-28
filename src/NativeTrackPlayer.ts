@@ -73,8 +73,6 @@ export interface Spec extends TurboModule {
   updateNowPlayingMetadata(metadata: UnsafeObject): void;
   setQueue(tracks: UnsafeObject[]): void;
   getQueue(): UnsafeObject[];
-  setRepeatMode(mode: string): void;
-  getRepeatMode(): string;
   getTrack(index: number): UnsafeObject | undefined;
   getActiveTrackIndex(): number | undefined;
   getActiveTrack(): UnsafeObject | undefined;

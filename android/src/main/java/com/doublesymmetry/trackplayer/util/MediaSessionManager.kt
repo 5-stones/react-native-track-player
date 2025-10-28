@@ -46,26 +46,17 @@ class MediaSessionManager {
     // Initialize with defaults:
     // - Allow all capabilities globally (for full external controller support)
     // - Limit notification capabilities to essential controls
-    update(
-      null,
+    val defaultNotificationCapabilities =
       listOf(
         PlayerCapability.PLAY,
         PlayerCapability.PAUSE,
         PlayerCapability.SKIP_TO_NEXT,
         PlayerCapability.SKIP_TO_PREVIOUS,
         PlayerCapability.SEEK_TO,
-      ),
-    )
-  }
+      )
 
-  /** Updates internal command configuration based on capabilities */
-  private fun update(
-    capabilities: List<PlayerCapability>?,
-    notificationCapabilities: List<PlayerCapability>?,
-  ) {
-    capabilities?.let { updatePlayerCommands(it) }
-
-    (notificationCapabilities ?: capabilities)?.let { updateSessionCommandsAndLayout(it) }
+    updatePlayerCommands(PlayerCapability.entries) // All capabilities for external controllers
+    updateSessionCommandsAndLayout(defaultNotificationCapabilities)
   }
 
   /**
@@ -73,21 +64,21 @@ class MediaSessionManager {
    *
    * @param mediaSession The MediaSession to configure
    * @param capabilities Global capabilities that enable commands for ALL MediaSession controllers
-   *   (Bluetooth, Android Auto, lock screen, notification, etc.). If null, keeps existing player
-   *   commands unchanged.
+   *   (Bluetooth, Android Auto, lock screen, notification, etc.).
    * @param notificationCapabilities Capabilities that control which buttons appear in notifications
-   *   only. Defaults to capabilities if null. Empty list disables all notification buttons.
+   *   only. When null, defaults to capabilities. Empty list disables all notification buttons.
    *
-   * If both parameters are null, keeps existing configuration unchanged. Manager initializes with
-   * defaults: all global capabilities, limited notification capabilities.
+   * Manager initializes with defaults: all global capabilities, limited notification capabilities.
    */
   fun updateMediaSession(
     mediaSession: MediaSession,
-    capabilities: List<PlayerCapability>?,
+    capabilities: List<PlayerCapability>,
     notificationCapabilities: List<PlayerCapability>?,
   ) {
     // Update internal configuration
-    update(capabilities, notificationCapabilities)
+    updatePlayerCommands(capabilities)
+    val effectiveNotificationCapabilities = notificationCapabilities ?: capabilities
+    updateSessionCommandsAndLayout(effectiveNotificationCapabilities)
 
     // Apply configuration to MediaSession notification controller
     mediaSession.mediaNotificationControllerInfo?.let { controllerInfo ->

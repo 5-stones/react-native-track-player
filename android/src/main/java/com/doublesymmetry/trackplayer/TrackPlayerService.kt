@@ -54,6 +54,7 @@ class TrackPlayerService : MediaLibraryService() {
   private var module = CompletableDeferred<TrackPlayerModule>()
   private val commandManager = MediaSessionManager()
   private lateinit var mediaSession: MediaLibrarySession
+  private var currentUpdateOptions = PlayerUpdateOptions()
 
   // Headless service binding
   private val headlessConnection: ServiceConnection =
@@ -180,32 +181,86 @@ class TrackPlayerService : MediaLibraryService() {
   }
 
   fun applyUpdateOptions(options: PlayerUpdateOptions) {
-    // Android-specific runtime options
-    options.skipSilence?.let { skipSilence -> player.skipSilence = skipSilence }
+    // Store previous values for change detection
+    val previousOptions = currentUpdateOptions
 
-    options.ratingType?.let { ratingType -> player.ratingType = ratingType.compat }
+    // Update current options
+    currentUpdateOptions = options
 
-    appKilledPlaybackBehavior =
-      AppKilledPlaybackBehavior.values().find { it.string == options.appKilledPlaybackBehavior }
-        ?: AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
+    // Check what changed
+    val skipSilenceChanged = previousOptions.skipSilence != options.skipSilence
+    val ratingTypeChanged = previousOptions.ratingType != options.ratingType
+    val appKilledPlaybackBehaviorChanged =
+      previousOptions.appKilledPlaybackBehavior != options.appKilledPlaybackBehavior
+    val shuffleChanged = previousOptions.shuffle != options.shuffle
+    val repeatModeChanged = previousOptions.repeatMode != options.repeatMode
+    val progressUpdateEventIntervalChanged =
+      previousOptions.progressUpdateEventInterval != options.progressUpdateEventInterval
+    val forwardJumpIntervalChanged =
+      previousOptions.forwardJumpInterval != options.forwardJumpInterval
+    val backwardJumpIntervalChanged =
+      previousOptions.backwardJumpInterval != options.backwardJumpInterval
+    val capabilitiesChanged = previousOptions.capabilities != options.capabilities
+    val notificationCapabilitiesChanged =
+      previousOptions.notificationCapabilities != options.notificationCapabilities
 
-    player.shuffleMode = options.shuffle ?: false
+    val hasChanged =
+      skipSilenceChanged ||
+        ratingTypeChanged ||
+        appKilledPlaybackBehaviorChanged ||
+        shuffleChanged ||
+        repeatModeChanged ||
+        progressUpdateEventIntervalChanged ||
+        forwardJumpIntervalChanged ||
+        backwardJumpIntervalChanged ||
+        capabilitiesChanged ||
+        notificationCapabilitiesChanged
 
-    // Update progress interval on the player
-    player.setProgressUpdateInterval(
-      if (options.progressUpdateEventInterval > 0) options.progressUpdateEventInterval else null
-    )
+    if (skipSilenceChanged) {
+      options.skipSilence?.let { skipSilence -> player.skipSilence = skipSilence }
+    }
 
-    // Update jump intervals
-    player.forwardJumpInterval = options.forwardJumpInterval
-    player.backwardJumpInterval = options.backwardJumpInterval
+    if (ratingTypeChanged) {
+      options.ratingType?.let { ratingType -> player.ratingType = ratingType.compat }
+    }
 
-    // Configure MediaSession commands based on capabilities
-    commandManager.updateMediaSession(
-      mediaSession,
-      options.capabilities,
-      options.notificationCapabilities,
-    )
+    if (appKilledPlaybackBehaviorChanged) {
+      appKilledPlaybackBehavior =
+        AppKilledPlaybackBehavior.values().find { it.string == options.appKilledPlaybackBehavior }
+          ?: AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
+    }
+
+    if (shuffleChanged) {
+      player.shuffleMode = options.shuffle ?: false
+    }
+
+    if (repeatModeChanged) {
+      player.repeatMode = options.repeatMode
+    }
+
+    if (progressUpdateEventIntervalChanged) {
+      player.setProgressUpdateInterval(options.progressUpdateEventInterval)
+    }
+
+    if (forwardJumpIntervalChanged) {
+      player.forwardJumpInterval = options.forwardJumpInterval
+    }
+
+    if (backwardJumpIntervalChanged) {
+      player.backwardJumpInterval = options.backwardJumpInterval
+    }
+
+    if (capabilitiesChanged || notificationCapabilitiesChanged) {
+      commandManager.updateMediaSession(
+        mediaSession,
+        options.capabilities,
+        options.notificationCapabilities,
+      )
+    }
+
+    if (hasChanged) {
+      player.callbacks?.onOptionsChanged(options)
+    }
   }
 
   override fun onBind(intent: Intent?): IBinder? {

@@ -13,9 +13,9 @@ import com.doublesymmetry.trackplayer.event.RemoteJumpBackwardEvent
 import com.doublesymmetry.trackplayer.event.RemoteJumpForwardEvent
 import com.doublesymmetry.trackplayer.event.RemoteSeekEvent
 import com.doublesymmetry.trackplayer.event.RemoteSetRatingEvent
-import com.doublesymmetry.trackplayer.model.PlayerUpdateOptions
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import com.doublesymmetry.trackplayer.model.PlaybackState
+import com.doublesymmetry.trackplayer.model.PlayerUpdateOptions
 import com.facebook.react.bridge.WritableMap
 
 /** Callbacks for all player events. */

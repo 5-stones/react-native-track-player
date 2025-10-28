@@ -28,7 +28,6 @@ import com.doublesymmetry.trackplayer.model.PlaybackState
 import com.doublesymmetry.trackplayer.model.PlayerSetupOptions
 import com.doublesymmetry.trackplayer.model.PlayerUpdateOptions
 import com.doublesymmetry.trackplayer.model.TrackFactory
-import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
 import com.doublesymmetry.trackplayer.util.BundleUtils
 import com.doublesymmetry.trackplayer.util.MetadataAdapter
 import com.facebook.react.bridge.Arguments
@@ -193,9 +192,7 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   override fun updateOptions(data: ReadableMap?): Unit = runBlockingOnMain {
     updateOptions.updateFromBridge(data)
     service.applyUpdateOptions(updateOptions)
-
-    // Emit options changed event
-    onOptionsChanged(updateOptions)
+    // Service will call callbacks.onOptionsChanged if anything actually changed
   }
 
   override fun getOptions(): WritableMap = runBlockingOnMain { updateOptions.toBridge() }
@@ -316,14 +313,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   override fun setRate(rate: Double) = runBlockingOnMain { player.playbackSpeed = rate.toFloat() }
 
   override fun getRate(): Double = runBlockingOnMain { player.playbackSpeed.toDouble() }
-
-  override fun setRepeatMode(mode: String) = runBlockingOnMain {
-    player.repeatMode =
-      PlayerRepeatMode.fromString(mode)
-        ?: throw IllegalArgumentException("Invalid repeat mode value: $mode")
-  }
-
-  override fun getRepeatMode(): String = runBlockingOnMain { player.repeatMode.string }
 
   override fun setPlayWhenReady(playWhenReady: Boolean) = runBlockingOnMain {
     player.playWhenReady = playWhenReady

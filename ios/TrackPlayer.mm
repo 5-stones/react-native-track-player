@@ -304,8 +304,6 @@ RCT_EXPORT_MODULE()
   [self emitOnOptionsChanged:body];
 }
 
-
-
 /*****************************************
  * Android Only Methods (Stubs)
  *****************************************/

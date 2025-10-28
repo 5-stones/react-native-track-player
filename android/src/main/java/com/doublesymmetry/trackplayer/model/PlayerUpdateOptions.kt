@@ -1,6 +1,7 @@
 package com.doublesymmetry.trackplayer.model
 
 import com.doublesymmetry.trackplayer.option.PlayerCapability
+import com.doublesymmetry.trackplayer.option.RepeatMode
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableMap
@@ -13,14 +14,23 @@ data class PlayerUpdateOptions(
   // Jump intervals
   var forwardJumpInterval: Double = 15.0,
   var backwardJumpInterval: Double = 15.0,
-  var progressUpdateEventInterval: Double = -1.0,
+  var progressUpdateEventInterval: Double? = null,
 
   // Rating and capabilities
-  var ratingType: RatingType? = null,
-  var capabilities: List<PlayerCapability>? = null,
+  var capabilities: List<PlayerCapability> =
+    listOf(
+      PlayerCapability.PLAY,
+      PlayerCapability.PAUSE,
+      PlayerCapability.SKIP_TO_NEXT,
+      PlayerCapability.SKIP_TO_PREVIOUS,
+    ),
   var notificationCapabilities: List<PlayerCapability>? = null,
 
+  // Repeat mode
+  var repeatMode: RepeatMode = RepeatMode.OFF,
+
   // Android-specific runtime options (all under android.* in JS)
+  var ratingType: RatingType? = null,
   var appKilledPlaybackBehavior: String? = null,
   var skipSilence: Boolean? = null,
   var shuffle: Boolean? = null,
@@ -36,10 +46,13 @@ data class PlayerUpdateOptions(
       backwardJumpInterval = map.getDouble("backwardJumpInterval")
     }
     if (map.hasKey("progressUpdateEventInterval")) {
-      progressUpdateEventInterval = map.getDouble("progressUpdateEventInterval")
+      progressUpdateEventInterval =
+        if (map.isNull("progressUpdateEventInterval")) {
+          null
+        } else {
+          map.getDouble("progressUpdateEventInterval")
+        }
     }
-
-    map.getString("ratingType")?.let { ratingType = RatingType.fromString(it) }
 
     map.getArray("capabilities")?.let { arr ->
       capabilities =
@@ -50,18 +63,31 @@ data class PlayerUpdateOptions(
         }
     }
 
-    map.getArray("notificationCapabilities")?.let { arr ->
+    if (map.hasKey("notificationCapabilities")) {
       notificationCapabilities =
-        (0 until arr.size()).mapNotNull { index ->
-          val value = arr.getString(index) ?: return@mapNotNull null
-          PlayerCapability.fromString(value)
-            ?: throw IllegalArgumentException("Invalid notificationCapability value: $value")
+        if (map.isNull("notificationCapabilities")) {
+          null // Explicitly set to null - reset to default behavior
+        } else {
+          map.getArray("notificationCapabilities")?.let { arr ->
+            (0 until arr.size()).mapNotNull { index ->
+              val value = arr.getString(index) ?: return@mapNotNull null
+              PlayerCapability.fromString(value)
+                ?: throw IllegalArgumentException("Invalid notificationCapability value: $value")
+            }
+          }
         }
+    }
+
+    if (map.hasKey("repeatMode")) {
+      repeatMode = map.getString("repeatMode")?.let { RepeatMode.fromString(it) } ?: RepeatMode.OFF
     }
 
     // Android-specific runtime options (all under android.*)
     val androidMap = if (map.hasKey("android")) map.getMap("android") else null
     androidMap?.let { android ->
+      if (android.hasKey("ratingType")) {
+        ratingType = android.getString("ratingType")?.let { RatingType.fromString(it) }
+      }
       if (android.hasKey("appKilledPlaybackBehavior")) {
         appKilledPlaybackBehavior = android.getString("appKilledPlaybackBehavior")
       }
@@ -81,34 +107,38 @@ data class PlayerUpdateOptions(
     result.putDouble("forwardJumpInterval", forwardJumpInterval)
     result.putDouble("backwardJumpInterval", backwardJumpInterval)
 
-    // Add progress update interval if set (don't include if disabled)
-    if (progressUpdateEventInterval > 0) {
+    // Add progress update interval (always include, null means disabled)
+    if (progressUpdateEventInterval != null) {
       result.putDouble("progressUpdateEventInterval", progressUpdateEventInterval)
+    } else {
+      result.putNull("progressUpdateEventInterval")
     }
 
-    // Add rating type if set
-    ratingType?.let { result.putString("ratingType", it.string) }
+    // Add capabilities (always include, even if empty)
+    val capabilitiesArray = Arguments.createArray()
+    capabilities.forEach { cap -> capabilitiesArray.pushString(cap.string) }
+    result.putArray("capabilities", capabilitiesArray)
 
-    // Add capabilities if set
-    capabilities?.let { caps ->
-      val capabilitiesArray = Arguments.createArray()
-      caps.forEach { cap -> capabilitiesArray.pushString(cap.string) }
-      result.putArray("capabilities", capabilitiesArray)
-    }
-
-    // Add notification capabilities if set
+    // Add notification capabilities if set (null means not set, different from empty)
     notificationCapabilities?.let { caps ->
       val notificationCapsArray = Arguments.createArray()
       caps.forEach { cap -> notificationCapsArray.pushString(cap.string) }
       result.putArray("notificationCapabilities", notificationCapsArray)
     }
 
+    // Add repeat mode (always include)
+    result.putString("repeatMode", repeatMode.string)
+
     // Add Android-specific options if any are set
     val hasAndroidOptions =
-      appKilledPlaybackBehavior != null || skipSilence != null || shuffle != null
+      ratingType != null ||
+        appKilledPlaybackBehavior != null ||
+        skipSilence != null ||
+        shuffle != null
     if (hasAndroidOptions) {
       val androidOptions = Arguments.createMap()
 
+      ratingType?.let { androidOptions.putString("ratingType", it.string) }
       appKilledPlaybackBehavior?.let { androidOptions.putString("appKilledPlaybackBehavior", it) }
       skipSilence?.let { androidOptions.putBoolean("skipSilence", it) }
       shuffle?.let { androidOptions.putBoolean("shuffle", it) }

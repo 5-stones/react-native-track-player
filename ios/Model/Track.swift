@@ -271,7 +271,7 @@ public class Track {
   private static let allowedBridgeKeys: Set<String> = [
     "url", "type", "userAgent", "contentType", "pitchAlgorithm", "headers", "data",
     "title", "album", "artist", "duration", "artwork", "description",
-    "genre", "date", "rating", "isLiveStream", "mediaId"
+    "genre", "date", "rating", "isLiveStream", "mediaId",
   ]
 
   private static func validateFromBridge(dictionary: [String: Any]) throws {
@@ -283,7 +283,7 @@ public class Track {
         code: -1,
         userInfo: [
           NSLocalizedDescriptionKey:
-            "Track has unexpected properties: \(unexpectedKeys.sorted().joined(separator: ", ")). Only 'data' field can contain custom properties."
+            "Track has unexpected properties: \(unexpectedKeys.sorted().joined(separator: ", ")). Only 'data' field can contain custom properties.",
         ]
       )
     }
