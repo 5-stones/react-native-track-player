@@ -67,7 +67,6 @@ sealed class MetadataAdapter {
                 rawEntry.putString("key", entry.id.uppercase())
                 rawEntry.putString("keySpace", "org.id3")
                 rawEntry.putString("value", entry.values[0])
-                rawEntry.putString("time", "-1")
                 rawEntries.add(rawEntry)
               }
 
@@ -77,7 +76,6 @@ sealed class MetadataAdapter {
                     putString("value", entry.url)
                     putString("key", entry.id.uppercase())
                     putString("keySpace", "org.id3")
-                    putString("time", "-1")
                   }
                 )
               }
@@ -92,7 +90,6 @@ sealed class MetadataAdapter {
                     putString("commonKey", "title")
                     putString("key", "StreamTitle")
                     putString("keySpace", "icy")
-                    putString("time", "-1")
                   }
                 )
 
@@ -101,7 +98,6 @@ sealed class MetadataAdapter {
                     putString("value", entry.url)
                     putString("key", "StreamURL")
                     putString("keySpace", "icy")
-                    putString("time", "-1")
                   }
                 )
 
@@ -111,7 +107,6 @@ sealed class MetadataAdapter {
                     putString("commonKey", "genre")
                     putString("key", "StreamGenre")
                     putString("keySpace", "icy")
-                    putString("time", "-1")
                   }
                 )
               }
@@ -124,7 +119,6 @@ sealed class MetadataAdapter {
                     putString("value", entry.url)
                     putString("key", "StreamURL")
                     putString("keySpace", "icy")
-                    putString("time", "-1")
                   }
                 )
 
@@ -134,7 +128,6 @@ sealed class MetadataAdapter {
                     putString("commonKey", "title")
                     putString("key", "StreamTitle")
                     putString("keySpace", "icy")
-                    putString("time", "-1")
                   }
                 )
               }
@@ -171,7 +164,6 @@ sealed class MetadataAdapter {
                 rawEntry.putString("key", entry.key)
                 rawEntry.putString("keySpace", "org.vorbis")
                 rawEntry.putString("value", entry.value)
-                rawEntry.putString("time", "-1")
                 rawEntries.add(rawEntry)
               }
 
@@ -203,7 +195,6 @@ sealed class MetadataAdapter {
                 rawEntry.putString("key", entry.key.substringAfterLast("."))
                 rawEntry.putString("keySpace", "com.apple.quicktime")
                 rawEntry.putString("value", entry.value.toString())
-                rawEntry.putString("time", "-1")
                 rawEntries.add(rawEntry)
               }
             }
