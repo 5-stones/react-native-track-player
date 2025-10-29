@@ -26,7 +26,9 @@ import {
   TrackInfo,
 } from './components';
 import { useSetupPlayer } from './hooks/usePlayer';
-import { tracks } from './services';
+import { installListeners, tracks } from './services';
+
+installListeners();
 
 const tracksWithIds = tracks.map((track, index) => ({
   ...track,

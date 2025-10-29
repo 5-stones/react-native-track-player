@@ -1,4 +1,4 @@
-import { AppRegistry, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 import TrackPlayer from '../NativeTrackPlayer';
 import type {
@@ -175,21 +175,6 @@ export interface PlayerOptions {
  */
 export async function setupPlayer(options: PlayerOptions = {}): Promise<void> {
   return TrackPlayer.setupPlayer(options);
-}
-
-/**
- * Register the playback service. The service will run as long as the player runs.
- */
-export function registerPlaybackService(factory: () => ServiceHandler) {
-  if (isAndroid) {
-    // Registers the headless task
-    AppRegistry.registerHeadlessTask('TrackPlayer', factory);
-  } else if (Platform.OS === 'web') {
-    factory()();
-  } else {
-    // Initializes and runs the service in the next tick
-    setImmediate(factory());
-  }
 }
 
 // MARK: - Android-specific

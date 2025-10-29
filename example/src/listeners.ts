@@ -1,6 +1,6 @@
 import TrackPlayer, { Event } from 'react-native-track-player';
 
-export async function PlaybackService() {
+export async function installListeners() {
   TrackPlayer.addEventListener(Event.RemotePause, () => {
     console.log('Event.RemotePause');
     TrackPlayer.pause();
@@ -64,7 +64,7 @@ export async function PlaybackService() {
     console.log('Event.MetadataTimedReceived', event);
   });
 
-  TrackPlayer.addEventListener(Event.MetadataCommonReceived, (event) => {
+  TrackPlayer.onMetadataCommonReceived((event) => {
     console.log('Event.MetadataCommonReceived', event);
   });
 }
