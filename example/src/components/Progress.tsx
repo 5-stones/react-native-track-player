@@ -1,5 +1,4 @@
 import Slider from '@react-native-community/slider';
-import React from 'react';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
 import TrackPlayer, { useProgress } from 'react-native-track-player';
 import { Spacer } from './Spacer';

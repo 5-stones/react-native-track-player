@@ -1,4 +1,4 @@
-import React from 'react';
+import { Children, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import TrackPlayer, {
   AppKilledPlaybackBehavior,
@@ -99,10 +99,10 @@ function OptionStack({
   children,
   vertical,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   vertical?: boolean;
 }) {
-  const childrenArray = React.Children.toArray(children);
+  const childrenArray = Children.toArray(children);
 
   return (
     <View style={vertical ? styles.optionColumn : styles.optionRow}>

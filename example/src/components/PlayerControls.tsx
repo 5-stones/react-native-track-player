@@ -1,5 +1,4 @@
 import Icon from '@react-native-vector-icons/fontawesome6';
-import React from 'react';
 import { StyleSheet, TouchableWithoutFeedback, View } from 'react-native';
 import TrackPlayer from 'react-native-track-player';
 

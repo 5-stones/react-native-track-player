@@ -1,8 +1,7 @@
-import React from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
-import { Spacer } from './Spacer';
-import { Button } from './Button';
 import TrackPlayer from 'react-native-track-player';
+import { Button } from './Button';
+import { Spacer } from './Spacer';
 
 const onUpdateNotificationMetadata = async () => {
   const randomTitle = Math.random().toString(36).substring(7);

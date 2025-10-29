@@ -68,6 +68,11 @@ export enum Event {
   PlaybackProgressUpdated = 'playback-progress-updated',
 
   /**
+   * Fired when repeat mode has changed.
+   */
+  PlaybackRepeatModeChanged = 'playback-repeat-mode-changed',
+
+  /**
    * Fired when the user presses the play button.
    * See https://rntp.dev/docs/api/events#remoteplay
    **/

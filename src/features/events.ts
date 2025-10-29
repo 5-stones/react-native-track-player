@@ -82,7 +82,6 @@ const callbackByEvent = {
   'metadata-timed-received': TrackPlayer.onMetadataTimedReceived,
   'playback-state': TrackPlayer.onPlaybackState,
   'playback-playing-state': TrackPlayer.onPlaybackPlayingState,
-  'playback-active-track': TrackPlayer.onPlaybackActiveTrack,
   'playback-active-track-changed': TrackPlayer.onPlaybackActiveTrackChanged,
   'playback-progress-updated': TrackPlayer.onPlaybackProgressUpdated,
   'playback-play-when-ready-changed':
@@ -106,7 +105,7 @@ const callbackByEvent = {
   'remote-dislike': TrackPlayer.onRemoteDislike,
   'remote-bookmark': TrackPlayer.onRemoteBookmark,
   'remote-skip': TrackPlayer.onRemoteSkip,
-} satisfies Record<Event, (callback: unknown) => { remove: () => void }>;
+} satisfies Record<Event, (callback: any) => { remove: () => void }>;
 
 /**
  * Subscribes to a TrackPlayer event.
