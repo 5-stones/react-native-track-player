@@ -37,17 +37,111 @@ export interface NowPlayingMetadata extends TrackMetadataBase {
 }
 
 /**
- * Common metadata received event.
+ * Standardized common metadata field names that raw metadata keys can map to.
  */
-export interface AudioCommonMetadataReceivedEvent {
-  metadata: unknown;
+export enum CommonMetadataKey {
+  Title = "title",
+  Artist = "artist",
+  AlbumName = "albumName",
+  Genre = "genre",
+  CreationDate = "creationDate",
 }
 
 /**
- * Timed metadata received event.
+ * Metadata key spaces (namespaces) that identify the format or source of metadata.
+ */
+export enum MetadataKeySpace {
+  /** ID3 metadata (MP3 files) */
+  ID3 = "org.id3",
+  /** ICY metadata (streaming audio) */
+  ICY = "icy",
+  /** Vorbis comments (OGG/FLAC files) */
+  Vorbis = "org.vorbis",
+  /** QuickTime/MP4/M4A metadata */
+  QuickTime = "com.apple.quicktime",
+}
+
+/**
+ * Represents a raw metadata entry from timed or chapter metadata events.
+ * Only available in AudioMetadata, not in AudioCommonMetadata.
+ */
+export interface RawEntry {
+  /**
+   * The common key that maps to standardized metadata fields.
+   * Might be undefined if the key doesn't map to a common field.
+   */
+  commonKey?: CommonMetadataKey;
+  /**
+   * The key space/namespace for the metadata that identifies the format or source.
+   * Might be undefined for some metadata formats.
+   */
+  keySpace?: MetadataKeySpace;
+  /**
+   * The time position for timed metadata entries in seconds.
+   * Might be undefined for non-timed metadata.
+   */
+  time?: number;
+  /**
+   * The metadata value. Can be string, number, boolean, or other types depending on the metadata.
+   */
+  value?: unknown;
+  /**
+   * The metadata key identifier (e.g., "TIT2", "StreamTitle", "TITLE").
+   */
+  key: string;
+}
+
+/**
+ * An object representing the common metadata received for a track.
+ * This is used for common metadata events which do not include raw metadata.
+ */
+export interface AudioCommonMetadata {
+  title?: string;
+  artist?: string;
+  albumTitle?: string;
+  subtitle?: string;
+  description?: string;
+  artworkUri?: string;
+  trackNumber?: string;
+  composer?: string;
+  conductor?: string;
+  genre?: string;
+  compilation?: string;
+  station?: string;
+  mediaType?: string;
+  creationDate?: string;
+  creationYear?: string;
+}
+
+/**
+ * An extension of AudioCommonMetadata that includes the raw metadata.
+ * This is used for timed and chapter metadata events which include access to raw metadata entries.
+ */
+export interface AudioMetadata extends AudioCommonMetadata {
+  /**
+   * The raw metadata that was used to populate. May contain other non common keys. May be empty.
+   * Only available in timed and chapter metadata events, not in common metadata events.
+   */
+  raw: RawEntry[];
+}
+
+/**
+ * Common metadata received event.
+ * Contains standardized metadata fields without raw metadata entries.
+ * Available on both iOS and Android.
+ */
+export interface AudioCommonMetadataReceivedEvent {
+  metadata: AudioCommonMetadata;
+}
+
+/**
+ * Timed and chapter metadata received event.
+ * Contains standardized metadata fields plus raw metadata entries.
+ * Available on both iOS and Android for timed metadata.
+ * Chapter metadata is iOS-only.
  */
 export interface AudioMetadataReceivedEvent {
-  metadata: unknown;
+  metadata: AudioMetadata[];
 }
 
 // MARK: - Helpers
