@@ -29,9 +29,6 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.google.common.util.concurrent.SettableFuture
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import com.doublesymmetry.trackplayer.event.ControllerConnectedEvent
 import com.doublesymmetry.trackplayer.event.ControllerDisconnectedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
@@ -47,6 +44,7 @@ import com.doublesymmetry.trackplayer.event.RemoteSeekEvent
 import com.doublesymmetry.trackplayer.event.RemoteSetRatingEvent
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toMilliseconds
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
+import com.doublesymmetry.trackplayer.model.AppKilledPlaybackBehavior
 import com.doublesymmetry.trackplayer.model.AudioOffloadOptions
 import com.doublesymmetry.trackplayer.model.PlaybackMetadata
 import com.doublesymmetry.trackplayer.model.PlaybackState
@@ -70,14 +68,13 @@ import timber.log.Timber
 @UnstableApi
 class TrackPlayer(
   internal val context: Context,
-  private val setupOptions: PlayerSetupOptions = PlayerSetupOptions(),
-  private var callbacks: TrackPlayerCallbacks? = null,
 ) {
 
-  // Runtime options that can be updated
-  var forwardJumpInterval: Double = 15.0
-  var backwardJumpInterval: Double = 15.0
-  private var currentUpdateOptions = PlayerUpdateOptions()
+  val appKilledPlaybackBehavior: AppKilledPlaybackBehavior
+    get() = options.appKilledPlaybackBehavior
+  private var options = PlayerUpdateOptions()
+  private var callbacks: TrackPlayerCallbacks? = null
+  private lateinit var mediaSession: androidx.media3.session.MediaSession
   private val commandManager = MediaSessionManager()
 
   // Media browser functionality
@@ -86,8 +83,8 @@ class TrackPlayer(
   private val pendingSearchRequests = ConcurrentHashMap<String, SettableFuture<List<MediaItem>>>()
   private var mediaItemById: MutableMap<String, MediaItem> = mutableMapOf()
 
-  val exoPlayer: ExoPlayer
-  val forwardingPlayer: Player
+  lateinit var exoPlayer: ExoPlayer
+  lateinit var forwardingPlayer: Player
 
   /**
    * ForwardingPlayer that intercepts external player actions and dispatches them to callbacks.
@@ -156,14 +153,13 @@ class TrackPlayer(
     override fun seekForward() {
       Timber.d("InterceptingPlayer.seekForward() called")
       callbacks?.let {
-        it.onRemoteJumpForward(RemoteJumpForwardEvent(interval = forwardJumpInterval))
+        it.onRemoteJumpForward(RemoteJumpForwardEvent(interval = options.forwardJumpInterval))
       } ?: super.seekForward()
     }
 
     override fun seekBack() {
-      Timber.d("InterceptingPlayer.seekBack() called")
       callbacks?.let {
-        it.onRemoteJumpBackward(RemoteJumpBackwardEvent(interval = backwardJumpInterval))
+        it.onRemoteJumpBackward(RemoteJumpBackwardEvent(interval = options.backwardJumpInterval))
       } ?: super.seekBack()
     }
 
@@ -182,7 +178,7 @@ class TrackPlayer(
     }
   }
 
-  private var playerListener: PlayerListener
+  private lateinit var playerListener: PlayerListener
   private var cache: SimpleCache? = null
 
   private val progressUpdateManager: PlaybackProgressUpdateManager by lazy {
@@ -305,23 +301,15 @@ class TrackPlayer(
     }
 
   val duration: Long
-    get() {
-      return if (exoPlayer.duration == C.TIME_UNSET) 0 else exoPlayer.duration
-    }
+    get() = if (exoPlayer.duration == C.TIME_UNSET) 0 else exoPlayer.duration
 
   internal var oldPosition = 0L
 
   val position: Long
-    get() {
-      return if (exoPlayer.currentPosition == C.INDEX_UNSET.toLong()) 0
-      else exoPlayer.currentPosition
-    }
+    get() = if (exoPlayer.currentPosition == C.INDEX_UNSET.toLong()) 0 else exoPlayer.currentPosition
 
   val bufferedPosition: Long
-    get() {
-      return if (exoPlayer.bufferedPosition == C.INDEX_UNSET.toLong()) 0
-      else exoPlayer.bufferedPosition
-    }
+    get() = if (exoPlayer.bufferedPosition == C.INDEX_UNSET.toLong()) 0 else exoPlayer.bufferedPosition
 
   var volume: Float
     get() = exoPlayer.volume
@@ -341,30 +329,18 @@ class TrackPlayer(
   var ratingType: Int = RatingCompat.RATING_NONE
 
   var repeatMode: PlayerRepeatMode
-    get() {
-      return when (exoPlayer.repeatMode) {
-        Player.REPEAT_MODE_ALL -> PlayerRepeatMode.ALL
-        Player.REPEAT_MODE_ONE -> PlayerRepeatMode.ONE
-        else -> PlayerRepeatMode.OFF
-      }
-    }
-    set(value) {
-      when (value) {
-        PlayerRepeatMode.ALL -> exoPlayer.repeatMode = Player.REPEAT_MODE_ALL
-        PlayerRepeatMode.ONE -> exoPlayer.repeatMode = Player.REPEAT_MODE_ONE
-        PlayerRepeatMode.OFF -> exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
-      }
+    get() = PlayerRepeatMode.fromMedia3(exoPlayer.repeatMode)
+    internal set(value) {
+      exoPlayer.repeatMode = value.toMedia3()
     }
 
   val currentIndex: Int?
-    get() =
-      if (exoPlayer.currentMediaItemIndex == C.INDEX_UNSET) null
-      else exoPlayer.currentMediaItemIndex
+    get() = if (exoPlayer.currentMediaItemIndex == C.INDEX_UNSET) null else exoPlayer.currentMediaItemIndex
 
-  var shuffleMode
+  var shuffleMode: Boolean
     get() = exoPlayer.shuffleModeEnabled
-    set(v) {
-      exoPlayer.shuffleModeEnabled = v
+    set(value) {
+      exoPlayer.shuffleModeEnabled = value
     }
 
   val trackCount: Int
@@ -374,10 +350,9 @@ class TrackPlayer(
     get() = exoPlayer.mediaItemCount == 0
 
   val tracks: List<Track>
-    get() =
-      (0 until exoPlayer.mediaItemCount).map { index ->
-        Track.fromMediaItem(exoPlayer.getMediaItemAt(index))
-      }
+    get() = (0 until exoPlayer.mediaItemCount).map { index ->
+      Track.fromMediaItem(exoPlayer.getMediaItemAt(index))
+    }
 
   val isLastTrack: Boolean
     get() = exoPlayer.currentMediaItemIndex == exoPlayer.mediaItemCount - 1
@@ -399,7 +374,7 @@ class TrackPlayer(
 
   var skipSilence: Boolean
     get() = exoPlayer.skipSilenceEnabled
-    set(value) {
+    internal set(value) {
       exoPlayer.skipSilenceEnabled = value
     }
 
@@ -419,15 +394,34 @@ class TrackPlayer(
         .build()
   }
 
-  init {
+
+  /**
+   * Sets up or recreates the ExoPlayer with the provided setup options.
+   * This method can be called multiple times to change setup options.
+   */
+  fun setup(setupOptions: PlayerSetupOptions) {
+    Timber.d("Setting up player with new options")
+
+    val isInitialSetup = !::exoPlayer.isInitialized
+
+    if (!isInitialSetup) {
+      forwardingPlayer.removeListener(playerListener)
+      exoPlayer.release()
+      Timber.d("Player cleanup completed")
+    }
+
+    // Update cache if needed
     if (setupOptions.maxCacheSize > 0) {
       cache = PlayerCache.initCache(context, setupOptions.maxCacheSize.toLong())
+    } else {
+      // Release existing cache if maxCacheSize is 0
+      cache?.release()
+      cache = null
     }
-    callbacks?.onPlaybackState(PlaybackState(State.NONE))
 
+    // Recreate ExoPlayer with new setup options
     val renderer = DefaultRenderersFactory(context)
     renderer.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
-
     val loadControl = run {
       val multiplier =
         DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS.toDouble() /
@@ -452,30 +446,45 @@ class TrackPlayer(
         .setBackBuffer(backBuffer, false)
         .build()
     }
-
     exoPlayer =
       ExoPlayer.Builder(context)
         .setRenderersFactory(renderer)
         .setHandleAudioBecomingNoisy(setupOptions.handleAudioBecomingNoisy)
         .setMediaSourceFactory(MediaFactory(context, cache))
-        .setWakeMode(setupOptions.wakeMode.toExoPlayer())
+        .setWakeMode(setupOptions.wakeMode.toMedia3())
         .setLoadControl(loadControl)
         .setName("rntp")
         .build()
-
     val audioAttributes =
       AudioAttributes.Builder()
         .setUsage(C.USAGE_MEDIA)
-        .setContentType(setupOptions.audioContentType.toExoPlayer())
+        .setContentType(setupOptions.audioContentType.toMedia3())
         .build()
     exoPlayer.setAudioAttributes(audioAttributes, true)
 
     // Apply setup-specific options
     setupOptions.audioOffload?.let { setAudioOffload(it) }
 
+    // Recreate forwarding player with new ExoPlayer
     forwardingPlayer = InterceptingPlayer(exoPlayer)
-    playerListener = PlayerListener(this)
-    forwardingPlayer.addListener(playerListener)
+
+    if (isInitialSetup) {
+      // Initial setup - create player listener and emit initial state
+      playerListener = PlayerListener(this)
+      forwardingPlayer.addListener(playerListener)
+      callbacks?.onPlaybackState(PlaybackState(State.NONE))
+    } else {
+      // Re-setup - re-add listener and update MediaSession
+      forwardingPlayer.addListener(playerListener)
+
+      // Update MediaSession with new forwardingPlayer reference if MediaSession exists
+      if (::mediaSession.isInitialized) {
+        Timber.d("Updating MediaSession with new forwardingPlayer reference")
+        mediaSession.player = forwardingPlayer
+      }
+
+      setPlayerState(State.NONE)
+    }
   }
 
   /**
@@ -734,15 +743,12 @@ class TrackPlayer(
    * @param options The new options to apply
    * @param mediaSession The MediaSession to update when capabilities change
    */
-  fun applyUpdateOptions(
-    options: PlayerUpdateOptions,
-    mediaSession: androidx.media3.session.MediaSession? = null
-  ) {
+  fun applyOptions(options: PlayerUpdateOptions) {
     // Store previous values for change detection
-    val previousOptions = currentUpdateOptions
+    val previousOptions = this.options
 
     // Update current options
-    currentUpdateOptions = options
+    this.options = options.copy()
 
     // Check what changed
     val skipSilenceChanged = previousOptions.skipSilence != options.skipSilence
@@ -758,6 +764,8 @@ class TrackPlayer(
     val capabilitiesChanged = previousOptions.capabilities != options.capabilities
     val notificationCapabilitiesChanged =
       previousOptions.notificationCapabilities != options.notificationCapabilities
+    val appKilledPlaybackBehaviorChanged =
+      previousOptions.appKilledPlaybackBehavior != options.appKilledPlaybackBehavior
 
     val hasChanged =
       skipSilenceChanged ||
@@ -768,11 +776,12 @@ class TrackPlayer(
         forwardJumpIntervalChanged ||
         backwardJumpIntervalChanged ||
         capabilitiesChanged ||
-        notificationCapabilitiesChanged
+        notificationCapabilitiesChanged ||
+        appKilledPlaybackBehaviorChanged
 
     // Apply only changed properties
     if (skipSilenceChanged) {
-      options.skipSilence?.let { skipSilence = it }
+      skipSilence = options.skipSilence
     }
 
     if (ratingTypeChanged) {
@@ -780,7 +789,7 @@ class TrackPlayer(
     }
 
     if (shuffleChanged) {
-      shuffleMode = options.shuffle ?: false
+      shuffleMode = options.shuffle
     }
 
     if (repeatModeChanged) {
@@ -791,22 +800,12 @@ class TrackPlayer(
       setProgressUpdateInterval(options.progressUpdateEventInterval)
     }
 
-    if (forwardJumpIntervalChanged) {
-      forwardJumpInterval = options.forwardJumpInterval
-    }
-
-    if (backwardJumpIntervalChanged) {
-      backwardJumpInterval = options.backwardJumpInterval
-    }
-
     if (capabilitiesChanged || notificationCapabilitiesChanged) {
-      mediaSession?.let { session ->
-        commandManager.updateMediaSession(
-          session,
-          options.capabilities,
-          options.notificationCapabilities,
-        )
-      }
+      commandManager.updateMediaSession(
+        mediaSession,
+        options.capabilities,
+        options.notificationCapabilities,
+      )
     }
 
     if (hasChanged) {
@@ -830,6 +829,14 @@ class TrackPlayer(
    */
   fun getCallbacks(): TrackPlayerCallbacks? {
     return this.callbacks
+  }
+
+  fun setMediaSession(mediaSession: androidx.media3.session.MediaSession) {
+    this.mediaSession = mediaSession
+  }
+
+  fun getOptions(): PlayerUpdateOptions {
+    return options
   }
 
   /**

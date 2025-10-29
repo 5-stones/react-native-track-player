@@ -54,7 +54,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   private lateinit var browser: MediaBrowser
   private var mediaBrowserFuture: ListenableFuture<MediaBrowser>? = null
   private var setupOptions = PlayerSetupOptions()
-  private var updateOptions = PlayerUpdateOptions()
   private var playerSetUpPromise: Promise? = null
   private val mainScope = MainScope()
   private var connectedService: TrackPlayerService? = null
@@ -133,9 +132,8 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     launchInScope {
       connectedService =
         (serviceBinder as TrackPlayerService.LocalBinder).service.apply {
-          registerModule(this@TrackPlayerModule)
-          setupPlayer(setupOptions)
-          applyUpdateOptions(updateOptions)
+          player.setCallbacks(this@TrackPlayerModule.callbacks)
+          player.setup(setupOptions)
         }
 
       val sessionToken =
@@ -163,8 +161,8 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     launchInScope {
       setupOptions.updateFromBridge(data)
 
-      if (connectedService != null) {
-        connectedService?.setupPlayer(setupOptions)
+      connectedService?.let {
+        it.player.setup(setupOptions)
         promise.resolve(null)
         return@launchInScope
       }
@@ -190,12 +188,14 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   override fun updateOptions(data: ReadableMap?): Unit = runBlockingOnMain {
-    updateOptions.updateFromBridge(data)
-    service.applyUpdateOptions(updateOptions)
-    // Service will call callbacks.onOptionsChanged if anything actually changed
+    // Get current options and update only the fields provided in data
+    val currentOptions = player.getOptions()
+    val updatedOptions = currentOptions.copy()
+    updatedOptions.updateFromBridge(data)
+    player.applyOptions(updatedOptions)
   }
 
-  override fun getOptions(): WritableMap = runBlockingOnMain { updateOptions.toBridge() }
+  override fun getOptions(): WritableMap = runBlockingOnMain { player.getOptions().toBridge() }
 
   override fun add(data: ReadableArray, insertBeforeIndex: Double?): Unit = runBlockingOnMain {
     val inputIndex = insertBeforeIndex?.toInt() ?: -1

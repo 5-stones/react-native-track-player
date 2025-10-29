@@ -2,6 +2,7 @@ package com.doublesymmetry.trackplayer.model
 
 import com.doublesymmetry.trackplayer.option.PlayerCapability
 import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
+import com.doublesymmetry.trackplayer.model.AppKilledPlaybackBehavior
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.WritableMap
@@ -32,9 +33,9 @@ data class PlayerUpdateOptions(
 
   // Android-specific runtime options (all under android.* in JS)
   var ratingType: RatingType? = null,
-  var appKilledPlaybackBehavior: String? = null,
-  var skipSilence: Boolean? = null,
-  var shuffle: Boolean? = null,
+  var appKilledPlaybackBehavior: AppKilledPlaybackBehavior = AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION,
+  var skipSilence: Boolean = false,
+  var shuffle: Boolean = false,
 ) {
 
   fun updateFromBridge(map: ReadableMap?) {
@@ -90,7 +91,9 @@ data class PlayerUpdateOptions(
         ratingType = android.getString("ratingType")?.let { RatingType.fromString(it) }
       }
       if (android.hasKey("appKilledPlaybackBehavior")) {
-        appKilledPlaybackBehavior = android.getString("appKilledPlaybackBehavior")
+        appKilledPlaybackBehavior = android.getString("appKilledPlaybackBehavior")?.let {
+          AppKilledPlaybackBehavior.values().find { enum -> enum.string == it }
+        } ?: AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
       }
       if (android.hasKey("skipSilence")) {
         skipSilence = android.getBoolean("skipSilence")
@@ -131,23 +134,17 @@ data class PlayerUpdateOptions(
     // Add repeat mode (always include)
     result.putString("repeatMode", repeatMode.string)
 
-    // Add Android-specific options if any are set
-    val hasAndroidOptions =
-      ratingType != null ||
-        appKilledPlaybackBehavior != null ||
-        skipSilence != null ||
-        shuffle != null
-    if (hasAndroidOptions) {
-      val androidOptions = Arguments.createMap()
+    // Add Android-specific options (always included since appKilledPlaybackBehavior is always present)
+    val androidOptions = Arguments.createMap()
 
-      ratingType?.let { androidOptions.putString("ratingType", it.string) }
-      appKilledPlaybackBehavior?.let { androidOptions.putString("appKilledPlaybackBehavior", it) }
-      skipSilence?.let { androidOptions.putBoolean("skipSilence", it) }
-      shuffle?.let { androidOptions.putBoolean("shuffle", it) }
+    ratingType?.let { androidOptions.putString("ratingType", it.string) }
+    androidOptions.putString("appKilledPlaybackBehavior", appKilledPlaybackBehavior.string)
+    androidOptions.putBoolean("skipSilence", skipSilence)
+    androidOptions.putBoolean("shuffle", shuffle)
 
-      result.putMap("android", androidOptions)
-    }
+    result.putMap("android", androidOptions)
 
     return result
   }
+
 }

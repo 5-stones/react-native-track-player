@@ -50,9 +50,7 @@ class TrackPlayerService : MediaLibraryService() {
   lateinit var player: TrackPlayer
   private val binder = LocalBinder()
   private val scope = MainScope()
-  private var module = CompletableDeferred<TrackPlayerModule>()
   private lateinit var mediaSession: MediaLibrarySession
-  private var currentUpdateOptions = PlayerUpdateOptions()
 
   // Headless service binding
   private val headlessConnection: ServiceConnection =
@@ -105,9 +103,8 @@ class TrackPlayerService : MediaLibraryService() {
       )
     }
 
-    // Create initial player with default options for MediaSession
     player = TrackPlayer(this)
-
+    player.setup(PlayerSetupOptions())
     val openAppIntent =
       packageManager.getLaunchIntentForPackage(packageName)?.apply {
         flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
@@ -127,68 +124,11 @@ class TrackPlayerService : MediaLibraryService() {
           )
         )
         .build()
-
-    // Now set up player properly with default options
-    setupPlayer(PlayerSetupOptions())
+    player.setMediaSession(mediaSession)
 
     // Bind headless service once at startup for JS task execution
     val headlessIntent = Intent(applicationContext, TrackPlayerHeadlessTaskService::class.java)
     bindService(headlessIntent, headlessConnection, BIND_AUTO_CREATE)
-  }
-
-  private var appKilledPlaybackBehavior =
-    AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
-
-  fun setupPlayer(setupOptions: PlayerSetupOptions, callbacks: TrackPlayerCallbacks? = null) {
-    Timber.d("Setting up player")
-
-    // Always create a new player instance
-    val oldPlayer = if (::player.isInitialized) player else null
-    player = TrackPlayer(this@TrackPlayerService, setupOptions, callbacks)
-    oldPlayer?.destroy()
-    mediaSession.player = player.forwardingPlayer
-  }
-
-  /**
-   * Registers a TrackPlayerModule instance with this service. Called when the module connects to
-   * the service.
-   */
-  fun registerModule(moduleInstance: TrackPlayerModule) {
-    Timber.d("TrackPlayerModule registered with service")
-
-    player.setCallbacks(moduleInstance.callbacks)
-
-    if (!module.isCompleted) {
-      module.complete(moduleInstance)
-      Timber.d("Completed module registration")
-    }
-  }
-
-  /**
-   * Resets the module registration for new registrations. Called when the app is closed but service
-   * continues running.
-   */
-  private fun resetModule() {
-    module = CompletableDeferred()
-    Timber.d("Reset module for future registrations")
-  }
-
-  fun applyUpdateOptions(options: PlayerUpdateOptions) {
-    // Store previous appKilledPlaybackBehavior for change detection
-    val previousAppKilledPlaybackBehavior = currentUpdateOptions.appKilledPlaybackBehavior
-
-    // Update current options for service-specific tracking
-    currentUpdateOptions = options
-
-    // Handle service-specific option: appKilledPlaybackBehavior
-    if (previousAppKilledPlaybackBehavior != options.appKilledPlaybackBehavior) {
-      appKilledPlaybackBehavior =
-        AppKilledPlaybackBehavior.values().find { it.string == options.appKilledPlaybackBehavior }
-          ?: AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION
-    }
-
-    // Delegate player-specific options to TrackPlayer with MediaSession reference
-    player.applyUpdateOptions(options, mediaSession)
   }
 
   override fun onBind(intent: Intent?): IBinder? {
@@ -204,6 +144,9 @@ class TrackPlayerService : MediaLibraryService() {
 
   override fun onTaskRemoved(rootIntent: Intent?) {
     onUnbind(rootIntent)
+
+    val appKilledPlaybackBehavior = player.appKilledPlaybackBehavior
+
     Timber.d("player = $player, appKilledPlaybackBehavior = $appKilledPlaybackBehavior")
 
     // Check if there are still external controllers connected (like Android Auto)
@@ -215,8 +158,6 @@ class TrackPlayerService : MediaLibraryService() {
 
     Timber.d("hasExternalControllers = $hasExternalControllers")
 
-    // Reset module for future registrations when app is closed
-    resetModule()
 
     when (appKilledPlaybackBehavior) {
       AppKilledPlaybackBehavior.PAUSE_PLAYBACK -> {
@@ -261,11 +202,14 @@ class TrackPlayerService : MediaLibraryService() {
 
   override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession {
     Timber.d("onGetSession requested by: ${controllerInfo.packageName}")
-    if (!::player.isInitialized) {
-      Timber.w("Player not initialized - recreating with default options")
-      player = TrackPlayer(this)
-      setupPlayer(PlayerSetupOptions())
+
+    // Ensure player is properly set up for external controllers like Android Auto
+    // Only call setup if callbacks haven't been installed yet (meaning React Native hasn't connected)
+    if (player.getCallbacks() == null) {
+      Timber.w("External controller connecting before React Native setup - using default options")
+      player.setup(PlayerSetupOptions())
     }
+
     return mediaSession
   }
 
@@ -284,13 +228,11 @@ class TrackPlayerService : MediaLibraryService() {
       }
     }
 
-    if (::player.isInitialized) {
-      Timber.d("Releasing media session and destroying player")
-      if (::mediaSession.isInitialized) {
-        mediaSession.release()
-      }
-      player.destroy()
+    Timber.d("Releasing media session and destroying player")
+    if (::mediaSession.isInitialized) {
+      mediaSession.release()
     }
+    player.destroy()
 
     super.onDestroy()
   }

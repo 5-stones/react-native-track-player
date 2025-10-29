@@ -13,7 +13,7 @@ enum class AudioContentType {
   MOVIE,
   UNKNOWN;
 
-  fun toExoPlayer(): Int {
+  fun toMedia3(): Int {
     return when (this) {
       MUSIC -> C.AUDIO_CONTENT_TYPE_MUSIC
       SPEECH -> C.AUDIO_CONTENT_TYPE_SPEECH

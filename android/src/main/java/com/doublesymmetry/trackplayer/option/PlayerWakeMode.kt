@@ -7,7 +7,7 @@ enum class PlayerWakeMode {
   LOCAL,
   NETWORK;
 
-  fun toExoPlayer(): Int {
+  fun toMedia3(): Int {
     return when (this) {
       NONE -> C.WAKE_MODE_NONE
       LOCAL -> C.WAKE_MODE_LOCAL
