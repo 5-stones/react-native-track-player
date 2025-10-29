@@ -80,10 +80,6 @@ export interface Spec extends TurboModule {
   getActiveTrackIndex(): number | undefined;
   getActiveTrack(): UnsafeObject | undefined;
 
-  // MARK: event listeners
-  addListener(eventName: string): void;
-  removeListeners(count: number): void;
-
   // MARK: Android methods
   acquireWakeLock(): void;
   abandonWakeLock(): void;

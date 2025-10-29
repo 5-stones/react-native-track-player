@@ -188,11 +188,6 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
     return super.setRate(rate);
   }
 
-  /**
-   * stubbed methods for cross-platform compat
-   */
-  public addListener() {}
-  public removeListeners() {}
   public async acquireWakeLock() {}
   public async abandonWakeLock() {}
 }

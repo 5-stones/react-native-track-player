@@ -97,16 +97,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
     const val NAME = "TrackPlayer"
   }
 
-  override fun addListener(eventType: String) {
-    // No implementation needed for TurboModule
-    // This implements the abstract method required by NativeTrackPlayerSpec
-  }
-
-  override fun removeListeners(count: Double) {
-    // No implementation needed for TurboModule
-    // This implements the abstract method required by NativeTrackPlayerSpec
-  }
-
   override fun initialize() {
     Timber.d("TrackPlayerModule.initialize() called on instance: ${this.hashCode()}")
     Timber.d("React context: ${context.javaClass.simpleName}")

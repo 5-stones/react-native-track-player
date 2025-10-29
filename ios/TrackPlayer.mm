@@ -187,15 +187,6 @@ RCT_EXPORT_MODULE()
   return [nativeTrackPlayer getOptions];
 }
 
-// event listeners
-- (void)addListener:(NSString *)eventName {
-  // Event listeners are managed by RCTEventEmitter automatically
-}
-
-- (void)removeListeners:(double)count {
-  // Event listeners are managed by RCTEventEmitter automatically
-}
-
 - (void)emitPlaybackState:(NSDictionary *)body {
   [self emitOnPlaybackState:body];
 }
