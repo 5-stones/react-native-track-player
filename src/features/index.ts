@@ -22,10 +22,5 @@ export * from './progress';
 export * from './queue';
 export * from './rate';
 export * from './remoteControls';
+export * from './repeatMode';
 export * from './volume';
-
-// Re-export constants
-export * from '../constants';
-
-// Re-export utility hooks
-export * from '../hooks';

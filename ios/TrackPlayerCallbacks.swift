@@ -26,6 +26,9 @@ public protocol TrackPlayerCallbacks: AnyObject {
   /// Called when the playback queue ends (player reaches the end of the last track).
   func onPlaybackQueueEnded(_ event: PlaybackQueueEndedEvent)
 
+  /// Called when the repeat mode changes.
+  func onPlaybackRepeatModeChanged(_ event: PlaybackRepeatModeChangedEvent)
+
   /// Called when the player encounters an error.
   func onPlaybackError(_ error: Error?)
 

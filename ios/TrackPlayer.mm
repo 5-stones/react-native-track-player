@@ -144,7 +144,7 @@ RCT_EXPORT_MODULE()
 }
 
 - (void)setRepeatMode:(NSString *)mode {
-  [nativeTrackPlayer setRepeatModeWithRepeatMode:mode];
+  [nativeTrackPlayer setRepeatMode:mode];
 }
 
 - (void)setVolume:(double)level {
@@ -218,6 +218,10 @@ RCT_EXPORT_MODULE()
 
 - (void)emitPlaybackQueueEnded:(NSDictionary *)body {
   [self emitOnPlaybackQueueEnded:body];
+}
+
+- (void)emitPlaybackRepeatModeChanged:(NSDictionary *)body {
+  [self emitOnPlaybackRepeatModeChanged:body];
 }
 
 - (void)emitPlaybackError:(NSDictionary *)body {

@@ -28,9 +28,6 @@ data class PlayerUpdateOptions(
     ),
   var notificationCapabilities: List<PlayerCapability>? = null,
 
-  // Repeat mode
-  var repeatMode: PlayerRepeatMode = PlayerRepeatMode.OFF,
-
   // Android-specific runtime options (all under android.* in JS)
   var ratingType: RatingType? = null,
   var appKilledPlaybackBehavior: AppKilledPlaybackBehavior = AppKilledPlaybackBehavior.STOP_PLAYBACK_AND_REMOVE_NOTIFICATION,
@@ -80,9 +77,6 @@ data class PlayerUpdateOptions(
         }
     }
 
-    if (map.hasKey("repeatMode")) {
-      repeatMode = map.getString("repeatMode")?.let { PlayerRepeatMode.fromString(it) } ?: PlayerRepeatMode.OFF
-    }
 
     // Android-specific runtime options (all under android.*)
     val androidMap = if (map.hasKey("android")) map.getMap("android") else null
@@ -131,8 +125,6 @@ data class PlayerUpdateOptions(
       result.putArray("notificationCapabilities", notificationCapsArray)
     }
 
-    // Add repeat mode (always include)
-    result.putString("repeatMode", repeatMode.string)
 
     // Add Android-specific options (always included since appKilledPlaybackBehavior is always present)
     val androidOptions = Arguments.createMap()

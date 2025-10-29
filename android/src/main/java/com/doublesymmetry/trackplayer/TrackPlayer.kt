@@ -38,6 +38,7 @@ import com.doublesymmetry.trackplayer.event.PlaybackPlayWhenReadyChangedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackPlayingStateEvent
 import com.doublesymmetry.trackplayer.event.PlaybackProgressUpdatedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackQueueEndedEvent
+import com.doublesymmetry.trackplayer.event.PlaybackRepeatModeChangedEvent
 import com.doublesymmetry.trackplayer.event.RemoteJumpBackwardEvent
 import com.doublesymmetry.trackplayer.event.RemoteJumpForwardEvent
 import com.doublesymmetry.trackplayer.event.RemoteSeekEvent
@@ -331,7 +332,15 @@ class TrackPlayer(
   var repeatMode: PlayerRepeatMode
     get() = PlayerRepeatMode.fromMedia3(exoPlayer.repeatMode)
     internal set(value) {
+      val oldValue = repeatMode
       exoPlayer.repeatMode = value.toMedia3()
+
+      // Emit event if value changed
+      if (oldValue != value) {
+        callbacks?.onPlaybackRepeatModeChanged(
+          PlaybackRepeatModeChangedEvent(repeatMode = value)
+        )
+      }
     }
 
   val currentIndex: Int?
@@ -754,7 +763,6 @@ class TrackPlayer(
     val skipSilenceChanged = previousOptions.skipSilence != options.skipSilence
     val ratingTypeChanged = previousOptions.ratingType != options.ratingType
     val shuffleChanged = previousOptions.shuffle != options.shuffle
-    val repeatModeChanged = previousOptions.repeatMode != options.repeatMode
     val progressUpdateEventIntervalChanged =
       previousOptions.progressUpdateEventInterval != options.progressUpdateEventInterval
     val forwardJumpIntervalChanged =
@@ -771,7 +779,6 @@ class TrackPlayer(
       skipSilenceChanged ||
         ratingTypeChanged ||
         shuffleChanged ||
-        repeatModeChanged ||
         progressUpdateEventIntervalChanged ||
         forwardJumpIntervalChanged ||
         backwardJumpIntervalChanged ||
@@ -792,9 +799,6 @@ class TrackPlayer(
       shuffleMode = options.shuffle
     }
 
-    if (repeatModeChanged) {
-      repeatMode = options.repeatMode
-    }
 
     if (progressUpdateEventIntervalChanged) {
       setProgressUpdateInterval(options.progressUpdateEventInterval)

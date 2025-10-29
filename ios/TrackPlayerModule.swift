@@ -590,6 +590,24 @@ public class NativeTrackPlayerImpl: NSObject {
   }
 
   @objc
+  public func getRepeatMode() -> String {
+    return onMainThread {
+      guard self.hasInitialized else { return RepeatMode.off.rawValue }
+      return player.getRepeatMode().rawValue
+    }
+  }
+
+  @objc
+  public func setRepeatMode(_ mode: String) {
+    ensureMainThread {
+      guard self.hasInitialized else { return }
+      if let repeatMode = RepeatMode(rawValue: mode) {
+        player.setRepeatMode(repeatMode)
+      }
+    }
+  }
+
+  @objc
   public func updateMetadata(for trackIndex: Int, metadata: [String: Any]) {
     ensureMainThread {
       guard self.hasInitialized else { return }
@@ -790,6 +808,10 @@ extension NativeTrackPlayerImpl: TrackPlayerCallbacks {
 
   public func onPlaybackQueueEnded(_ event: PlaybackQueueEndedEvent) {
     delegate?.emitPlaybackQueueEnded(event.toBridge())
+  }
+
+  public func onPlaybackRepeatModeChanged(_ event: PlaybackRepeatModeChangedEvent) {
+    delegate?.emitPlaybackRepeatModeChanged(event.toBridge())
   }
 
   public func onPlaybackError(_ error: Error?) {

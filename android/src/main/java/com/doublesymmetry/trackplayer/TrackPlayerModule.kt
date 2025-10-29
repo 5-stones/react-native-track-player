@@ -18,6 +18,7 @@ import com.doublesymmetry.trackplayer.event.PlaybackPlayWhenReadyChangedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackPlayingStateEvent
 import com.doublesymmetry.trackplayer.event.PlaybackProgressUpdatedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackQueueEndedEvent
+import com.doublesymmetry.trackplayer.event.PlaybackRepeatModeChangedEvent
 import com.doublesymmetry.trackplayer.event.RemoteJumpBackwardEvent
 import com.doublesymmetry.trackplayer.event.RemoteJumpForwardEvent
 import com.doublesymmetry.trackplayer.event.RemoteSeekEvent
@@ -28,6 +29,7 @@ import com.doublesymmetry.trackplayer.model.PlaybackState
 import com.doublesymmetry.trackplayer.model.PlayerSetupOptions
 import com.doublesymmetry.trackplayer.model.PlayerUpdateOptions
 import com.doublesymmetry.trackplayer.model.TrackFactory
+import com.doublesymmetry.trackplayer.option.PlayerRepeatMode
 import com.doublesymmetry.trackplayer.util.BundleUtils
 import com.doublesymmetry.trackplayer.util.MetadataAdapter
 import com.facebook.react.bridge.Arguments
@@ -196,6 +198,14 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
   }
 
   override fun getOptions(): WritableMap = runBlockingOnMain { player.getOptions().toBridge() }
+
+  override fun getRepeatMode(): String = runBlockingOnMain { player.repeatMode.string }
+
+  override fun setRepeatMode(mode: String): Unit = runBlockingOnMain {
+    PlayerRepeatMode.fromString(mode)?.let { repeatMode ->
+      player.repeatMode = repeatMode
+    }
+  }
 
   override fun add(data: ReadableArray, insertBeforeIndex: Double?): Unit = runBlockingOnMain {
     val inputIndex = insertBeforeIndex?.toInt() ?: -1
@@ -412,6 +422,10 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
 
       override fun onPlaybackQueueEnded(event: PlaybackQueueEndedEvent) {
         emitOnPlaybackQueueEnded(event.toBridge())
+      }
+
+      override fun onPlaybackRepeatModeChanged(event: PlaybackRepeatModeChangedEvent) {
+        emitOnPlaybackRepeatModeChanged(event.toBridge())
       }
 
       override fun onPlaybackError(event: PlaybackErrorEvent) {

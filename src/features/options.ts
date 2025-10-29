@@ -193,11 +193,6 @@ export interface UpdateOptions {
   progressUpdateEventInterval?: number;
 
   capabilities?: Capability[];
-
-  /**
-   * The repeat mode of the player.
-   */
-  repeatMode?: RepeatMode;
 }
 
 // MARK: - Functions

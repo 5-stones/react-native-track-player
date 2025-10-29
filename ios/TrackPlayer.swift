@@ -9,7 +9,16 @@ public class TrackPlayer {
   private var lastTrack: Track?
 
   /// The repeat mode for the queue player.
-  public var repeatMode: RepeatMode = .off
+  public var repeatMode: RepeatMode = .off {
+    didSet {
+      guard oldValue != repeatMode else { return }
+      assertMainThread()
+
+      callbacks?.onPlaybackRepeatModeChanged(
+        PlaybackRepeatModeChangedEvent(repeatMode: repeatMode)
+      )
+    }
+  }
 
   // MARK: - Queue Properties
 
@@ -162,6 +171,14 @@ public class TrackPlayer {
 
   public func getPlaybackState() -> PlaybackState {
     return PlaybackState(state: state, error: playbackError)
+  }
+
+  public func getRepeatMode() -> RepeatMode {
+    return repeatMode
+  }
+
+  public func setRepeatMode(_ mode: RepeatMode) {
+    repeatMode = mode
   }
 
   /**

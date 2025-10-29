@@ -23,6 +23,7 @@ export interface Spec extends TurboModule {
   readonly onPlaybackPlayingState: EventEmitter<UnsafeObject>;
   readonly onPlaybackProgressUpdated: EventEmitter<UnsafeObject>;
   readonly onPlaybackQueueEnded: EventEmitter<UnsafeObject>;
+  readonly onPlaybackRepeatModeChanged: EventEmitter<UnsafeObject>;
   readonly onPlaybackState: EventEmitter<UnsafeObject>;
   readonly onRemoteBookmark: EventEmitter<UnsafeObject>;
   readonly onRemoteDislike: EventEmitter<UnsafeObject>;
@@ -58,6 +59,8 @@ export interface Spec extends TurboModule {
   getProgress(): UnsafeObject;
   getPlaybackState(): UnsafeObject;
   getPlayingState(): UnsafeObject;
+  getRepeatMode(): string;
+  setRepeatMode(mode: string): void;
   getPlaybackError(): UnsafeObject | null;
   retry(): void;
 

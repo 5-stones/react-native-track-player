@@ -87,6 +87,7 @@ const callbackByEvent = {
   'playback-progress-updated': TrackPlayer.onPlaybackProgressUpdated,
   'playback-play-when-ready-changed':
     TrackPlayer.onPlaybackPlayWhenReadyChanged,
+  'playback-repeat-mode-changed': TrackPlayer.onPlaybackRepeatModeChanged,
   'playback-queue-ended': TrackPlayer.onPlaybackQueueEnded,
   'playback-error': TrackPlayer.onPlaybackError,
   'playback-metadata': TrackPlayer.onPlaybackMetadata,
