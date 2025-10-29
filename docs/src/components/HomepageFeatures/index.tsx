@@ -1,10 +1,10 @@
-import React from 'react';
 import clsx from 'clsx';
+import type { ComponentProps, ComponentType } from 'react';
 import styles from './styles.module.css';
 
 type FeatureItem = {
   title: string;
-  Svg: React.ComponentType<React.ComponentProps<'svg'>>;
+  Svg: ComponentType<ComponentProps<'svg'>>;
   description: JSX.Element;
 };
 

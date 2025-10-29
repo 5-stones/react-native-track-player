@@ -56,7 +56,6 @@ const MyComponent = () => {
 `useProgress` accepts an interval to set the rate (in miliseconds) to poll the track player's progress. The default value is `1000` or every second.
 
 ```tsx
-import React from 'react';
 import { Text, View } from 'react-native';
 import { useProgress } from 'react-native-track-player';
 
