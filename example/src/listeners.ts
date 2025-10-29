@@ -1,70 +1,70 @@
-import TrackPlayer, { Event } from 'react-native-track-player';
+import TrackPlayer from 'react-native-track-player';
 
 export async function installListeners() {
-  TrackPlayer.addEventListener(Event.RemotePause, () => {
+  TrackPlayer.onRemotePause(() => {
     console.log('Event.RemotePause');
     TrackPlayer.pause();
   });
 
-  TrackPlayer.addEventListener(Event.RemotePlay, () => {
+  TrackPlayer.onRemotePlay(() => {
     console.log('Event.RemotePlay');
     TrackPlayer.play();
   });
 
-  TrackPlayer.addEventListener(Event.RemoteNext, () => {
+  TrackPlayer.onRemoteNext(() => {
     console.log('Event.RemoteNext');
     TrackPlayer.skipToNext();
   });
 
-  TrackPlayer.addEventListener(Event.RemotePrevious, () => {
+  TrackPlayer.onRemotePrevious(() => {
     console.log('Event.RemotePrevious');
     TrackPlayer.skipToPrevious();
   });
 
-  TrackPlayer.addEventListener(Event.RemoteJumpForward, async (event) => {
+  TrackPlayer.onRemoteJumpForward((event) => {
     console.log('Event.RemoteJumpForward', event);
     TrackPlayer.seekBy(event.interval);
   });
 
-  TrackPlayer.addEventListener(Event.RemoteJumpBackward, async (event) => {
+  TrackPlayer.onRemoteJumpBackward((event) => {
     console.log('Event.RemoteJumpBackward', event);
     TrackPlayer.seekBy(-event.interval);
   });
 
-  TrackPlayer.addEventListener(Event.RemoteSeek, (event) => {
+  TrackPlayer.onRemoteSeek((event) => {
     console.log('Event.RemoteSeek', event);
     TrackPlayer.seekTo(event.position);
   });
 
-  TrackPlayer.addEventListener(Event.PlaybackQueueEnded, (event) => {
-    console.log('Event.PlaybackQueueEnded', event);
+  TrackPlayer.onQueueEnded((event) => {
+    console.log('onQueueEnded', event);
   });
 
-  TrackPlayer.addEventListener(Event.PlaybackActiveTrackChanged, (event) => {
-    console.log('Event.PlaybackActiveTrackChanged', event);
+  TrackPlayer.onActiveTrackChanged((event) => {
+    console.log('onActiveTrackChanged', event);
   });
 
-  TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, (event) => {
-    console.log('Event.PlaybackProgressUpdated', event);
+  TrackPlayer.onProgressUpdated((event) => {
+    console.log('onProgressUpdated', event);
   });
 
-  TrackPlayer.addEventListener(Event.PlaybackPlayWhenReadyChanged, (event) => {
-    console.log('Event.PlaybackPlayWhenReadyChanged', event);
+  TrackPlayer.onPlayWhenReadyChanged((event) => {
+    console.log('onPlayWhenReadyChanged', event);
   });
 
-  TrackPlayer.addEventListener(Event.PlaybackState, (event) => {
-    console.log('Event.PlaybackState', event);
+  TrackPlayer.onPlaybackState((event) => {
+    console.log('onPlaybackState', event);
   });
 
-  TrackPlayer.addEventListener(Event.MetadataChapterReceived, (event) => {
-    console.log('Event.MetadataChapterReceived', event);
+  TrackPlayer.onMetadataChapterReceived((event) => {
+    console.log('onMetadataChapterReceived', event);
   });
 
-  TrackPlayer.addEventListener(Event.MetadataTimedReceived, (event) => {
-    console.log('Event.MetadataTimedReceived', event);
+  TrackPlayer.onMetadataTimedReceived((event) => {
+    console.log('onMetadataTimedReceived', event);
   });
 
   TrackPlayer.onMetadataCommonReceived((event) => {
-    console.log('Event.MetadataCommonReceived', event);
+    console.log('onMetadataCommonReceived', event);
   });
 }
