@@ -17,7 +17,11 @@ class MetadataAdapter {
 
     for metadataItem in items {
       var rawMetadataItem: [String: Any] = [:]
-      rawMetadataItem["time"] = metadataItem.time.seconds
+
+      if CMTIME_IS_VALID(metadataItem.time) && CMTIME_IS_NUMERIC(metadataItem.time) {
+        rawMetadataItem["time"] = metadataItem.time.seconds
+      }
+
       rawMetadataItem["value"] = metadataItem.value
       rawMetadataItem["key"] = metadataItem.key
       if let commonKey = metadataItem.commonKey?.rawValue {
