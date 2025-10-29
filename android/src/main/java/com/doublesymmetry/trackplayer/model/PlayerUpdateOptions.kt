@@ -62,22 +62,6 @@ data class PlayerUpdateOptions(
         }
     }
 
-    if (map.hasKey("notificationCapabilities")) {
-      notificationCapabilities =
-        if (map.isNull("notificationCapabilities")) {
-          null // Explicitly set to null - reset to default behavior
-        } else {
-          map.getArray("notificationCapabilities")?.let { arr ->
-            (0 until arr.size()).mapNotNull { index ->
-              val value = arr.getString(index) ?: return@mapNotNull null
-              PlayerCapability.fromString(value)
-                ?: throw IllegalArgumentException("Invalid notificationCapability value: $value")
-            }
-          }
-        }
-    }
-
-
     // Android-specific runtime options (all under android.*)
     val androidMap = if (map.hasKey("android")) map.getMap("android") else null
     androidMap?.let { android ->
@@ -94,6 +78,20 @@ data class PlayerUpdateOptions(
       }
       if (android.hasKey("shuffle")) {
         shuffle = android.getBoolean("shuffle")
+      }
+      if (android.hasKey("notificationCapabilities")) {
+        notificationCapabilities =
+          if (android.isNull("notificationCapabilities")) {
+            null // Explicitly set to null - reset to default behavior
+          } else {
+            android.getArray("notificationCapabilities")?.let { arr ->
+              (0 until arr.size()).mapNotNull { index ->
+                val value = arr.getString(index) ?: return@mapNotNull null
+                PlayerCapability.fromString(value)
+                  ?: throw IllegalArgumentException("Invalid notificationCapability value: $value")
+              }
+            }
+          }
       }
     }
   }
@@ -118,14 +116,6 @@ data class PlayerUpdateOptions(
     capabilities.forEach { cap -> capabilitiesArray.pushString(cap.string) }
     result.putArray("capabilities", capabilitiesArray)
 
-    // Add notification capabilities if set (null means not set, different from empty)
-    notificationCapabilities?.let { caps ->
-      val notificationCapsArray = Arguments.createArray()
-      caps.forEach { cap -> notificationCapsArray.pushString(cap.string) }
-      result.putArray("notificationCapabilities", notificationCapsArray)
-    }
-
-
     // Add Android-specific options (always included since appKilledPlaybackBehavior is always present)
     val androidOptions = Arguments.createMap()
 
@@ -133,6 +123,13 @@ data class PlayerUpdateOptions(
     androidOptions.putString("appKilledPlaybackBehavior", appKilledPlaybackBehavior.string)
     androidOptions.putBoolean("skipSilence", skipSilence)
     androidOptions.putBoolean("shuffle", shuffle)
+
+    // Add notification capabilities under android namespace if set
+    notificationCapabilities?.let { caps ->
+      val notificationCapsArray = Arguments.createArray()
+      caps.forEach { cap -> notificationCapsArray.pushString(cap.string) }
+      androidOptions.putArray("notificationCapabilities", notificationCapsArray)
+    }
 
     result.putMap("android", androidOptions)
 
