@@ -138,6 +138,59 @@ TrackPlayer.updateOptions({
 
 ### Event Listener Pattern Changes
 
+**Automatic remote control handlers**: Remote controls now work automatically with sane default behavior. You no longer need to manually install basic remote control listeners - they are set up automatically when the module loads.
+
+**New override system**: Use `handleRemote*` functions to override default behavior and `onRemote*` functions for listening/debugging without affecting the default behavior.
+
+**Before (v4):**
+```typescript
+// Required manual setup for basic remote controls
+export function installListeners() {
+  TrackPlayer.onRemotePlay(() => {
+    TrackPlayer.play();
+  });
+  
+  TrackPlayer.onRemotePause(() => {
+    TrackPlayer.pause();
+  });
+  
+  TrackPlayer.onRemoteNext(() => {
+    TrackPlayer.skipToNext();
+  });
+  
+  // All remote controls required manual setup
+}
+```
+
+**After (v5):**
+```typescript
+// Remote controls work automatically - no setup required!
+// Only override if you need custom behavior:
+
+export function installListeners() {
+  // Override default behavior when needed
+  TrackPlayer.handleRemotePause(() => {
+    console.log('Custom pause logic');
+    TrackPlayer.pause();
+  });
+  
+  // Listen for debugging without affecting behavior
+  TrackPlayer.onRemotePlay(() => {
+    console.log('Play button pressed');
+    // Default TrackPlayer.play() still happens automatically
+  });
+  
+  // Most remote controls work automatically:
+  // - Play/Pause: TrackPlayer.play()/pause()
+  // - Next/Previous: TrackPlayer.skipToNext()/skipToPrevious()
+  // - Seek: TrackPlayer.seekTo()
+  // - Jump Forward/Backward: TrackPlayer.seekBy()
+  // - Stop: TrackPlayer.stop()
+}
+```
+
+**Migration**: Remove manual remote control setup for basic functionality. Only use `handleRemote*` functions if you need custom behavior beyond the defaults.
+
 **`registerPlaybackService` removed**: The playback service pattern has been replaced with direct event listener installation. Event listeners should now be set up directly in your app initialization rather than in a separate service.
 
 **Before (v4):**
@@ -178,23 +231,31 @@ installListeners(); // Call early in app initialization
 
 // listeners.ts
 export function installListeners() {
-  TrackPlayer.addEventListener(Event.RemotePause, () => {
+  // Remote controls work automatically now!
+  // Only add listeners for non-remote events or custom behavior:
+  
+  TrackPlayer.onQueueEnded(() => {
+    console.log('Queue ended');
+  });
+  
+  TrackPlayer.onActiveTrackChanged(() => {
+    console.log('Track changed');
+  });
+  
+  // Override remote controls only if you need custom behavior:
+  TrackPlayer.handleRemotePause(() => {
+    console.log('Custom pause logic');
     TrackPlayer.pause();
   });
-  
-  TrackPlayer.addEventListener(Event.RemotePlay, () => {
-    TrackPlayer.play();
-  });
-  
-  // other event listeners...
 }
 ```
 
 **Migration steps:**
 1. Remove `TrackPlayer.registerPlaybackService()` call from your index file
-2. Create a function to install event listeners directly
-3. Call this function early in your app initialization (typically in App.tsx)
-4. Move your event listener logic from the playback service to the new listener installation function
+2. Remove basic remote control listeners (play, pause, next, previous, seek, jump, stop) - they work automatically now
+3. For custom remote control behavior, replace `onRemote*` calls with `handleRemote*` calls
+4. Keep `onRemote*` calls only for debugging/logging purposes
+5. Move remaining non-remote event listeners to a function called early in your app initialization
 
 See the example app for a complete implementation of the new pattern.
 

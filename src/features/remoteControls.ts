@@ -1,4 +1,12 @@
 import TrackPlayer from '../NativeTrackPlayer';
+import { pause, play, seekBy, seekTo, stop } from './playback';
+import { skipToNext, skipToPrevious } from './queue';
+
+// MARK: - Handlers State
+
+const customHandlers = new Map<string, any>();
+
+// MARK: - Event Interfaces
 
 /**
  * Remote jump backward event.
@@ -74,7 +82,199 @@ export interface AndroidControllerDisconnectedEvent {
   name: string;
 }
 
-// MARK: - Event Callbacks
+// MARK: - Default Handlers
+
+// Install remote control handlers with default behavior immediately when module loads
+// Custom handlers can override the defaults using handleRemote* functions
+
+// Basic playback controls
+TrackPlayer.onRemotePlay(() => {
+  const customHandler = customHandlers.get('play');
+  if (customHandler) {
+    customHandler();
+  } else {
+    play();
+  }
+});
+
+TrackPlayer.onRemotePause(() => {
+  const customHandler = customHandlers.get('pause');
+  if (customHandler) {
+    customHandler();
+  } else {
+    pause();
+  }
+});
+
+TrackPlayer.onRemoteNext(() => {
+  const customHandler = customHandlers.get('next');
+  if (customHandler) {
+    customHandler();
+  } else {
+    skipToNext();
+  }
+});
+
+TrackPlayer.onRemotePrevious(() => {
+  const customHandler = customHandlers.get('previous');
+  if (customHandler) {
+    customHandler();
+  } else {
+    skipToPrevious();
+  }
+});
+
+TrackPlayer.onRemoteStop(() => {
+  const customHandler = customHandlers.get('stop');
+  if (customHandler) {
+    customHandler();
+  } else {
+    stop();
+  }
+});
+
+// Seek controls
+TrackPlayer.onRemoteSeek((event: any) => {
+  const customHandler = customHandlers.get('seek');
+  if (customHandler) {
+    customHandler(event);
+  } else {
+    seekTo(event.position);
+  }
+});
+
+TrackPlayer.onRemoteJumpForward((event: any) => {
+  const customHandler = customHandlers.get('jumpForward');
+  if (customHandler) {
+    customHandler(event);
+  } else {
+    seekBy(event.interval);
+  }
+});
+
+TrackPlayer.onRemoteJumpBackward((event: any) => {
+  const customHandler = customHandlers.get('jumpBackward');
+  if (customHandler) {
+    customHandler(event);
+  } else {
+    seekBy(-event.interval);
+  }
+});
+
+// MARK: - Handler Override Functions
+//
+// Use these functions when you want to OVERRIDE the default remote control behavior.
+// These will replace the default handlers with your custom logic.
+// If you just want to listen to events for debugging/logging, use the onRemote* functions below.
+
+/**
+ * Sets a custom handler for remote play events, overriding the default behavior.
+ * @param callback - Called when the user presses the play button
+ * @returns Cleanup function to restore default behavior
+ */
+export function handleRemotePlay(callback: () => void): () => void {
+  customHandlers.set('play', callback);
+  return () => {
+    customHandlers.delete('play');
+  };
+}
+
+/**
+ * Sets a custom handler for remote pause events, overriding the default behavior.
+ * @param callback - Called when the user presses the pause button
+ * @returns Cleanup function to restore default behavior
+ */
+export function handleRemotePause(callback: () => void): () => void {
+  customHandlers.set('pause', callback);
+  return () => {
+    customHandlers.delete('pause');
+  };
+}
+
+/**
+ * Sets a custom handler for remote next events, overriding the default behavior.
+ * @param callback - Called when the user presses the next track button
+ * @returns Cleanup function to restore default behavior
+ */
+export function handleRemoteNext(callback: () => void): () => void {
+  customHandlers.set('next', callback);
+  return () => {
+    customHandlers.delete('next');
+  };
+}
+
+/**
+ * Sets a custom handler for remote previous events, overriding the default behavior.
+ * @param callback - Called when the user presses the previous track button
+ * @returns Cleanup function to restore default behavior
+ */
+export function handleRemotePrevious(callback: () => void): () => void {
+  customHandlers.set('previous', callback);
+  return () => {
+    customHandlers.delete('previous');
+  };
+}
+
+/**
+ * Sets a custom handler for remote stop events, overriding the default behavior.
+ * @param callback - Called when the user presses the stop button
+ * @returns Cleanup function to restore default behavior
+ */
+export function handleRemoteStop(callback: () => void): () => void {
+  customHandlers.set('stop', callback);
+  return () => {
+    customHandlers.delete('stop');
+  };
+}
+
+/**
+ * Sets a custom handler for remote seek events, overriding the default behavior.
+ * @param callback - Called when the user changes the position of the timeline
+ * @returns Cleanup function to restore default behavior
+ */
+export function handleRemoteSeek(
+  callback: (event: RemoteSeekEvent) => void
+): () => void {
+  customHandlers.set('seek', callback);
+  return () => {
+    customHandlers.delete('seek');
+  };
+}
+
+/**
+ * Sets a custom handler for remote jump forward events, overriding the default behavior.
+ * @param callback - Called when the user presses the jump forward button
+ * @returns Cleanup function to restore default behavior
+ */
+export function handleRemoteJumpForward(
+  callback: (event: RemoteJumpForwardEvent) => void
+): () => void {
+  customHandlers.set('jumpForward', callback);
+  return () => {
+    customHandlers.delete('jumpForward');
+  };
+}
+
+/**
+ * Sets a custom handler for remote jump backward events, overriding the default behavior.
+ * @param callback - Called when the user presses the jump backward button
+ * @returns Cleanup function to restore default behavior
+ */
+export function handleRemoteJumpBackward(
+  callback: (event: RemoteJumpBackwardEvent) => void
+): () => void {
+  customHandlers.set('jumpBackward', callback);
+  return () => {
+    customHandlers.delete('jumpBackward');
+  };
+}
+
+// MARK: - Event Callbacks (for listening/debugging only)
+//
+// Use these functions when you want to LISTEN to remote control events without overriding
+// the default behavior. These are perfect for logging, analytics, or debugging.
+// Multiple listeners can be registered for the same event.
+// To override the default behavior, use the handleRemote* functions above.
 
 /**
  * Subscribes to remote bookmark events (iOS only).

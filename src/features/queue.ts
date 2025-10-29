@@ -144,7 +144,7 @@ export function removeUpcomingTracks(): void {
  * @param index - The index of the track to skip to.
  * @param initialPosition - (Optional) The initial position to seek to in seconds.
  */
-export function skip(index: number, initialPosition = -1): void {
+export function skip(index: number, initialPosition?: number): void {
   TrackPlayer.skip(index, initialPosition);
 }
 
@@ -152,7 +152,7 @@ export function skip(index: number, initialPosition = -1): void {
  * Skips to the next track in the queue.
  * @param initialPosition - (Optional) The initial position to seek to in seconds.
  */
-export function skipToNext(initialPosition = -1): void {
+export function skipToNext(initialPosition?: number): void {
   TrackPlayer.skipToNext(initialPosition);
 }
 
@@ -160,7 +160,7 @@ export function skipToNext(initialPosition = -1): void {
  * Skips to the previous track in the queue.
  * @param initialPosition - (Optional) The initial position to seek to in seconds.
  */
-export function skipToPrevious(initialPosition = -1): void {
+export function skipToPrevious(initialPosition?: number): void {
   TrackPlayer.skipToPrevious(initialPosition);
 }
 
