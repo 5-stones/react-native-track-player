@@ -145,7 +145,7 @@ public class TrackPlayer {
       callbacks?.onPlaybackProgressUpdated(progressEvent)
     }
 
-  internal lazy var playingState: PlayingState = PlayingState { [weak self] event in
+  lazy var playingState: PlayingState = PlayingState { [weak self] event in
     self?.callbacks?.onPlaybackPlayingState(event)
   }
 

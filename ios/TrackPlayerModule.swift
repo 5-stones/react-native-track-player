@@ -602,7 +602,7 @@ public class NativeTrackPlayerImpl: NSObject {
     ensureMainThread {
       guard self.hasInitialized else { return }
       if let repeatMode = RepeatMode(rawValue: mode) {
-        player.setRepeatMode(repeatMode)
+        self.player.setRepeatMode(repeatMode)
       }
     }
   }

@@ -1,6 +1,6 @@
 import Foundation
 
-enum Capability: String {
+public enum Capability: String {
   case play
   case pause
   case togglePlayPause = "toggle-play-pause"
