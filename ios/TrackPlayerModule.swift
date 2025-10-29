@@ -630,6 +630,11 @@ public class NativeTrackPlayerImpl: NSObject {
     }
   }
 
+  @objc
+  public func setMediaBrowserReady() {
+    // No-op on iOS - media browser functionality is Android-only
+  }
+
   private func updateNowPlayingInfo(with metadata: [String: Any]) {
     currentImageTask?.cancel()
     var ret: [NowPlayingInfoKeyValue] = []

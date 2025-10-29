@@ -183,6 +183,10 @@ RCT_EXPORT_MODULE()
   [nativeTrackPlayer updateOptionsWithOptions:options];
 }
 
+- (void)setMediaBrowserReady {
+  [nativeTrackPlayer setMediaBrowserReady];
+}
+
 - (NSDictionary *)getOptions {
   return [nativeTrackPlayer getOptions];
 }
