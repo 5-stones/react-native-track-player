@@ -1,14 +1,17 @@
-import SegmentedControl from './SegmentedControl';
-import React, { useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import TrackPlayer, {
   AppKilledPlaybackBehavior,
   RepeatMode,
+  useOptions,
+  useRepeatMode,
 } from 'react-native-track-player';
-import { playerOptions } from '../services';
+import SegmentedControl from './SegmentedControl';
 import { Spacer } from './Spacer';
 
 export function OptionSheet() {
+  const currentOptions = useOptions();
+  const currentRepeatMode = useRepeatMode();
   return (
     <ScrollView contentContainerStyle={styles.contentContainer}>
       <Options
@@ -18,13 +21,13 @@ export function OptionSheet() {
           { label: 'Track', value: RepeatMode.Track },
           { label: 'Queue', value: RepeatMode.Queue },
         ]}
-        initialValue={TrackPlayer.getRepeatMode()}
+        value={currentRepeatMode}
         onSelect={(repeatMode) => {
           TrackPlayer.setRepeatMode(repeatMode);
         }}
       />
       <Spacer />
-      {Platform.OS === 'android' && (
+      {currentOptions.android && (
         <Options
           label="Audio Service on App Kill"
           options={[
@@ -39,20 +42,35 @@ export function OptionSheet() {
                 AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
             },
           ]}
-          initialValue={playerOptions.android.appKilledPlaybackBehavior}
-          onSelect={async (appKilledPlaybackBehavior) => {
-            // TODO: Copied from example/src/services/SetupService.tsx until updateOptions
-            // allows for partial updates (i.e. only android.appKilledPlaybackBehavior).
-            await TrackPlayer.updateOptions({
-              ...playerOptions,
+          value={
+            currentOptions.android.appKilledPlaybackBehavior
+          }
+          onSelect={(appKilledPlaybackBehavior) => {
+            TrackPlayer.updateOptions({
               android: {
-                ...playerOptions.android,
                 appKilledPlaybackBehavior,
               },
             });
           }}
         />
       )}
+      <Spacer />
+      <Options
+        label="Jump Interval"
+        options={[
+          { label: '5s', value: 5 },
+          { label: '10s', value: 10 },
+          { label: '15s', value: 15 },
+          { label: '30s', value: 30 },
+        ]}
+        value={currentOptions.backwardJumpInterval}
+        onSelect={(jumpInterval) => {
+          TrackPlayer.updateOptions({
+            backwardJumpInterval: jumpInterval,
+            forwardJumpInterval: jumpInterval,
+          });
+        }}
+      />
     </ScrollView>
   );
 }
@@ -98,17 +116,15 @@ function OptionStack({
 function Options<T>({
   label,
   options,
-  initialValue,
+  value,
   onSelect,
 }: {
   label: string;
   options: Array<{ label: string; value: T }>;
-  initialValue: T;
+  value: T;
   onSelect: (value: T) => void;
 }) {
-  const [selectedIndex, setSelectedIndex] = useState(() =>
-    options.findIndex((opt) => opt.value === initialValue)
-  );
+  const selectedIndex = options.findIndex((opt) => opt.value === value);
 
   return (
     <OptionStack vertical={true}>
@@ -119,10 +135,9 @@ function Options<T>({
         values={options.map((opt) => opt.label)}
         selectedIndex={selectedIndex}
         onChange={(index) => {
-          setSelectedIndex(index);
-          const value = options[index]?.value;
-          if (value !== undefined) {
-            onSelect(value);
+          const newValue = options[index]?.value;
+          if (newValue !== undefined) {
+            onSelect(newValue);
           }
         }}
       />
