@@ -759,6 +759,7 @@ public class NativeTrackPlayerImpl: NSObject {
   func emitPlaybackPlayWhenReadyChanged(_ body: [String: Any])
   func emitPlaybackPlayingState(_ body: [String: Bool])
   func emitPlaybackQueueEnded(_ body: [String: Any])
+  func emitPlaybackRepeatModeChanged(_ body: [String: Any])
   func emitPlaybackError(_ body: [String: Any])
   func emitRemotePlay()
   func emitRemotePause()
