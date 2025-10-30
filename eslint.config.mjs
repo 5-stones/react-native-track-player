@@ -1,7 +1,6 @@
 import { fixupConfigRules } from '@eslint/compat';
 import { FlatCompat } from '@eslint/eslintrc';
 import js from '@eslint/js';
-import tseslint from '@typescript-eslint/eslint-plugin';
 import prettier from 'eslint-plugin-prettier';
 import { defineConfig } from 'eslint/config';
 import path from 'node:path';
@@ -20,7 +19,6 @@ export default defineConfig([
   {
     plugins: {
       prettier,
-      '@typescript-eslint': tseslint,
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'error',
@@ -31,7 +29,7 @@ export default defineConfig([
           quoteProps: 'consistent',
           singleQuote: true,
           tabWidth: 2,
-          trailingComma: 'es5',
+          trailingComma: 'all',
           useTabs: false,
         },
       ],
