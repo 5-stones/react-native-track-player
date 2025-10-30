@@ -162,6 +162,15 @@ export class Player {
     return this.element.pause();
   }
 
+  public togglePlayback() {
+    if (!this.element) throw new SetupNotCalledError();
+    if (this.playWhenReady) {
+      return this.pause();
+    } else {
+      return this.play();
+    }
+  }
+
   public setRate(rate: number) {
     if (!this.element) throw new SetupNotCalledError();
     this.element.defaultPlaybackRate = rate;

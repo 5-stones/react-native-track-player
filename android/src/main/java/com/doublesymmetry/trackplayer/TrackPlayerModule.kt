@@ -294,6 +294,8 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
 
   override fun pause() = runBlockingOnMain { player.pause() }
 
+  override fun togglePlayback() = runBlockingOnMain { player.togglePlayback() }
+
   override fun stop() = runBlockingOnMain { player.stop() }
 
   override fun seekTo(seconds: Double) = runBlockingOnMain {

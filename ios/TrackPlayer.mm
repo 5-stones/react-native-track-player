@@ -107,6 +107,10 @@ RCT_EXPORT_MODULE()
   [nativeTrackPlayer play];
 }
 
+- (void)togglePlayback {
+  [nativeTrackPlayer togglePlayback];
+}
+
 - (void)remove:(NSArray *)indexes {
   [nativeTrackPlayer removeWithTracks:indexes];
 }

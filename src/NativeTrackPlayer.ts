@@ -47,6 +47,7 @@ export interface Spec extends TurboModule {
   reset(): void;
   play(): void;
   pause(): void;
+  togglePlayback(): void;
   stop(): void;
   setPlayWhenReady(playWhenReady: boolean): void;
   getPlayWhenReady(): boolean;

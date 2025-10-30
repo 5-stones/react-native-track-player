@@ -451,6 +451,13 @@ public class TrackPlayer {
   }
 
   /**
+   Toggle playback between play and pause
+   */
+  public func togglePlayback() {
+    playWhenReady = !playWhenReady
+  }
+
+  /**
    Stop playback
    */
   public func stop() {

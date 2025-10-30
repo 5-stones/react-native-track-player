@@ -660,6 +660,14 @@ class TrackPlayer(
     exoPlayer.pause()
   }
 
+  fun togglePlayback() {
+    if (exoPlayer.playWhenReady) {
+      pause()
+    } else {
+      play()
+    }
+  }
+
   /**
    * Stops playback, without clearing the active track. Calling this method will cause the playback
    * state to transition to State.NONE and the player will release the loaded media and resources

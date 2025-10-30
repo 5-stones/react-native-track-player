@@ -178,6 +178,9 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
   public async pause() {
     return super.pause();
   }
+  public async togglePlayback() {
+    return super.togglePlayback();
+  }
   public async seekBy(seconds: number) {
     return super.seekBy(seconds);
   }

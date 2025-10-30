@@ -405,6 +405,14 @@ public class NativeTrackPlayerImpl: NSObject {
   }
 
   @objc
+  public func togglePlayback() {
+    ensureMainThread {
+      guard self.hasInitialized else { return }
+      self.player.togglePlayback()
+    }
+  }
+
+  @objc
   public func setPlayWhenReady(playWhenReady: Bool) {
     ensureMainThread {
       guard self.hasInitialized else { return }

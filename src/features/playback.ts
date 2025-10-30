@@ -1,4 +1,5 @@
 import TrackPlayer from '../NativeTrackPlayer';
+import { getPlaybackState } from './playbackState';
 
 // MARK: - Playback Controls
 
@@ -21,6 +22,13 @@ export function play(): void {
  */
 export function pause(): void {
   TrackPlayer.pause();
+}
+
+/**
+ * Toggles playback between play and pause.
+ */
+export function togglePlayback(): void {
+  TrackPlayer.togglePlayback();
 }
 
 /**

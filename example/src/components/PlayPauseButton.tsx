@@ -15,7 +15,7 @@ export function PlayPauseButton() {
         <ActivityIndicator />
       ) : (
         <TouchableWithoutFeedback
-          onPress={playing ? TrackPlayer.pause : TrackPlayer.play}
+          onPress={TrackPlayer.togglePlayback}
         >
           <Icon
             name={playing ? 'pause' : 'play'}
