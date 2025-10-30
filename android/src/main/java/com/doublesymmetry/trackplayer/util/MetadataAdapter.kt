@@ -1,9 +1,7 @@
 package com.doublesymmetry.trackplayer.util
 
-import androidx.annotation.OptIn
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Metadata
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.container.MdtaMetadataEntry
 import androidx.media3.extractor.metadata.icy.IcyHeaders
 import androidx.media3.extractor.metadata.icy.IcyInfo
@@ -18,7 +16,6 @@ import timber.log.Timber
 
 sealed class MetadataAdapter {
   companion object {
-    @OptIn(UnstableApi::class)
     fun fromMetadata(metadata: Metadata): List<WritableMap> {
       val group = mutableListOf<WritableMap>()
 

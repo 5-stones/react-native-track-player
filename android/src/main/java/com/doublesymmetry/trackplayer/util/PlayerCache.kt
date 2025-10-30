@@ -1,7 +1,6 @@
 package com.doublesymmetry.trackplayer.util
 
 import android.content.Context
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.DatabaseProvider
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
@@ -12,7 +11,6 @@ import java.io.File
  * Singleton cache manager for ExoPlayer media caching. Provides thread-safe lazy initialization of
  * media cache.
  */
-@UnstableApi
 object PlayerCache {
   @Volatile private var instance: SimpleCache? = null
 

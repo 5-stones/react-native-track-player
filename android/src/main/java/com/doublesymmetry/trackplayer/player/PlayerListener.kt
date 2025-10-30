@@ -5,14 +5,12 @@ import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Metadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 import com.doublesymmetry.trackplayer.TrackPlayer
 import com.doublesymmetry.trackplayer.event.PlaybackError
 import com.doublesymmetry.trackplayer.extension.NumberExt.Companion.toSeconds
 import com.doublesymmetry.trackplayer.model.State
 import java.util.Locale
 
-@UnstableApi
 class PlayerListener(private val trackPlayer: TrackPlayer) : Player.Listener {
   /** Called when there is metadata associated with the current playback time. */
   override fun onMetadata(metadata: Metadata) {

@@ -1,10 +1,6 @@
-@file:OptIn(UnstableApi::class)
-
 package com.doublesymmetry.trackplayer.option
 
-import androidx.annotation.OptIn
 import androidx.media3.common.C
-import androidx.media3.common.util.UnstableApi
 
 enum class AudioContentType {
   MUSIC,

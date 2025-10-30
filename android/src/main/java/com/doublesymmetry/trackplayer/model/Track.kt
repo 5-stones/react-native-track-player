@@ -4,12 +4,10 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
-import androidx.annotation.OptIn
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Rating
-import androidx.media3.common.util.UnstableApi
 import com.doublesymmetry.trackplayer.util.BundleUtils
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableArray
@@ -17,7 +15,6 @@ import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.ReadableType
 import com.facebook.react.bridge.WritableMap
 
-@OptIn(UnstableApi::class)
 class Track
 private constructor(
   // Network/File info

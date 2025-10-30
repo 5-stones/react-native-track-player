@@ -7,7 +7,6 @@ import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
@@ -66,7 +65,6 @@ import com.facebook.react.bridge.WritableMap
 import java.util.concurrent.TimeUnit
 import timber.log.Timber
 
-@UnstableApi
 class TrackPlayer(
   internal val context: Context,
 ) {
@@ -95,7 +93,6 @@ class TrackPlayer(
    * the queue, ensuring all queue changes go through the RNTP API for proper state management and
    * event handling.
    */
-  @UnstableApi
   private inner class InterceptingPlayer(player: ExoPlayer) : ForwardingPlayer(player) {
 
     override fun setMediaItems(mediaItems: MutableList<MediaItem>, resetPosition: Boolean) {

@@ -12,12 +12,10 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
 import androidx.annotation.MainThread
-import androidx.annotation.OptIn
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Rating
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.LibraryResult
 import androidx.media3.session.MediaLibraryService
 import androidx.media3.session.MediaSession
@@ -44,7 +42,6 @@ import kotlinx.coroutines.guava.future
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
-@OptIn(UnstableApi::class)
 @MainThread
 class TrackPlayerService : MediaLibraryService() {
   lateinit var player: TrackPlayer
