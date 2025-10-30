@@ -1,7 +1,15 @@
 import { DeviceEventEmitter } from 'react-native';
 
-import { Event } from '../src/constants/Event';
 import { State } from '../src/constants/State';
+
+// Web-specific event constants
+const Event = {
+  PlaybackState: 'playback-state',
+  PlaybackProgressUpdated: 'playback-progress-updated',
+  PlaybackQueueEnded: 'playback-queue-ended',
+  PlaybackPlayWhenReadyChanged: 'playback-play-when-ready-changed',
+  PlaybackActiveTrackChanged: 'playback-active-track-changed',
+};
 import type { Spec } from '../src/NativeTrackPlayer';
 import type { PlaybackState, Track, UpdateOptions } from '../src/types';
 import { PlaylistPlayer, RepeatMode } from './TrackPlayer';
