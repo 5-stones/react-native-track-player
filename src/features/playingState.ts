@@ -1,5 +1,5 @@
 import TrackPlayer from '../NativeTrackPlayer';
-import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
+import { useUpdatedNativeValue } from '../utils/useUpdatedNativeValue';
 
 // MARK: - Types
 
@@ -25,7 +25,7 @@ export function getPlayingState(): PlayingState {
  * @returns Cleanup function to unsubscribe
  */
 export function onPlayingState(
-  callback: (state: PlayingState) => void
+  callback: (state: PlayingState) => void,
 ): () => void {
   return TrackPlayer.onPlaybackPlayingState(callback as () => void).remove;
 }

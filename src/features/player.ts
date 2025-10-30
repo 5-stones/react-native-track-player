@@ -24,7 +24,12 @@ const isAndroid = Platform.OS === 'android';
  *   other than the ones defined. See
  *   https://developer.android.com/reference/android/media/AudioAttributes#CONTENT_TYPE_UNKNOWN
  */
-export type AndroidAudioContentType = 'music' | 'speech' | 'sonification' | 'movie' | 'unknown';
+export type AndroidAudioContentType =
+  | 'music'
+  | 'speech'
+  | 'sonification'
+  | 'movie'
+  | 'unknown';
 
 /**
  * IOSCategory options:
@@ -46,7 +51,13 @@ export type AndroidAudioContentType = 'music' | 'speech' | 'sonification' | 'mov
  *   audio. See
  *   https://developer.apple.com/documentation/avfaudio/avaudiosession/category/1616451-record
  */
-export type IOSCategory = 'playback' | 'playAndRecord' | 'multiRoute' | 'ambient' | 'soloAmbient' | 'record';
+export type IOSCategory =
+  | 'playback'
+  | 'playAndRecord'
+  | 'multiRoute'
+  | 'ambient'
+  | 'soloAmbient'
+  | 'record';
 
 /**
  * IOSCategoryMode options:
@@ -77,7 +88,16 @@ export type IOSCategory = 'playback' | 'playAndRecord' | 'multiRoute' | 'ambient
  *   text-to-speech. See
  *   https://developer.apple.com/documentation/avfaudio/avaudiosession/mode/2962803-voiceprompt
  */
-export type IOSCategoryMode = 'default' | 'gameChat' | 'measurement' | 'moviePlayback' | 'spokenAudio' | 'videoChat' | 'videoRecording' | 'voiceChat' | 'voicePrompt';
+export type IOSCategoryMode =
+  | 'default'
+  | 'gameChat'
+  | 'measurement'
+  | 'moviePlayback'
+  | 'spokenAudio'
+  | 'videoChat'
+  | 'videoRecording'
+  | 'voiceChat'
+  | 'voicePrompt';
 
 /**
  * IOSCategoryOptions options:
@@ -105,7 +125,14 @@ export type IOSCategoryMode = 'default' | 'gameChat' | 'measurement' | 'moviePla
  *   session defaults to the built-in speaker instead of the receiver. See
  *   https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions/1616462-defaulttospeaker
  */
-export type IOSCategoryOptions = 'mixWithOthers' | 'duckOthers' | 'interruptSpokenAudioAndMixWithOthers' | 'allowBluetooth' | 'allowBluetoothA2DP' | 'allowAirPlay' | 'defaultToSpeaker';
+export type IOSCategoryOptions =
+  | 'mixWithOthers'
+  | 'duckOthers'
+  | 'interruptSpokenAudioAndMixWithOthers'
+  | 'allowBluetooth'
+  | 'allowBluetoothA2DP'
+  | 'allowAirPlay'
+  | 'defaultToSpeaker';
 
 /**
  * IOSCategoryPolicy options:

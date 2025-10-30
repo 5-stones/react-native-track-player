@@ -90,14 +90,14 @@ export interface Spec extends TurboModule {
 
   readonly onGetChildrenRequest: EventEmitter<{
     requestId: string;
-    id: string,
-    page: number,
-    pageSize: number,
-  }>
+    id: string;
+    page: number;
+    pageSize: number;
+  }>;
   resolveGetChildrenRequest(
     requestId: string,
     items: UnsafeObject[],
-    totalChildrenCount: number
+    totalChildrenCount: number,
   ): void;
 
   readonly onGetSearchResultRequest: EventEmitter<{
@@ -110,7 +110,7 @@ export interface Spec extends TurboModule {
   resolveSearchResultRequest(
     requestId: string,
     items: UnsafeObject[],
-    totalMatchesCount: number
+    totalMatchesCount: number,
   ): void;
 
   // Signal that JS side is ready to receive media browser events

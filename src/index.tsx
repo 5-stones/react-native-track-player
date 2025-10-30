@@ -1,6 +1,5 @@
-import * as TrackPlayer from './trackPlayer';
+import * as TrackPlayer from './features';
 
 export * from './features';
-export * from './hooks';
 
 export default TrackPlayer;

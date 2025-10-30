@@ -1,9 +1,15 @@
 import TrackPlayer from '../NativeTrackPlayer';
-import resolveAssetSource from '../resolveAssetSource';
+import resolveAssetSource from '../utils/resolveAssetSource';
 
 // MARK: - Types
 
-export type RatingType = 'heart' | 'thumbs-up-down' | '3-stars' | '4-stars' | '5-stars' | 'percentage';
+export type RatingType =
+  | 'heart'
+  | 'thumbs-up-down'
+  | '3-stars'
+  | '4-stars'
+  | '5-stars'
+  | 'percentage';
 
 export interface TrackMetadataBase {
   /** The track title */
@@ -41,11 +47,11 @@ export interface NowPlayingMetadata extends TrackMetadataBase {
  * Standardized common metadata field names that raw metadata keys can map to.
  */
 export enum CommonMetadataKey {
-  Title = "title",
-  Artist = "artist",
-  AlbumName = "albumName",
-  Genre = "genre",
-  CreationDate = "creationDate",
+  Title = 'title',
+  Artist = 'artist',
+  AlbumName = 'albumName',
+  Genre = 'genre',
+  CreationDate = 'creationDate',
 }
 
 /**
@@ -53,13 +59,13 @@ export enum CommonMetadataKey {
  */
 export enum MetadataKeySpace {
   /** ID3 metadata (MP3 files) */
-  ID3 = "org.id3",
+  ID3 = 'org.id3',
   /** ICY metadata (streaming audio) */
-  ICY = "icy",
+  ICY = 'icy',
   /** Vorbis comments (OGG/FLAC files) */
-  Vorbis = "org.vorbis",
+  Vorbis = 'org.vorbis',
   /** QuickTime/MP4/M4A metadata */
-  QuickTime = "com.apple.quicktime",
+  QuickTime = 'com.apple.quicktime',
 }
 
 /**
@@ -172,7 +178,7 @@ function resolveImportedAsset(id?: number) {
  */
 export function updateMetadataForTrack(
   trackIndex: number,
-  metadata: TrackMetadataBase
+  metadata: TrackMetadataBase,
 ): void {
   TrackPlayer.updateMetadataForTrack(trackIndex, {
     ...metadata,
@@ -199,7 +205,7 @@ export function updateNowPlayingMetadata(metadata: NowPlayingMetadata): void {
  * @returns Cleanup function to unsubscribe
  */
 export function onMetadataChapterReceived(
-  callback: (event: AudioMetadataReceivedEvent) => void
+  callback: (event: AudioMetadataReceivedEvent) => void,
 ): () => void {
   return TrackPlayer.onMetadataChapterReceived(callback as () => void).remove;
 }
@@ -210,7 +216,7 @@ export function onMetadataChapterReceived(
  * @returns Cleanup function to unsubscribe
  */
 export function onMetadataCommonReceived(
-  callback: (event: AudioCommonMetadataReceivedEvent) => void
+  callback: (event: AudioCommonMetadataReceivedEvent) => void,
 ): () => void {
   return TrackPlayer.onMetadataCommonReceived(callback as () => void).remove;
 }
@@ -221,7 +227,7 @@ export function onMetadataCommonReceived(
  * @returns Cleanup function to unsubscribe
  */
 export function onMetadataTimedReceived(
-  callback: (event: AudioMetadataReceivedEvent) => void
+  callback: (event: AudioMetadataReceivedEvent) => void,
 ): () => void {
   return TrackPlayer.onMetadataTimedReceived(callback as () => void).remove;
 }

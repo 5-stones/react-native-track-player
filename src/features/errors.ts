@@ -1,4 +1,4 @@
-import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
+import { useUpdatedNativeValue } from '../utils/useUpdatedNativeValue';
 import TrackPlayer from '../NativeTrackPlayer';
 
 export type PlaybackError = {
@@ -33,7 +33,7 @@ export function getPlaybackError(): PlaybackError | undefined {
  * @returns Cleanup function to unsubscribe
  */
 export function onPlaybackError(
-  callback: (event: PlaybackErrorEvent) => void
+  callback: (event: PlaybackErrorEvent) => void,
 ): () => void {
   return TrackPlayer.onPlaybackError(callback as () => void).remove;
 }

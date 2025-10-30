@@ -233,7 +233,7 @@ export function handleRemoteStop(callback: () => void): () => void {
  * @returns Cleanup function to restore default behavior
  */
 export function handleRemoteSeek(
-  callback: (event: RemoteSeekEvent) => void
+  callback: (event: RemoteSeekEvent) => void,
 ): () => void {
   customHandlers.set('seek', callback);
   return () => {
@@ -247,7 +247,7 @@ export function handleRemoteSeek(
  * @returns Cleanup function to restore default behavior
  */
 export function handleRemoteJumpForward(
-  callback: (event: RemoteJumpForwardEvent) => void
+  callback: (event: RemoteJumpForwardEvent) => void,
 ): () => void {
   customHandlers.set('jumpForward', callback);
   return () => {
@@ -261,7 +261,7 @@ export function handleRemoteJumpForward(
  * @returns Cleanup function to restore default behavior
  */
 export function handleRemoteJumpBackward(
-  callback: (event: RemoteJumpBackwardEvent) => void
+  callback: (event: RemoteJumpBackwardEvent) => void,
 ): () => void {
   customHandlers.set('jumpBackward', callback);
   return () => {
@@ -300,7 +300,7 @@ export function onRemoteDislike(callback: () => void): () => void {
  * @returns Cleanup function to unsubscribe
  */
 export function onRemoteJumpBackward(
-  callback: (event: RemoteJumpBackwardEvent) => void
+  callback: (event: RemoteJumpBackwardEvent) => void,
 ): () => void {
   return TrackPlayer.onRemoteJumpBackward(callback as () => void).remove;
 }
@@ -311,7 +311,7 @@ export function onRemoteJumpBackward(
  * @returns Cleanup function to unsubscribe
  */
 export function onRemoteJumpForward(
-  callback: (event: RemoteJumpForwardEvent) => void
+  callback: (event: RemoteJumpForwardEvent) => void,
 ): () => void {
   return TrackPlayer.onRemoteJumpForward(callback as () => void).remove;
 }
@@ -358,7 +358,7 @@ export function onRemotePlay(callback: () => void): () => void {
  * @returns Cleanup function to unsubscribe
  */
 export function onRemotePlayId(
-  callback: (event: RemotePlayIdEvent) => void
+  callback: (event: RemotePlayIdEvent) => void,
 ): () => void {
   return TrackPlayer.onRemotePlayId(callback as () => void).remove;
 }
@@ -369,7 +369,7 @@ export function onRemotePlayId(
  * @returns Cleanup function to unsubscribe
  */
 export function onRemotePlaySearch(
-  callback: (event: RemotePlaySearchEvent) => void
+  callback: (event: RemotePlaySearchEvent) => void,
 ): () => void {
   return TrackPlayer.onRemotePlaySearch(callback as () => void).remove;
 }
@@ -389,7 +389,7 @@ export function onRemotePrevious(callback: () => void): () => void {
  * @returns Cleanup function to unsubscribe
  */
 export function onRemoteSeek(
-  callback: (event: RemoteSeekEvent) => void
+  callback: (event: RemoteSeekEvent) => void,
 ): () => void {
   return TrackPlayer.onRemoteSeek(callback as () => void).remove;
 }
@@ -400,7 +400,7 @@ export function onRemoteSeek(
  * @returns Cleanup function to unsubscribe
  */
 export function onRemoteSetRating(
-  callback: (event: RemoteSetRatingEvent) => void
+  callback: (event: RemoteSetRatingEvent) => void,
 ): () => void {
   return TrackPlayer.onRemoteSetRating(callback as () => void).remove;
 }
@@ -411,7 +411,7 @@ export function onRemoteSetRating(
  * @returns Cleanup function to unsubscribe
  */
 export function onRemoteSkip(
-  callback: (event: RemoteSkipEvent) => void
+  callback: (event: RemoteSkipEvent) => void,
 ): () => void {
   return TrackPlayer.onRemoteSkip(callback as () => void).remove;
 }
@@ -431,7 +431,7 @@ export function onRemoteStop(callback: () => void): () => void {
  * @returns Cleanup function to unsubscribe
  */
 export function onAndroidControllerConnected(
-  callback: (event: AndroidControllerConnectedEvent) => void
+  callback: (event: AndroidControllerConnectedEvent) => void,
 ): () => void {
   return TrackPlayer.onAndroidControllerConnected(callback as () => void)
     .remove;
@@ -443,7 +443,7 @@ export function onAndroidControllerConnected(
  * @returns Cleanup function to unsubscribe
  */
 export function onAndroidControllerDisconnected(
-  callback: (event: AndroidControllerDisconnectedEvent) => void
+  callback: (event: AndroidControllerDisconnectedEvent) => void,
 ): () => void {
   return TrackPlayer.onAndroidControllerDisconnected(callback as () => void)
     .remove;

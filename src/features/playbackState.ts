@@ -1,4 +1,4 @@
-import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
+import { useUpdatedNativeValue } from '../utils/useUpdatedNativeValue';
 import TrackPlayer from '../NativeTrackPlayer';
 import type { PlaybackErrorEvent } from './errors';
 
@@ -23,7 +23,16 @@ import type { PlaybackErrorEvent } from './errors';
  * - `'ended'`: Indicates that playback stopped due to the end of the queue
  *   being reached.
  */
-export type State = 'none' | 'ready' | 'playing' | 'paused' | 'stopped' | 'loading' | 'buffering' | 'error' | 'ended';
+export type State =
+  | 'none'
+  | 'ready'
+  | 'playing'
+  | 'paused'
+  | 'stopped'
+  | 'loading'
+  | 'buffering'
+  | 'error'
+  | 'ended';
 
 export type PlaybackState =
   | {
@@ -52,7 +61,7 @@ export function getPlaybackState(): PlaybackState {
  * @returns Cleanup function to unsubscribe
  */
 export function onPlaybackState(
-  callback: (state: PlaybackState) => void
+  callback: (state: PlaybackState) => void,
 ): () => void {
   return TrackPlayer.onPlaybackState(callback as () => void).remove;
 }

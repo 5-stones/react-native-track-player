@@ -1,5 +1,5 @@
 import TrackPlayer from '../NativeTrackPlayer';
-import resolveAssetSource from '../resolveAssetSource';
+import resolveAssetSource from '../utils/resolveAssetSource';
 import type { TrackMetadataBase } from './metadata';
 
 // MARK: - Types
@@ -91,7 +91,7 @@ export function add(tracks: AddTrack[], insertBeforeIndex?: number): void;
 export function add(track: AddTrack, insertBeforeIndex?: number): void;
 export function add(
   tracks: AddTrack | AddTrack[],
-  insertBeforeIndex = -1
+  insertBeforeIndex = -1,
 ): void {
   const addTracks = Array.isArray(tracks) ? tracks : [tracks];
   if (addTracks.length > 0) {
@@ -139,7 +139,7 @@ export function remove(indexes: number[]): void;
 export function remove(index: number): void;
 export function remove(indexOrIndexes: number | number[]): void {
   TrackPlayer.remove(
-    Array.isArray(indexOrIndexes) ? indexOrIndexes : [indexOrIndexes]
+    Array.isArray(indexOrIndexes) ? indexOrIndexes : [indexOrIndexes],
   );
 }
 
@@ -209,7 +209,7 @@ export function getQueue(): Track[] {
  * @returns Cleanup function to unsubscribe
  */
 export function onQueueEnded(
-  callback: (event: PlaybackQueueEndedEvent) => void
+  callback: (event: PlaybackQueueEndedEvent) => void,
 ): () => void {
   return TrackPlayer.onPlaybackQueueEnded(callback as () => void).remove;
 }

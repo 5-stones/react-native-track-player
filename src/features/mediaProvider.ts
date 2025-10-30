@@ -49,7 +49,7 @@ function onGetItem(
         // Return minimal track indicating "not found"
         TrackPlayer.resolveGetItemRequest(requestId, {
           mediaId: data.id,
-          title: 'Item not found'
+          title: 'Item not found',
         });
       }
     },
@@ -57,11 +57,7 @@ function onGetItem(
 }
 
 function onGetChildren(
-  callback: (event: {
-    id: string;
-    page: number;
-    pageSize: number;
-  }) => Promise<{
+  callback: (event: { id: string; page: number; pageSize: number }) => Promise<{
     children: Track[];
     total?: number;
   }>,

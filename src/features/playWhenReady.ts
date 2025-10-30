@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
 import TrackPlayer from '../NativeTrackPlayer';
-import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
+import { useUpdatedNativeValue } from '../utils/useUpdatedNativeValue';
 
 /**
  * Event data for when playWhenReady changes.
@@ -39,7 +39,7 @@ export function setPlayWhenReady(playWhenReady: boolean): void {
  * @returns Cleanup function to unsubscribe
  */
 export function onPlayWhenReadyChanged(
-  callback: (event: PlaybackPlayWhenReadyChangedEvent) => void
+  callback: (event: PlaybackPlayWhenReadyChangedEvent) => void,
 ): () => void {
   return TrackPlayer.onPlaybackPlayWhenReadyChanged(callback as () => void)
     .remove;
@@ -55,7 +55,7 @@ export function usePlayWhenReady(): boolean {
   const subscribe = useCallback(
     (callback: (event: PlaybackPlayWhenReadyChangedEvent) => void) =>
       onPlayWhenReadyChanged(callback),
-    []
+    [],
   );
 
   return useUpdatedNativeValue(getPlayWhenReady, subscribe, 'playWhenReady');

@@ -1,5 +1,5 @@
 import TrackPlayer from '../NativeTrackPlayer';
-import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
+import { useUpdatedNativeValue } from '../utils/useUpdatedNativeValue';
 
 // MARK: - Types
 
@@ -13,7 +13,6 @@ import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
 export type RepeatMode = 'off' | 'track' | 'queue';
 
 // MARK: - Getters
-
 
 /**
  * Gets the current repeat mode.
@@ -43,7 +42,7 @@ export interface RepeatModeChangedEvent {
  * @returns Cleanup function to unsubscribe
  */
 export function onRepeatModeChanged(
-  callback: (event: RepeatModeChangedEvent) => void
+  callback: (event: RepeatModeChangedEvent) => void,
 ): () => void {
   return TrackPlayer.onPlaybackRepeatModeChanged(callback as () => void).remove;
 }
@@ -55,5 +54,9 @@ export function onRepeatModeChanged(
  * @returns The current repeat mode
  */
 export function useRepeatMode(): RepeatMode {
-  return useUpdatedNativeValue(getRepeatMode, onRepeatModeChanged, 'repeatMode');
+  return useUpdatedNativeValue(
+    getRepeatMode,
+    onRepeatModeChanged,
+    'repeatMode',
+  );
 }

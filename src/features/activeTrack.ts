@@ -64,7 +64,7 @@ export function getActiveTrackIndex(): number | undefined {
  * @returns Cleanup function to unsubscribe
  */
 export function onActiveTrackChanged(
-  callback: (event: PlaybackActiveTrackChangedEvent) => void
+  callback: (event: PlaybackActiveTrackChangedEvent) => void,
 ): () => void {
   return TrackPlayer.onPlaybackActiveTrackChanged(callback as () => void)
     .remove;

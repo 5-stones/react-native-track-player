@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 export function useUpdatedNativeValue<T, E = T>(
   getter: () => T,
   subscribe: (callback: (event: E) => void) => () => void,
-  eventKey?: keyof E
+  eventKey?: keyof E,
 ): T {
   const [value, setValue] = useState(() => getter());
 

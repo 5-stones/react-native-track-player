@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
+import { useUpdatedNativeValue } from '../utils/useUpdatedNativeValue';
 import TrackPlayer from '../NativeTrackPlayer';
 import { onPlaybackState } from './playbackState';
 

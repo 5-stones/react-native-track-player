@@ -1,11 +1,23 @@
 import type { RepeatMode } from './repeatMode';
-import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
+import { useUpdatedNativeValue } from '../utils/useUpdatedNativeValue';
 import TrackPlayer from '../NativeTrackPlayer';
 import type { RatingType } from './metadata';
 
 // MARK: - Types
 
-export type Capability = 'play' | 'play-from-id' | 'play-from-search' | 'pause' | 'stop' | 'seek-to' | 'skip' | 'skip-to-next' | 'skip-to-previous' | 'jump-forward' | 'jump-backward' | 'set-rating';
+export type Capability =
+  | 'play'
+  | 'play-from-id'
+  | 'play-from-search'
+  | 'pause'
+  | 'stop'
+  | 'seek-to'
+  | 'skip'
+  | 'skip-to-next'
+  | 'skip-to-previous'
+  | 'jump-forward'
+  | 'jump-backward'
+  | 'set-rating';
 
 /**
  * AppKilledPlaybackBehavior options:
@@ -20,7 +32,10 @@ export type Capability = 'play' | 'play-from-id' | 'play-from-search' | 'pause' 
  *   notification is removed and can't be used to resume playback. Users would
  *   need to open the app again to start playing audio.
  */
-export type AppKilledPlaybackBehavior = 'continue-playback' | 'pause-playback' | 'stop-playback-and-remove-notification';
+export type AppKilledPlaybackBehavior =
+  | 'continue-playback'
+  | 'pause-playback'
+  | 'stop-playback-and-remove-notification';
 
 /**
  * Current player options with resolved defaults.
@@ -83,7 +98,6 @@ export interface FeedbackOptions {
   title: string;
 }
 
-
 export interface AndroidUpdateOptions {
   /**
    * Whether the audio playback notification is also removed when the playback
@@ -126,8 +140,6 @@ export interface AndroidUpdateOptions {
    */
   notificationCapabilities: Capability[] | null;
 }
-
-
 
 export interface IOSUpdateOptions {
   /**
@@ -259,7 +271,7 @@ export function getOptions(): Options {
  * @returns Cleanup function to unsubscribe
  */
 export function onOptionsChanged(
-  callback: (options: Options) => void
+  callback: (options: Options) => void,
 ): () => void {
   return TrackPlayer.onOptionsChanged(callback as () => void).remove;
 }

@@ -76,23 +76,23 @@ export class Player {
     });
     this.element.addEventListener(
       'ended',
-      this.onStateUpdate.bind(this, State.Ended)
+      this.onStateUpdate.bind(this, State.Ended),
     );
     this.element.addEventListener(
       'playing',
-      this.onStateUpdate.bind(this, State.Playing)
+      this.onStateUpdate.bind(this, State.Playing),
     );
     this.element.addEventListener(
       'pause',
-      this.onStateUpdate.bind(this, State.Paused)
+      this.onStateUpdate.bind(this, State.Paused),
     );
     this.player!.addEventListener(
       'loading',
-      this.onStateUpdate.bind(this, State.Loading)
+      this.onStateUpdate.bind(this, State.Loading),
     );
     this.player!.addEventListener(
       'loaded',
-      this.onStateUpdate.bind(this, State.Ready)
+      this.onStateUpdate.bind(this, State.Ready),
     );
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.player!.addEventListener('buffering', ({ buffering }: any) => {
