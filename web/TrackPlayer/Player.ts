@@ -1,6 +1,7 @@
-import { State } from '../../src/constants/State';
-import type { PlaybackState, Progress, Track } from '../../src/features';
+import { State } from './State';
+import type { PlaybackState, Progress, Track, State as StateType } from '../../src/features';
 import { SetupNotCalledError } from './SetupNotCalledError';
+import type shaka from 'shaka-player/dist/shaka-player.ui';
 
 export class Player {
   protected hasInitialized = false;
@@ -115,7 +116,7 @@ export class Player {
   /**
    * event handlers
    */
-  protected onStateUpdate(state: Exclude<State, State.Error>) {
+  protected onStateUpdate(state: Exclude<StateType, 'error'>) {
     this.state = { state };
   }
 

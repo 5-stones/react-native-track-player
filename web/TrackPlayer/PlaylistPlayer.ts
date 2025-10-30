@@ -1,7 +1,7 @@
 import { Player } from './Player';
+import { State } from './State';
 
-import { State } from '../../src/constants/State';
-import type { Track } from '../../src/features';
+import type { Track, State as StateType, RepeatMode as RepeatModeType } from '../../src/features';
 import { RepeatMode } from './RepeatMode';
 
 export class PlaylistPlayer extends Player {
@@ -9,9 +9,9 @@ export class PlaylistPlayer extends Player {
   protected playlist: Track[] = [];
   protected lastIndex?: number;
   protected _currentIndex?: number;
-  protected repeatMode: RepeatMode = RepeatMode.Off;
+  protected repeatMode: RepeatModeType = RepeatMode.Off;
 
-  protected onStateUpdate(state: Exclude<State, State.Error>) {
+  protected onStateUpdate(state: Exclude<StateType, 'error'>) {
     super.onStateUpdate(state);
 
     if (state === State.Ended) {
@@ -120,12 +120,12 @@ export class PlaylistPlayer extends Player {
     this.goToIndex(index, initialPosition);
   }
 
-  public getTrack(index: number): Track | null {
+  public getTrack(index: number): Track | undefined {
     const track = this.playlist[index];
-    return track || null;
+    return track;
   }
 
-  public setRepeatMode(mode: RepeatMode) {
+  public setRepeatMode(mode: RepeatModeType) {
     this.repeatMode = mode;
   }
 
