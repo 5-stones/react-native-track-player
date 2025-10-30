@@ -1,19 +1,122 @@
 import { Platform } from 'react-native';
 
 import TrackPlayer from '../NativeTrackPlayer';
-import type {
-  AndroidAudioContentType,
-  IOSCategory,
-  IOSCategoryMode,
-  IOSCategoryOptions,
-  IOSCategoryPolicy
-} from '../constants';
 
 const isAndroid = Platform.OS === 'android';
 
 // MARK: - Types
 
-export type ServiceHandler = () => Promise<void>;
+/**
+ * AndroidAudioContentType options:
+ * - `'music'`: Content type value to use when the content type is music. See
+ *   https://developer.android.com/reference/android/media/AudioAttributes#CONTENT_TYPE_MUSIC
+ * - `'speech'`: Content type value to use when the content type is speech. See
+ *   https://developer.android.com/reference/android/media/AudioAttributes#CONTENT_TYPE_SPEECH
+ * - `'sonification'`: Content type value to use when the content type is a
+ *   sound used to accompany a user action, such as a beep or sound effect
+ *   expressing a key click, or event, such as the type of a sound for a bonus
+ *   being received in a game. These sounds are mostly synthesized or short
+ *   Foley sounds. See
+ *   https://developer.android.com/reference/android/media/AudioAttributes#CONTENT_TYPE_SONIFICATION
+ * - `'movie'`: Content type value to use when the content type is a soundtrack,
+ *   typically accompanying a movie or TV program.
+ * - `'unknown'`: Content type value to use when the content type is unknown, or
+ *   other than the ones defined. See
+ *   https://developer.android.com/reference/android/media/AudioAttributes#CONTENT_TYPE_UNKNOWN
+ */
+export type AndroidAudioContentType = 'music' | 'speech' | 'sonification' | 'movie' | 'unknown';
+
+/**
+ * IOSCategory options:
+ * - `'playback'`: The category for playing recorded music or other sounds that
+ *   are central to the successful use of your app. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/category/1616509-playback
+ * - `'playAndRecord'`: The category for recording (input) and playback (output)
+ *   of audio, such as for a Voice over Internet Protocol (VoIP) app. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/category/1616568-playandrecord
+ * - `'multiRoute'`: The category for routing distinct streams of audio data to
+ *   different output devices at the same time. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/category/1616484-multiroute
+ * - `'ambient'`: The category for an app in which sound playback is nonprimary
+ *   — that is, your app also works with the sound turned off. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/category/1616560-ambient
+ * - `'soloAmbient'`: The default audio session category. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/category/1616488-soloambient
+ * - `'record'`: The category for recording audio while also silencing playback
+ *   audio. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/category/1616451-record
+ */
+export type IOSCategory = 'playback' | 'playAndRecord' | 'multiRoute' | 'ambient' | 'soloAmbient' | 'record';
+
+/**
+ * IOSCategoryMode options:
+ * - `'default'`: The default audio session mode. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/mode/1616579-default
+ * - `'gameChat'`: A mode that the GameKit framework sets on behalf of an
+ *   application that uses GameKit's voice chat service. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/mode/1616511-gamechat
+ * - `'measurement'`: A mode that indicates that your app is performing
+ *   measurement of audio input or output. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/mode/1616608-measurement
+ * - `'moviePlayback'`: A mode that indicates that your app is playing back
+ *   movie content. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/mode/1616623-movieplayback
+ * - `'spokenAudio'`: A mode used for continuous spoken audio to pause the audio
+ *   when another app plays a short audio prompt. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/mode/1616510-spokenaudio
+ * - `'videoChat'`: A mode that indicates that your app is engaging in online
+ *   video conferencing. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/mode/1616590-videochat
+ * - `'videoRecording'`: A mode that indicates that your app is recording a
+ *   movie. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/mode/1616535-videorecording
+ * - `'voiceChat'`: A mode that indicates that your app is performing two-way
+ *   voice communication, such as using Voice over Internet Protocol (VoIP). See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/mode/1616455-voicechat
+ * - `'voicePrompt'`: A mode that indicates that your app plays audio using
+ *   text-to-speech. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/mode/2962803-voiceprompt
+ */
+export type IOSCategoryMode = 'default' | 'gameChat' | 'measurement' | 'moviePlayback' | 'spokenAudio' | 'videoChat' | 'videoRecording' | 'voiceChat' | 'voicePrompt';
+
+/**
+ * IOSCategoryOptions options:
+ * - `'mixWithOthers'`: An option that indicates whether audio from this session
+ *   mixes with audio from active sessions in other audio apps. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions/1616611-mixwithothers
+ * - `'duckOthers'`: An option that reduces the volume of other audio sessions
+ *   while audio from this session plays. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions/1616618-duckothers
+ * - `'interruptSpokenAudioAndMixWithOthers'`: An option that determines whether
+ *   to pause spoken audio content from other sessions when your app plays its
+ *   audio. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions/1616534-interruptspokenaudioandmixwithot
+ * - `'allowBluetooth'`: An option that determines whether Bluetooth hands-free
+ *   devices appear as available input routes. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions/1616518-allowbluetooth
+ * - `'allowBluetoothA2DP'`: An option that determines whether you can stream
+ *   audio from this session to Bluetooth devices that support the Advanced
+ *   Audio Distribution Profile (A2DP). See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions/1771735-allowbluetootha2dp
+ * - `'allowAirPlay'`: An option that determines whether you can stream audio
+ *   from this session to AirPlay devices. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions/1771736-allowairplay
+ * - `'defaultToSpeaker'`: An option that determines whether audio from the
+ *   session defaults to the built-in speaker instead of the receiver. See
+ *   https://developer.apple.com/documentation/avfaudio/avaudiosession/categoryoptions/1616462-defaulttospeaker
+ */
+export type IOSCategoryOptions = 'mixWithOthers' | 'duckOthers' | 'interruptSpokenAudioAndMixWithOthers' | 'allowBluetooth' | 'allowBluetoothA2DP' | 'allowAirPlay' | 'defaultToSpeaker';
+
+/**
+ * IOSCategoryPolicy options:
+ * - `'default'`: See
+ *   https://developer.apple.com/documentation/avfoundation/avaudiosession/routesharingpolicy/default
+ * - `'longFormAudio'`: See
+ *   https://developer.apple.com/documentation/avfoundation/avaudiosession/routesharingpolicy/longformaudio
+ * - `'longFormVideo'`: See
+ *   https://developer.apple.com/documentation/avfoundation/avaudiosession/routesharingpolicy/longformvideo
+ */
+export type IOSCategoryPolicy = 'default' | 'longFormAudio' | 'longFormVideo';
 
 export interface AndroidAudioOffloadSettings {
   /**

@@ -1,8 +1,9 @@
-import { RatingType } from '../constants';
 import TrackPlayer from '../NativeTrackPlayer';
 import resolveAssetSource from '../resolveAssetSource';
 
 // MARK: - Types
+
+export type RatingType = 'heart' | 'thumbs-up-down' | '3-stars' | '4-stars' | '5-stars' | 'percentage';
 
 export interface TrackMetadataBase {
   /** The track title */

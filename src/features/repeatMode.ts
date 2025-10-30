@@ -1,6 +1,16 @@
 import TrackPlayer from '../NativeTrackPlayer';
-import type { RepeatMode } from '../constants';
 import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
+
+// MARK: - Types
+
+/**
+ * RepeatMode options:
+ * - `'off'`: Playback stops when the last track in the queue has finished
+ *   playing.
+ * - `'track'`: Repeats the current track infinitely during ongoing playback.
+ * - `'queue'`: Repeats the entire queue infinitely.
+ */
+export type RepeatMode = 'off' | 'track' | 'queue';
 
 // MARK: - Getters
 

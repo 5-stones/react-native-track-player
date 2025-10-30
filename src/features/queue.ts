@@ -1,9 +1,20 @@
-import { PitchAlgorithm, TrackType } from '../constants';
 import TrackPlayer from '../NativeTrackPlayer';
 import resolveAssetSource from '../resolveAssetSource';
 import type { TrackMetadataBase } from './metadata';
 
 // MARK: - Types
+
+export type TrackType = 'default' | 'dash' | 'hls' | 'smoothstreaming';
+
+/**
+ * PitchAlgorithm options:
+ * - `'linear'`: A high-quality time pitch algorithm that doesn't perform pitch
+ *   correction.
+ * - `'music'`: A highest-quality time pitch algorithm that's suitable for
+ *   music.
+ * - `'voice'`: A modest quality time pitch algorithm that's suitable for voice.
+ */
+export type PitchAlgorithm = 'linear' | 'music' | 'voice';
 
 export type ResourceObject = number;
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import TrackPlayer, { AppKilledPlaybackBehavior, Capability } from 'react-native-track-player';
+import TrackPlayer from 'react-native-track-player';
 import { tracks } from '../services';
 
 export function useSetupPlayer() {
@@ -15,24 +15,23 @@ export function useSetupPlayer() {
       }
       TrackPlayer.updateOptions({
         android: {
-          appKilledPlaybackBehavior:
-            AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
+          appKilledPlaybackBehavior: 'stop-playback-and-remove-notification',
           notificationCapabilities: [
-            Capability.Play,
-            Capability.Pause,
-            Capability.SeekTo,
-            Capability.SkipToNext,
-            Capability.SkipToPrevious,
+            'play',
+            'pause',
+            'seek-to',
+            'skip-to-next',
+            'skip-to-previous',
           ],
         },
         capabilities: [
-          Capability.Play,
-          Capability.Pause,
-          Capability.SkipToNext,
-          Capability.SkipToPrevious,
-          Capability.SeekTo,
-          Capability.JumpBackward,
-          Capability.JumpForward,
+          'play',
+          'pause',
+          'skip-to-next',
+          'skip-to-previous',
+          'seek-to',
+          'jump-backward',
+          'jump-forward',
         ],
         progressUpdateEventInterval: 2
       });

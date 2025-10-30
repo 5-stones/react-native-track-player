@@ -8,9 +8,45 @@ sidebar_position: 9
 
 ### General Changes
 
-- `androidAudioContentType` behavior: With the removal of `autoHandleInterruptions`, the `androidAudioContentType` option now directly controls Android's audio focus behavior. When set to `AndroidAudioContentType.Speech`, audio will be paused during short interruptions (like message notifications). When set to `AndroidAudioContentType.Music` (default), the playback volume is reduced while notifications play.
+**Enums converted to union types**: All enums have been converted to string union types for better tree-shaking and bundle size optimization. This is a breaking change that requires updating enum property access to string literals.
 
-- **iOS category policy restriction**: The `IOSCategoryPolicy.Independent` option has been removed as Apple's documentation states "Apps shouldn't try to set this value directly" - it's intended for system use only. Use `IOSCategoryPolicy.Default` or `IOSCategoryPolicy.LongFormAudio` instead.
+**Before (v4):**
+```typescript
+import { RepeatMode, State, Capability } from 'react-native-track-player';
+
+// Enum property access
+TrackPlayer.setRepeatMode(RepeatMode.Track);
+const isPlaying = state === State.Playing;
+const capabilities = [Capability.Play, Capability.Pause];
+```
+
+**After (v5):**
+```typescript
+import type { RepeatMode, State, Capability } from 'react-native-track-player';
+
+// String literal values
+TrackPlayer.setRepeatMode('track');
+const isPlaying = state === 'playing';
+const capabilities = ['play', 'pause'];
+```
+
+**Migration**: Replace all enum property access with their corresponding string literal values:
+- `RepeatMode.Off` → `'off'`
+- `RepeatMode.Track` → `'track'`
+- `RepeatMode.Queue` → `'queue'`
+- `State.Playing` → `'playing'`
+- `State.Paused` → `'paused'`
+- `State.Error` → `'error'`
+- `Capability.Play` → `'play'`
+- `Capability.Pause` → `'pause'`
+- `Capability.SkipToNext` → `'skip-to-next'`
+- And so on for all enum values...
+
+Note: Types can now be imported as `type` imports since they're no longer runtime values.
+
+- `androidAudioContentType` behavior: With the removal of `autoHandleInterruptions`, the `androidAudioContentType` option now directly controls Android's audio focus behavior. When set to `'speech'`, audio will be paused during short interruptions (like message notifications). When set to `'music'` (default), the playback volume is reduced while notifications play.
+
+- **iOS category policy restriction**: The `'independent'` option has been removed as Apple's documentation states "Apps shouldn't try to set this value directly" - it's intended for system use only. Use `'default'` or `'longFormAudio'` instead.
 
 - **Platform options moved to namespaces**: Platform-specific configuration options have been moved under their respective namespaces for better organization and consistency.
 
@@ -37,10 +73,10 @@ sidebar_position: 9
     maxBuffer: 50,
     playBuffer: 2.5,
     backBuffer: 0,
-    androidAudioContentType: AndroidAudioContentType.Music,
-    iosCategory: IOSCategory.Playback,
-    iosCategoryMode: IOSCategoryMode.Default,
-    iosCategoryOptions: [IOSCategoryOptions.AllowBluetooth],
+    androidAudioContentType: 'music',
+    iosCategory: 'playback',
+    iosCategoryMode: 'default',
+    iosCategoryOptions: ['allowBluetooth'],
     android: {
       // other Android options
     }
@@ -48,7 +84,7 @@ sidebar_position: 9
 
   // updateOptions
   TrackPlayer.updateOptions({
-    capabilities: [Capability.Play, Capability.Pause],
+    capabilities: ['play', 'pause'],
     likeOptions: { isActive: false, title: 'Like' },
     dislikeOptions: { isActive: false, title: 'Dislike' },
     bookmarkOptions: { isActive: false, title: 'Bookmark' }
@@ -63,20 +99,20 @@ sidebar_position: 9
       maxBuffer: 50,
       playBuffer: 2.5,
       backBuffer: 0,
-      audioContentType: AndroidAudioContentType.Music,
+      audioContentType: 'music',
       // other Android options
     },
     ios: {
-      category: IOSCategory.Playback,
-      categoryMode: IOSCategoryMode.Default,
-      categoryOptions: [IOSCategoryOptions.AllowBluetooth],
+      category: 'playback',
+      categoryMode: 'default',
+      categoryOptions: ['allowBluetooth'],
       // other iOS options
     }
   });
 
   // updateOptions
   TrackPlayer.updateOptions({
-    capabilities: [Capability.Play, Capability.Pause],
+    capabilities: ['play', 'pause'],
     ios: {
       likeOptions: { isActive: false, title: 'Like' },
       dislikeOptions: { isActive: false, title: 'Dislike' },
@@ -100,7 +136,7 @@ const options = TrackPlayer.getOptions();
 ```typescript
 // Default capabilities include basic playback controls
 const options = TrackPlayer.getOptions();
-// options.capabilities === [Capability.Play, Capability.Pause, Capability.SkipToNext, Capability.SkipToPrevious, Capability.SeekTo]
+// options.capabilities === ['play', 'pause', 'skip-to-next', 'skip-to-previous', 'seek-to']
 ```
 
 **Migration**: If you specifically want no capabilities (unusual), explicitly set an empty array:
@@ -113,17 +149,17 @@ TrackPlayer.updateOptions({ capabilities: [] });
 **Before (v4):**
 ```typescript
 TrackPlayer.updateOptions({
-  capabilities: [Capability.Play, Capability.Pause],
-  notificationCapabilities: [Capability.Play, Capability.Pause, Capability.SkipToNext], // top-level
+  capabilities: ['play', 'pause'],
+  notificationCapabilities: ['play', 'pause', 'skip-to-next'], // top-level
 });
 ```
 
 **After (v5):**
 ```typescript
 TrackPlayer.updateOptions({
-  capabilities: [Capability.Play, Capability.Pause],
+  capabilities: ['play', 'pause'],
   android: {
-    notificationCapabilities: [Capability.Play, Capability.Pause, Capability.SkipToNext], // moved to android.*
+    notificationCapabilities: ['play', 'pause', 'skip-to-next'], // moved to android.*
   }
 });
 ```
@@ -299,7 +335,7 @@ function MyComponent() {
   
   useTrackPlayerEvents([Event.PlaybackState, Event.PlaybackActiveTrackChanged], (event) => {
     if (event.type === Event.PlaybackState) {
-      setIsPlaying(event.state === State.Playing);
+      setIsPlaying(event.state === 'playing');
     } else if (event.type === Event.PlaybackActiveTrackChanged) {
       setTrackTitle(event.track?.title || '');
     }
@@ -312,13 +348,13 @@ function MyComponent() {
 **After (v5):**
 ```typescript
 import { usePlaybackState, useActiveTrack } from 'react-native-track-player';
-import { State } from 'react-native-track-player';
+import type { State } from 'react-native-track-player';
 
 function MyComponent() {
   const playbackState = usePlaybackState();
   const activeTrack = useActiveTrack();
   
-  const isPlaying = playbackState.state === State.Playing;
+  const isPlaying = playbackState.state === 'playing';
   const trackTitle = activeTrack?.title || '';
   
   return <Text>{isPlaying ? 'Playing' : 'Paused'}: {trackTitle}</Text>;

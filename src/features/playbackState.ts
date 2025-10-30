@@ -1,16 +1,36 @@
-import { State } from '../constants';
 import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
 import TrackPlayer from '../NativeTrackPlayer';
 import type { PlaybackErrorEvent } from './errors';
 
 // MARK: - Types
 
+/**
+ * State options:
+ * - `'none'`: Indicates that the player is idle (initial state, or no track
+ *   loaded)
+ * - `'ready'`: Indicates that the player has loaded a track and is ready to
+ *   play (but paused)
+ * - `'playing'`: Indicates that the player is currently playing
+ * - `'paused'`: Indicates that the player is currently paused
+ * - `'stopped'`: Indicates that the player is currently stopped
+ * - `'loading'`: Indicates that the initial load of the item is occurring.
+ * - `'buffering'`: Indicates that the player is currently loading more data
+ *   before it can continue playing or is ready to start playing.
+ * - `'error'`: Indicates that playback of the current item failed. Call
+ *   `TrackPlayer.getError()` to get more information on the type of error that
+ *   occurred. Call `TrackPlayer.retry()` or `TrackPlayer.play()` to try to play
+ *   the item again.
+ * - `'ended'`: Indicates that playback stopped due to the end of the queue
+ *   being reached.
+ */
+export type State = 'none' | 'ready' | 'playing' | 'paused' | 'stopped' | 'loading' | 'buffering' | 'error' | 'ended';
+
 export type PlaybackState =
   | {
-      state: Exclude<State, State.Error>;
+      state: Exclude<State, 'error'>;
     }
   | {
-      state: State.Error;
+      state: 'error';
       error: PlaybackErrorEvent;
     };
 

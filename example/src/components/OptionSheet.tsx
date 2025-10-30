@@ -1,8 +1,8 @@
 import { Children, type ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import TrackPlayer, {
-  AppKilledPlaybackBehavior,
-  RepeatMode,
+  type AppKilledPlaybackBehavior,
+  type RepeatMode,
   useOptions,
   useRepeatMode,
 } from 'react-native-track-player';
@@ -17,12 +17,12 @@ export function OptionSheet() {
       <Options
         label="Repeat Mode"
         options={[
-          { label: 'Off', value: RepeatMode.Off },
-          { label: 'Track', value: RepeatMode.Track },
-          { label: 'Queue', value: RepeatMode.Queue },
+          { label: 'Off', value: 'off' },
+          { label: 'Track', value: 'track' },
+          { label: 'Queue', value: 'queue' },
         ]}
         value={currentRepeatMode}
-        onSelect={(repeatMode) => {
+        onSelect={(repeatMode: RepeatMode) => {
           TrackPlayer.setRepeatMode(repeatMode);
         }}
       />
@@ -33,19 +33,18 @@ export function OptionSheet() {
           options={[
             {
               label: 'Continue',
-              value: AppKilledPlaybackBehavior.ContinuePlayback,
+              value: 'continue-playback',
             },
-            { label: 'Pause', value: AppKilledPlaybackBehavior.PausePlayback },
+            { label: 'Pause', value: 'pause-playback' },
             {
               label: 'Stop & Remove',
-              value:
-                AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
+              value: 'stop-playback-and-remove-notification',
             },
           ]}
           value={
             currentOptions.android.appKilledPlaybackBehavior
           }
-          onSelect={(appKilledPlaybackBehavior) => {
+          onSelect={(appKilledPlaybackBehavior: AppKilledPlaybackBehavior) => {
             TrackPlayer.updateOptions({
               android: {
                 appKilledPlaybackBehavior,

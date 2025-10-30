@@ -1,13 +1,26 @@
-import type {
-  AppKilledPlaybackBehavior,
-  Capability,
-  RatingType,
-  RepeatMode
-} from '../constants';
+import type { RepeatMode } from './repeatMode';
 import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
 import TrackPlayer from '../NativeTrackPlayer';
+import type { RatingType } from './metadata';
 
 // MARK: - Types
+
+export type Capability = 'play' | 'play-from-id' | 'play-from-search' | 'pause' | 'stop' | 'seek-to' | 'skip' | 'skip-to-next' | 'skip-to-previous' | 'jump-forward' | 'jump-backward' | 'set-rating';
+
+/**
+ * AppKilledPlaybackBehavior options:
+ * - `'continue-playback'`: This option will continue playing audio in the
+ *   background when the app is removed from recents. The notification remains.
+ *   This is the default.
+ * - `'pause-playback'`: This option will pause playing audio in the background
+ *   when the app is removed from recents. The notification remains and can be
+ *   used to resume playback.
+ * - `'stop-playback-and-remove-notification'`: This option will stop playing
+ *   audio in the background when the app is removed from recents. The
+ *   notification is removed and can't be used to resume playback. Users would
+ *   need to open the app again to start playing audio.
+ */
+export type AppKilledPlaybackBehavior = 'continue-playback' | 'pause-playback' | 'stop-playback-and-remove-notification';
 
 /**
  * Current player options with resolved defaults.
