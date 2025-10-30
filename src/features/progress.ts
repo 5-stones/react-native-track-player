@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 
+import { useUpdatedNativeValue } from '../hooks/useUpdatedNativeValue';
 import TrackPlayer from '../NativeTrackPlayer';
+import { onPlaybackState } from './playbackState';
 
 // MARK: - Types
 
@@ -47,47 +49,76 @@ export function getProgress(): Progress {
  * @returns Cleanup function to unsubscribe
  */
 export function onProgressUpdated(
-  callback: (event: PlaybackProgressUpdatedEvent) => void
+  callback: (event: PlaybackProgressUpdatedEvent) => void,
 ): () => void {
   return TrackPlayer.onPlaybackProgressUpdated(callback as () => void).remove;
 }
 
 // MARK: - Hooks
 
-export interface UseProgressOptions {
-  /** Update interval in milliseconds */
-  updateInterval?: number;
+/**
+ * Hook that returns the current playback progress and updates when it changes.
+ *
+ * Progress update frequency is controlled globally via `updateOptions({ progressUpdateEventInterval })`.
+ * @returns The current playback progress
+ */
+export function useProgress(): Progress {
+  return useUpdatedNativeValue(getProgress, onProgressUpdated);
 }
 
 /**
- * Hook that returns the current playback progress and updates periodically.
- * @param options - Configuration options
+ * Hook that returns the current playback progress and updates via polling.
+ *
+ * Use this when you need custom polling behavior instead of event-based updates.
+ *
+ * @param updateInterval - Update interval in milliseconds (default: 1000)
  * @returns The current playback progress
  */
-export function useProgress(options?: UseProgressOptions): Progress {
-  const [state, setState] = useState(getProgress);
+export function usePolledProgress(updateInterval = 1000): Progress {
+  const [state, setState] = useState<Progress>({
+    position: 0,
+    duration: 0,
+    buffered: 0,
+  });
 
   useEffect(() => {
-    const unsubscribe = onProgressUpdated(setState);
+    let mounted = true;
 
-    // Also poll for progress updates since events may not fire frequently enough
-    const interval =
-      options?.updateInterval ??
-      (typeof options?.updateInterval === 'number' ? 0 : 1000);
+    const update = () => {
+      try {
+        const { position, duration, buffered } = getProgress();
+        if (!mounted) return;
 
-    if (interval > 0) {
-      const id = setInterval(() => {
-        setState(getProgress());
-      }, interval);
+        setState((currentState) =>
+          position === currentState.position &&
+          duration === currentState.duration &&
+          buffered === currentState.buffered
+            ? currentState
+            : { position, duration, buffered },
+        );
+      } catch {
+        // Ignore failures (e.g., before setup)
+      }
+    };
 
-      return () => {
-        unsubscribe();
-        clearInterval(id);
-      };
-    }
+    // Update immediately on playback state changes
+    const unsubscribeState = onPlaybackState(update);
 
-    return unsubscribe;
-  }, [options?.updateInterval]);
+    const poll = () => {
+      update();
+      if (!mounted) return;
+      setTimeout(() => {
+        if (mounted) poll();
+      }, updateInterval);
+    };
+
+    poll();
+
+    return () => {
+      mounted = false;
+      unsubscribeState();
+    };
+  }, [updateInterval]);
 
   return state;
 }

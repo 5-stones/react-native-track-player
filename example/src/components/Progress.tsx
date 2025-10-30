@@ -1,10 +1,10 @@
 import Slider from '@react-native-community/slider';
 import { Dimensions, StyleSheet, Text, View } from 'react-native';
-import TrackPlayer, { useProgress } from 'react-native-track-player';
+import TrackPlayer, { usePolledProgress } from 'react-native-track-player';
 import { Spacer } from './Spacer';
 
 export function Progress({ live }: { live?: boolean }) {
-  const { position, duration } = useProgress();
+  const { position, duration } = usePolledProgress();
 
   // This is a workaround since the slider component only takes absolute widths
   const progressBarWidth = Dimensions.get('window').width * 0.92;

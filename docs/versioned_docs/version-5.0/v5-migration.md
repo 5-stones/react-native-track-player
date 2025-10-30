@@ -166,6 +166,58 @@ TrackPlayer.updateOptions({
 
 ### Hook Behavior Updates
 
+**`useProgress` hook simplified**: The `useProgress` hook no longer accepts configuration options and now uses event-based updates for optimal performance. This change makes `useProgress()` consistent with all other hooks in the library (like `usePlaybackState()`, `useActiveTrack()`, etc.) which use the same `useUpdatedNativeValue` pattern. For custom polling behavior, use the new `usePolledProgress` hook.
+
+**Before (v4):**
+```typescript
+import { useProgress } from 'react-native-track-player';
+
+function MyComponent() {
+  // Custom polling interval
+  const { position, duration } = useProgress(500); // 500ms polling
+  
+  return <Text>{Math.round(position)}s / {Math.round(duration)}s</Text>;
+}
+```
+
+**After (v5):**
+```typescript
+import { useProgress, usePolledProgress, updateOptions } from 'react-native-track-player';
+
+// Configure progress update frequency globally (affects all useProgress() hooks)
+updateOptions({
+  progressUpdateEventInterval: 0.5 // 500ms updates from native events
+});
+
+function MyComponent() {
+  // Event-based updates (recommended) - uses global progressUpdateEventInterval
+  const { position, duration } = useProgress();
+  
+  // OR custom polling if needed (ignores global config)
+  const { position, duration } = usePolledProgress(500); // 500ms polling
+  
+  return <Text>{Math.round(position)}s / {Math.round(duration)}s</Text>;
+}
+```
+
+**How `useProgress()` is configured:**
+- **Global configuration**: Set `progressUpdateEventInterval` in `updateOptions()` to control how often native progress events are fired
+- **All `useProgress()` hooks** across your app will receive updates at this frequency
+- **No per-hook configuration** - this promotes consistency and better performance
+- **Default frequency**: Uses the native player's default interval if not specified
+- **Consistent architecture**: `useProgress()` now follows the same `useUpdatedNativeValue` pattern as `usePlaybackState()`, `useActiveTrack()`, and all other hooks
+
+**Why split into two hooks?**
+- **`useProgress()`**: Event-based, consistent with library patterns, optimal performance
+- **`usePolledProgress()`**: Custom polling for edge cases that need different update frequencies, useful for component-specific update rates or smooth animations, and automatically stops polling when the component unmounts
+- **Separation of concerns**: Standard use cases get the optimized path, special cases get flexibility
+
+**Migration**: 
+- Replace `useProgress(interval)` with `usePolledProgress(interval)` if you need custom polling for specific components
+- Use `useProgress()` (no arguments) for standard event-based updates, which provides better performance
+- Configure global progress update frequency via `updateOptions({ progressUpdateEventInterval })` instead of per-hook
+- Set `progressUpdateEventInterval: null` to disable progress events entirely
+
 ### Player Method Updates
 
 ### Player State Updates
@@ -365,6 +417,7 @@ function MyComponent() {
 - `usePlaybackState()` - Current playback state (playing, paused, etc.)
 - `useActiveTrack()` - Currently active track
 - `useProgress()` - Playback progress (position, duration, buffered)
+- `usePolledProgress(interval?)` - Playback progress with custom polling interval
 - `usePlayWhenReady()` - Play when ready state
 - `useVolume()` - Current volume level
 - `useRate()` - Current playback rate
