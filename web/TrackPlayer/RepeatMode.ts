@@ -1,4 +1,4 @@
-import type { RepeatMode as RepeatModeType } from "../../src/features";
+import type { RepeatMode as RepeatModeType } from '../../src/features';
 
 export const RepeatMode = {
   Off: 'off' as const,

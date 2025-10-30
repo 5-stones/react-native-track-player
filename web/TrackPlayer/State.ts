@@ -1,4 +1,4 @@
-import type { State as StateType } from "../../src/features";
+import type { State as StateType } from '../../src/features';
 
 export const State = {
   None: 'none' as const,

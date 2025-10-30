@@ -1,5 +1,10 @@
 import { State } from './State';
-import type { PlaybackState, Progress, Track, State as StateType } from '../../src/features';
+import type {
+  PlaybackState,
+  Progress,
+  Track,
+  State as StateType,
+} from '../../src/features';
 import { SetupNotCalledError } from './SetupNotCalledError';
 import type shaka from 'shaka-player/dist/shaka-player.ui';
 
@@ -142,16 +147,12 @@ export class Player {
    * behavior is intentional as it mirrors what happens in Android. State
    * changes should be captured by event listeners.
    */
-  public load(
-    track: Track,
-    onComplete?: (track: Track) => void,
-  ) {
+  public load(track: Track, onComplete?: (track: Track) => void) {
     if (!this.player) throw new SetupNotCalledError();
-    this.player.load(track.url as string)
-      .then(() => {
-        this.current = track;
-        onComplete?.(track)
-      });
+    this.player.load(track.url as string).then(() => {
+      this.current = track;
+      onComplete?.(track);
+    });
   }
 
   /**
@@ -162,8 +163,7 @@ export class Player {
   public stop(onComplete?: () => void) {
     if (!this.player) throw new SetupNotCalledError();
     this.current = undefined;
-    this.player.unload()
-      .then(() => onComplete?.());
+    this.player.unload().then(() => onComplete?.());
   }
 
   /**

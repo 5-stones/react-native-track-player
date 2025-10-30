@@ -32,7 +32,9 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
     capabilities: [], // irrelevant in web-world
   };
 
-  private addStubListener() { return this.emitter.addListener('_', () => { }); }
+  private addStubListener() {
+    return this.emitter.addListener('_', () => {});
+  }
 
   // observe and emit state changes
   protected get state(): PlaybackState {
@@ -40,10 +42,10 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
   }
   protected set state(newState: PlaybackState) {
     const didStateChange = newState.state !== super.state.state;
-    const didErrorChange
-      = newState.state === State.Error && super.state.state === State.Error
-      ? newState.error === super.state.error
-      : false;
+    const didErrorChange =
+      newState.state === State.Error && super.state.state === State.Error
+        ? newState.error === super.state.error
+        : false;
 
     super.state = newState;
 
@@ -55,7 +57,7 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
     this.emitter.emit(Event.PlaybackState, newState);
     if (newState.state === State.Error) {
       const event: PlaybackErrorEvent = {
-        error: newState.error.error
+        error: newState.error.error,
       };
       this.emitter.emit(Event.PlaybackError, event);
     }
@@ -114,11 +116,21 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
   /****************************************
    * MARK: events
    ****************************************/
-  public onAndroidControllerConnected() { return this.addStubListener(); }
-  public onAndroidControllerDisconnected() { return this.addStubListener(); }
-  public onMetadataChapterReceived() { return this.addStubListener(); }
-  public onMetadataCommonReceived() { return this.addStubListener(); }
-  public onMetadataTimedReceived() { return this.addStubListener(); }
+  public onAndroidControllerConnected() {
+    return this.addStubListener();
+  }
+  public onAndroidControllerDisconnected() {
+    return this.addStubListener();
+  }
+  public onMetadataChapterReceived() {
+    return this.addStubListener();
+  }
+  public onMetadataCommonReceived() {
+    return this.addStubListener();
+  }
+  public onMetadataTimedReceived() {
+    return this.addStubListener();
+  }
 
   public onPlaybackActiveTrackChanged(callback: (event: object) => void) {
     return this.emitter.addListener(Event.PlaybackActiveTrackChanged, callback);
@@ -128,39 +140,42 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
     return this.emitter.addListener(Event.PlaybackError, callback);
   }
 
-  public onPlaybackMetadata() { return this.addStubListener(); }
-
-  public onPlaybackPlayWhenReadyChanged(
-    callback: (event: { playWhenReady: boolean; }) => void
-  ) {
-    return this.emitter.addListener(Event.PlaybackPlayWhenReadyChanged, callback);
+  public onPlaybackMetadata() {
+    return this.addStubListener();
   }
 
-  public onPlaybackPlayingState(
-    callback: (state: PlayingState) => void
+  public onPlaybackPlayWhenReadyChanged(
+    callback: (event: { playWhenReady: boolean }) => void,
   ) {
+    return this.emitter.addListener(
+      Event.PlaybackPlayWhenReadyChanged,
+      callback,
+    );
+  }
+
+  public onPlaybackPlayingState(callback: (state: PlayingState) => void) {
     return this.emitter.addListener(
       Event.PlaybackState,
       (state: PlaybackState) => {
         return callback(this.getPlayingState(state));
-      }
+      },
     );
   }
 
   public onPlaybackProgressUpdated(
-    callback: (event: PlaybackProgressUpdatedEvent) => void
+    callback: (event: PlaybackProgressUpdatedEvent) => void,
   ) {
     return this.emitter.addListener(Event.PlaybackProgressUpdated, callback);
   }
 
   public onPlaybackQueueEnded(
-    callback: (event: PlaybackQueueEndedEvent) => void
+    callback: (event: PlaybackQueueEndedEvent) => void,
   ) {
     return this.emitter.addListener(Event.PlaybackQueueEnded, callback);
   }
 
   public onPlaybackRepeatModeChanged(
-    callback: (event: RepeatModeChangedEvent) => void
+    callback: (event: RepeatModeChangedEvent) => void,
   ) {
     return this.emitter.addListener(Event.PlaybackRepeatModeChanged, callback);
   }
@@ -169,21 +184,51 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
     return this.emitter.addListener(Event.PlaybackState, callback);
   }
 
-  public onRemoteBookmark() { return this.addStubListener(); }
-  public onRemoteDislike() { return this.addStubListener(); }
-  public onRemoteJumpBackward() { return this.addStubListener(); }
-  public onRemoteJumpForward() { return this.addStubListener(); }
-  public onRemoteLike() { return this.addStubListener(); }
-  public onRemoteNext() { return this.addStubListener(); }
-  public onRemotePause() { return this.addStubListener(); }
-  public onRemotePlay() { return this.addStubListener(); }
-  public onRemotePlayId() { return this.addStubListener(); }
-  public onRemotePlaySearch() { return this.addStubListener(); }
-  public onRemotePrevious() { return this.addStubListener(); }
-  public onRemoteSeek() { return this.addStubListener(); }
-  public onRemoteSetRating() { return this.addStubListener(); }
-  public onRemoteSkip() { return this.addStubListener(); }
-  public onRemoteStop() { return this.addStubListener(); }
+  public onRemoteBookmark() {
+    return this.addStubListener();
+  }
+  public onRemoteDislike() {
+    return this.addStubListener();
+  }
+  public onRemoteJumpBackward() {
+    return this.addStubListener();
+  }
+  public onRemoteJumpForward() {
+    return this.addStubListener();
+  }
+  public onRemoteLike() {
+    return this.addStubListener();
+  }
+  public onRemoteNext() {
+    return this.addStubListener();
+  }
+  public onRemotePause() {
+    return this.addStubListener();
+  }
+  public onRemotePlay() {
+    return this.addStubListener();
+  }
+  public onRemotePlayId() {
+    return this.addStubListener();
+  }
+  public onRemotePlaySearch() {
+    return this.addStubListener();
+  }
+  public onRemotePrevious() {
+    return this.addStubListener();
+  }
+  public onRemoteSeek() {
+    return this.addStubListener();
+  }
+  public onRemoteSetRating() {
+    return this.addStubListener();
+  }
+  public onRemoteSkip() {
+    return this.addStubListener();
+  }
+  public onRemoteStop() {
+    return this.addStubListener();
+  }
 
   public onOptionsChanged(callback: (event: Options) => void) {
     return this.emitter.addListener(Event.PlaybackOptionsChanged, callback);
@@ -192,10 +237,7 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
   /****************************************
    * MARK: player api
    ****************************************/
-  public load(
-    track: Track,
-    onComplete?: (track: Track) => void,
-  ) {
+  public load(track: Track, onComplete?: (track: Track) => void) {
     if (!this.element) throw new SetupNotCalledError();
     const lastTrack = this.current;
     const lastPosition = this.element.currentTime;
@@ -262,7 +304,7 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
     const curState = state ? state.state : this.state.state;
     return {
       playing: curState === State.Playing,
-      buffering: curState === State.Buffering
+      buffering: curState === State.Buffering,
     };
   }
 
@@ -344,11 +386,17 @@ export class TrackPlayerModule extends PlaylistPlayer implements Spec {
   /****************************************
    * MARK: Media Browser Methods
    ****************************************/
-  public onGetItemRequest() { return this.addStubListener(); }
+  public onGetItemRequest() {
+    return this.addStubListener();
+  }
   public resolveGetItemRequest() {}
-  public onGetChildrenRequest() { return this.addStubListener(); }
+  public onGetChildrenRequest() {
+    return this.addStubListener();
+  }
   public resolveGetChildrenRequest() {}
-  public onGetSearchResultRequest() { return this.addStubListener(); }
+  public onGetSearchResultRequest() {
+    return this.addStubListener();
+  }
   public resolveSearchResultRequest() {}
   public setMediaBrowserReady() {}
 }

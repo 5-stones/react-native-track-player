@@ -1,7 +1,11 @@
 import { Player } from './Player';
 import { State } from './State';
 
-import type { Track, State as StateType, RepeatMode as RepeatModeType } from '../../src/features';
+import type {
+  Track,
+  State as StateType,
+  RepeatMode as RepeatModeType,
+} from '../../src/features';
 import { RepeatMode } from './RepeatMode';
 
 export class PlaylistPlayer extends Player {

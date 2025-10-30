@@ -8,4 +8,4 @@ export enum Event {
   PlaybackError = 'playback-error',
   PlaybackRepeatModeChanged = 'playback-repeat-mode-changed',
   PlaybackOptionsChanged = 'playback-options-changed',
-};
+}
