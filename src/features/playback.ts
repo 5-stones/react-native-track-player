@@ -1,5 +1,4 @@
 import TrackPlayer from '../NativeTrackPlayer';
-import { getPlaybackState } from './playbackState';
 
 // MARK: - Playback Controls
 
