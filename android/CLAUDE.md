@@ -100,7 +100,6 @@ class EXO,JS platform
 - **event/** - Comprehensive event types for all player interactions
   - Playback events (PlaybackErrorEvent, PlaybackProgressUpdatedEvent, etc.)
   - Remote control events (RemoteSeekEvent, RemoteJumpForwardEvent, etc.)
-  - Controller events (ControllerConnectedEvent, ControllerDisconnectedEvent)
 
 ### Data Models
 - **model/** - Data structures and configuration

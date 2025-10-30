@@ -498,13 +498,6 @@ class TrackPlayerModule(reactContext: ReactApplicationContext) :
         emitOnRemoteSetRating(event.toBridge())
       }
 
-      override fun onControllerConnected(event: ControllerConnectedEvent) {
-        emitOnAndroidControllerConnected(event.toBridge())
-      }
-
-      override fun onControllerDisconnected(event: ControllerDisconnectedEvent) {
-        emitOnAndroidControllerDisconnected(event.toBridge())
-      }
 
       override fun onOptionsChanged(options: PlayerUpdateOptions) {
         emitOnOptionsChanged(options.toBridge())

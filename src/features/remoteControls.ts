@@ -66,21 +66,6 @@ export interface RemoteSkipEvent {
   index: number;
 }
 
-/**
- * Android controller connected event.
- */
-export interface AndroidControllerConnectedEvent {
-  /** Name of the connected controller */
-  name: string;
-}
-
-/**
- * Android controller disconnected event.
- */
-export interface AndroidControllerDisconnectedEvent {
-  /** Name of the disconnected controller */
-  name: string;
-}
 
 // MARK: - Default Handlers
 
@@ -425,26 +410,3 @@ export function onRemoteStop(callback: () => void): () => void {
   return TrackPlayer.onRemoteStop(callback).remove;
 }
 
-/**
- * Subscribes to Android controller connected events.
- * @param callback - Called when an Android controller (media notification or Android Auto) connects
- * @returns Cleanup function to unsubscribe
- */
-export function onAndroidControllerConnected(
-  callback: (event: AndroidControllerConnectedEvent) => void,
-): () => void {
-  return TrackPlayer.onAndroidControllerConnected(callback as () => void)
-    .remove;
-}
-
-/**
- * Subscribes to Android controller disconnected events.
- * @param callback - Called when an Android controller (media notification or Android Auto) disconnects
- * @returns Cleanup function to unsubscribe
- */
-export function onAndroidControllerDisconnected(
-  callback: (event: AndroidControllerDisconnectedEvent) => void,
-): () => void {
-  return TrackPlayer.onAndroidControllerDisconnected(callback as () => void)
-    .remove;
-}

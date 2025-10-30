@@ -1,8 +1,6 @@
 package com.doublesymmetry.trackplayer
 
 import androidx.media3.common.Metadata
-import com.doublesymmetry.trackplayer.event.ControllerConnectedEvent
-import com.doublesymmetry.trackplayer.event.ControllerDisconnectedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackActiveTrackChangedEvent
 import com.doublesymmetry.trackplayer.event.PlaybackErrorEvent
 import com.doublesymmetry.trackplayer.event.PlaybackPlayWhenReadyChangedEvent
@@ -64,10 +62,6 @@ interface TrackPlayerCallbacks {
 
   fun onRemoteSetRating(event: RemoteSetRatingEvent)
 
-  // Android-specific events
-  fun onControllerConnected(event: ControllerConnectedEvent)
-
-  fun onControllerDisconnected(event: ControllerDisconnectedEvent)
 
   // Configuration events
   fun onOptionsChanged(options: PlayerUpdateOptions)
