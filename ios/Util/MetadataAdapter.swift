@@ -18,7 +18,7 @@ class MetadataAdapter {
     for metadataItem in items {
       var rawMetadataItem: [String: Any] = [:]
 
-      if CMTIME_IS_VALID(metadataItem.time) && CMTIME_IS_NUMERIC(metadataItem.time) {
+      if CMTIME_IS_VALID(metadataItem.time), CMTIME_IS_NUMERIC(metadataItem.time) {
         rawMetadataItem["time"] = metadataItem.time.seconds
       }
 

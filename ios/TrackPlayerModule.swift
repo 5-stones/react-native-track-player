@@ -225,11 +225,12 @@ public class NativeTrackPlayerImpl: NSObject {
 
       // Check if remote command related properties actually changed
       if previousCapabilities != self.updateOptions.capabilities ||
-         previousForwardJumpInterval != self.updateOptions.forwardJumpInterval ||
-         previousBackwardJumpInterval != self.updateOptions.backwardJumpInterval ||
-         previousLikeOptions != self.updateOptions.likeOptions ||
-         previousDislikeOptions != self.updateOptions.dislikeOptions ||
-         previousBookmarkOptions != self.updateOptions.bookmarkOptions {
+        previousForwardJumpInterval != self.updateOptions.forwardJumpInterval ||
+        previousBackwardJumpInterval != self.updateOptions.backwardJumpInterval ||
+        previousLikeOptions != self.updateOptions.likeOptions ||
+        previousDislikeOptions != self.updateOptions.dislikeOptions ||
+        previousBookmarkOptions != self.updateOptions.bookmarkOptions
+      {
         self.player.remoteCommands = self.updateOptions.capabilities
           .map { capability in
             capability.mapToPlayerCommand(
@@ -242,7 +243,8 @@ public class NativeTrackPlayerImpl: NSObject {
           }
       }
 
-      let progressIntervalChanged = previousProgressInterval != self.updateOptions.progressUpdateEventInterval
+      let progressIntervalChanged = previousProgressInterval != self.updateOptions
+        .progressUpdateEventInterval
       if progressIntervalChanged {
         self.player.setProgressUpdateInterval(self.updateOptions.progressUpdateEventInterval)
       }
@@ -254,11 +256,11 @@ public class NativeTrackPlayerImpl: NSObject {
 
       // Only emit options changed event if something actually changed
       let remoteCommandsChanged = previousCapabilities != self.updateOptions.capabilities ||
-                                  previousForwardJumpInterval != self.updateOptions.forwardJumpInterval ||
-                                  previousBackwardJumpInterval != self.updateOptions.backwardJumpInterval ||
-                                  previousLikeOptions != self.updateOptions.likeOptions ||
-                                  previousDislikeOptions != self.updateOptions.dislikeOptions ||
-                                  previousBookmarkOptions != self.updateOptions.bookmarkOptions
+        previousForwardJumpInterval != self.updateOptions.forwardJumpInterval ||
+        previousBackwardJumpInterval != self.updateOptions.backwardJumpInterval ||
+        previousLikeOptions != self.updateOptions.likeOptions ||
+        previousDislikeOptions != self.updateOptions.dislikeOptions ||
+        previousBookmarkOptions != self.updateOptions.bookmarkOptions
 
       if remoteCommandsChanged || progressIntervalChanged || repeatModeChanged {
         self.onOptionsChanged(self.updateOptions)
@@ -459,7 +461,6 @@ public class NativeTrackPlayerImpl: NSObject {
       self.player.reload(startFromCurrentTime: true)
     }
   }
-
 
   @objc
   public func setVolume(level: Float) {
@@ -796,7 +797,6 @@ public class NativeTrackPlayerImpl: NSObject {
   func emitOptionsChanged(_ body: [String: Any])
 }
 
-
 // MARK: - TrackPlayerCallbacks Implementation
 
 extension NativeTrackPlayerImpl: TrackPlayerCallbacks {
@@ -938,5 +938,4 @@ extension NativeTrackPlayerImpl: TrackPlayerCallbacks {
   public func onOptionsChanged(_ options: PlayerUpdateOptions) {
     delegate?.emitOptionsChanged(options.toBridge())
   }
-
 }

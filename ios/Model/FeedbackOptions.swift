@@ -13,8 +13,9 @@ public struct FeedbackOptions: Equatable {
   }
 
   public static func fromBridge(_ dict: [String: Any]?) -> FeedbackOptions? {
-    guard let dict = dict,
-          let title = dict["title"] as? String else {
+    guard let dict,
+          let title = dict["title"] as? String
+    else {
       return nil
     }
 
@@ -25,7 +26,7 @@ public struct FeedbackOptions: Equatable {
   public func toBridge() -> [String: Any] {
     return [
       "isActive": isActive,
-      "title": title
+      "title": title,
     ]
   }
 }

@@ -10,7 +10,7 @@ public class PlayerUpdateOptions {
   /// Jump intervals
   public var forwardJumpInterval: Double = 15.0
   public var backwardJumpInterval: Double = 15.0
-  public var progressUpdateEventInterval: Double? = nil
+  public var progressUpdateEventInterval: Double?
 
   /// Rating and capabilities
   public var capabilities: [Capability] = [
@@ -18,16 +18,16 @@ public class PlayerUpdateOptions {
     .pause,
     .next,
     .previous,
-    .seek
+    .seek,
   ]
 
   /// Repeat mode
   public var repeatMode: RepeatMode = .off
 
   /// iOS-specific options
-  public var likeOptions: FeedbackOptions = FeedbackOptions(title: "Like")
-  public var dislikeOptions: FeedbackOptions = FeedbackOptions(title: "Dislike")
-  public var bookmarkOptions: FeedbackOptions = FeedbackOptions(title: "Bookmark")
+  public var likeOptions: FeedbackOptions = .init(title: "Like")
+  public var dislikeOptions: FeedbackOptions = .init(title: "Dislike")
+  public var bookmarkOptions: FeedbackOptions = .init(title: "Bookmark")
 
   // MARK: - Initialization
 
@@ -51,7 +51,6 @@ public class PlayerUpdateOptions {
       }
     }
 
-
     // Update capabilities
     if let caps = options["capabilities"] as? [String] {
       var updatedCapabilities = caps.compactMap { Capability(rawValue: $0) }
@@ -61,7 +60,6 @@ public class PlayerUpdateOptions {
       }
       capabilities = updatedCapabilities
     }
-
 
     // Update repeat mode
     if options.keys.contains("repeatMode") {
@@ -75,15 +73,18 @@ public class PlayerUpdateOptions {
     // Update iOS-specific options
     if let iosOptions = options["ios"] as? [String: Any] {
       if let likeDict = iosOptions["likeOptions"] as? [String: Any],
-         let like = FeedbackOptions.fromBridge(likeDict) {
+         let like = FeedbackOptions.fromBridge(likeDict)
+      {
         likeOptions = like
       }
       if let dislikeDict = iosOptions["dislikeOptions"] as? [String: Any],
-         let dislike = FeedbackOptions.fromBridge(dislikeDict) {
+         let dislike = FeedbackOptions.fromBridge(dislikeDict)
+      {
         dislikeOptions = dislike
       }
       if let bookmarkDict = iosOptions["bookmarkOptions"] as? [String: Any],
-         let bookmark = FeedbackOptions.fromBridge(bookmarkDict) {
+         let bookmark = FeedbackOptions.fromBridge(bookmarkDict)
+      {
         bookmarkOptions = bookmark
       }
     }
@@ -103,11 +104,9 @@ public class PlayerUpdateOptions {
       result["progressUpdateEventInterval"] = NSNull()
     }
 
-
     // Add capabilities (always include, filter out auto-added toggle-play-pause)
-    let filteredCapabilities = capabilities.filter { $0 != .togglePlayPause }.map { $0.rawValue }
+    let filteredCapabilities = capabilities.filter { $0 != .togglePlayPause }.map(\.rawValue)
     result["capabilities"] = filteredCapabilities
-
 
     // Add repeat mode (always include)
     result["repeatMode"] = repeatMode.rawValue
@@ -116,13 +115,11 @@ public class PlayerUpdateOptions {
     result["ios"] = [
       "likeOptions": likeOptions.toBridge(),
       "dislikeOptions": dislikeOptions.toBridge(),
-      "bookmarkOptions": bookmarkOptions.toBridge()
+      "bookmarkOptions": bookmarkOptions.toBridge(),
     ]
 
     return result
   }
 
   // MARK: - Convenience Methods
-
-
 }
