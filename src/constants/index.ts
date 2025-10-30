@@ -1,7 +1,6 @@
 export * from './AndroidAudioContentType';
 export * from './AppKilledPlaybackBehavior';
 export * from './Capability';
-export * from './Event';
 export * from './IOSCategory';
 export * from './IOSCategoryMode';
 export * from './IOSCategoryOptions';
