@@ -21,7 +21,6 @@ export default defineConfig([
       prettier,
     },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'error',
       'react/react-in-jsx-scope': 'off',
       'prettier/prettier': [
         'error',
@@ -36,9 +35,18 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/**/*.ts', 'src/**/*.tsx', 'web/**/*.ts', 'web/**/*.tsx'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'error',
+    },
+  },
+  {
     ignores: [
-      'node_modules/',
-      'lib/'
+      '**/node_modules/',
+      'lib/',
+      '**/ios/',
+      '**/android/',
+      '**/.bundle/',
     ],
   },
 ]);

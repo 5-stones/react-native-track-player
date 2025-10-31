@@ -11,8 +11,10 @@
     "start": "next start",
     "e2e": "start-server-and-test http://localhost:3000 \"cypress open --e2e\"",
     "e2e:headless": "start-server-and-test http://localhost:3000 \"cypress run --e2e\"",
-    "lint": "eslint --max-warnings=0 .",
-    "format": "prettier --write --list-different ."
+    "lint": "eslint --fix components pages",
+    "lint:check": "eslint --max-warnings=0 components pages",
+    "format": "prettier --write components pages",
+    "format:check": "prettier --check components pages"
   },
   "dependencies": {
     "common-app": "workspace:*",

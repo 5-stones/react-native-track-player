@@ -3,10 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "format:fix": "prettier --write src",
-    "format": "prettier --check src",
-    "lint:fix": "eslint src --fix",
-    "lint": "eslint src --max-warnings=0",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src",
+    "lint": "eslint src --fix",
+    "lint:check": "eslint src --max-warnings=0",
     "start": "react-native start",
     "types": "tsc --noEmit true"
   },
