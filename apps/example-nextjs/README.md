@@ -80,10 +80,9 @@ apps/example-nextjs/
 The app uses Next.js dynamic imports to avoid SSR issues:
 
 ```javascript
-const AudioPlayer = dynamic(
-  () => import('../components/AudioPlayer'),
-  { ssr: false }
-);
+const AudioPlayer = dynamic(() => import('../components/AudioPlayer'), {
+  ssr: false,
+});
 ```
 
 This ensures TrackPlayer only loads client-side where browser APIs are available.
@@ -126,11 +125,13 @@ Initializes TrackPlayer and loads the queue:
 ### AudioPlayer
 
 Main UI with:
+
 - Track info and artwork
 - Progress bar
 - Playback controls (play/pause/skip)
 
 Uses TrackPlayer hooks:
+
 - `useActiveTrack()` - Current track info
 - `useProgress()` - Playback progress
 - `usePlaybackState()` - Player state
@@ -158,13 +159,13 @@ yarn dev
 
 ## Web vs Native Differences
 
-| Feature | Web | Native |
-|---------|-----|--------|
-| Background playback | Limited | Full |
-| Lock screen controls | No | Yes |
-| Notifications | No | Yes |
-| Car integration | No | Yes |
-| Audio formats | Browser-dependent | Platform-dependent |
+| Feature              | Web               | Native             |
+| -------------------- | ----------------- | ------------------ |
+| Background playback  | Limited           | Full               |
+| Lock screen controls | No                | Yes                |
+| Notifications        | No                | Yes                |
+| Car integration      | No                | Yes                |
+| Audio formats        | Browser-dependent | Platform-dependent |
 
 ## Resources
 

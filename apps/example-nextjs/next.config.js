@@ -17,14 +17,14 @@ const config = {
     'react-native-web',
     'react-native',
   ],
-  webpack(config, { isServer }) {
+  webpack(webpackConfig, { isServer }) {
     if (disableMinification) {
-      config.optimization.minimizer = [];
+      webpackConfig.optimization.minimizer = [];
     }
 
     // Configure aliases - must be done for both client and server
-    config.resolve.alias = {
-      ...(config.resolve.alias || {}),
+    webpackConfig.resolve.alias = {
+      ...(webpackConfig.resolve.alias || {}),
       // Ensure single React instance
       'react': path.resolve(__dirname, 'node_modules/react'),
       'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
@@ -32,11 +32,14 @@ const config = {
       'react-native$': path.resolve(__dirname, 'react-native-shim.js'),
       'react-native': path.resolve(__dirname, 'react-native-shim.js'),
       // Use web-specific implementation for TrackPlayer (compiled)
-      'react-native-track-player$': path.resolve(__dirname, '../../lib/module/index.js'),
+      'react-native-track-player$': path.resolve(
+        __dirname,
+        '../../lib/module/index.js',
+      ),
     };
 
     // Ensure proper extensions
-    config.resolve.extensions = [
+    webpackConfig.resolve.extensions = [
       '.web.tsx',
       '.web.ts',
       '.web.jsx',
@@ -47,13 +50,23 @@ const config = {
       '.js',
       '.json',
       '.wasm',
-      ...(config.resolve.extensions || []).filter(
-        ext => !['.web.tsx', '.web.ts', '.web.jsx', '.web.js', '.tsx', '.ts', '.jsx', '.js'].includes(ext)
+      ...(webpackConfig.resolve.extensions || []).filter(
+        (ext) =>
+          ![
+            '.web.tsx',
+            '.web.ts',
+            '.web.jsx',
+            '.web.js',
+            '.tsx',
+            '.ts',
+            '.jsx',
+            '.js',
+          ].includes(ext),
       ),
     ];
 
     // Add font file loader for react-native-vector-icons
-    config.module.rules.push({
+    webpackConfig.module.rules.push({
       test: /\.(ttf|otf|eot|woff|woff2)$/,
       type: 'asset/resource',
       generator: {
@@ -62,7 +75,7 @@ const config = {
     });
 
     // Add audio/video file loader
-    config.module.rules.push({
+    webpackConfig.module.rules.push({
       test: /\.(mp3|mp4|m4a|wav|ogg|webm)$/,
       type: 'asset/resource',
       generator: {
@@ -70,7 +83,7 @@ const config = {
       },
     });
 
-    return config;
+    return webpackConfig;
   },
 };
 

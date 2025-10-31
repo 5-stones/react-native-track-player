@@ -1,3 +1,4 @@
+/* eslint-disable react-native/no-inline-styles */
 import { Children } from 'react';
 import Document, { Html, Head, Main, NextScript } from 'next/document';
 import { AppRegistry } from 'react-native';

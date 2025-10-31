@@ -19,5 +19,5 @@ module.exports = getConfig(
       ],
     ],
   },
-  { root, pkg }
+  { root, pkg },
 );

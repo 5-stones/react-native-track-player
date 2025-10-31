@@ -24,5 +24,4 @@ export function installListeners() {
   TrackPlayer.onMetadataCommonReceived((event) => {
     console.log('onMetadataCommonReceived', event);
   });
-
 }
